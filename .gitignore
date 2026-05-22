@@ -1,0 +1,8 @@
+.DS_Store
+**/ .DS_Store
+*.log
+__pycache__/
+**/__pycache__/
+code/config.json
+code/daily_cache.json
+code/daily_cache.json
