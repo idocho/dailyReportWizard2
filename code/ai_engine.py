@@ -202,7 +202,7 @@ def _call_ai_hub(engine_type, api_key, prompt, max_tokens=300, temperature=0.5):
             "Content-Type":      "application/json"
         }
         body = {
-            "model":      "claude-3-5-sonnet-20241022",  # 문장력 감성 1티어
+            "model":      "claude-sonnet-4-5",  #  최신 Sonnet (2025)
             "max_tokens":  max_tokens,
             "temperature": temperature,
             "messages":    [{"role": "user", "content": prompt}]
