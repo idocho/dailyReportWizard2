@@ -28,7 +28,7 @@ _UNDERSTAND_TEXT = {
 _UNDERSTAND_SUB_TEXT = {
     "self_solve": "막힌 문제를 스스로 돌파하는 모습이 있었음",
     "retry":      "틀린 문제를 다시 풀며 오답을 점검함",
-    "confused":   "이전에 배운 개념과 혼동하는 부분이 관찰됨",
+    "confused":   "개념 정착에 조금 더 시간이 필요한 부분이 있었음 (참고용, 직접 언급 자제)",
 }
 _ENGAGE_TEXT = {
     "present":  "수업 중 발표에 적극 참여함",
@@ -41,6 +41,11 @@ _CAUTION_TEXT = {
     "phone":    "수업 집중도 저하",
     "chat":     "수업 참여도 저하",
     "attitude": "수업 태도 개선 필요",
+}
+_EXTRA_TEXT = {
+    "self_study":  "자율학습을 실시함",
+    "weekly_test": "주간 테스트를 실시함",
+    "retest":      "재시험을 실시함",
 }
 
 
@@ -71,11 +76,6 @@ def _build_obs_context(obs: dict) -> str:
     if caution_keys:
         lines.append("- 오늘 전반적인 집중도가 평소보다 낮은 편이었음 (참고용, 직접 언급 자제)")
 
-    _EXTRA_TEXT = {
-        "self_study":  "자율학습을 실시함",
-        "weekly_test": "주간 테스트를 실시함",
-        "retest":      "재시험을 실시함",
-    }
     extra_notes = [_EXTRA_TEXT[k] for k in (obs.get("extra") or []) if k in _EXTRA_TEXT]
     if extra_notes:
         lines.append(f"- 특수 이벤트: {', '.join(extra_notes)}")
@@ -94,8 +94,7 @@ def _base_conditions() -> str:
         "   - 입력되지 않은 교재는 문장에 언급하지 마세요.\n"
         "3. 수업 관찰 및 이벤트 태그 반영 규칙 (필수):\n"
         "   - [기본 태그]: 집중도나 이해도 태그는 첫 부분에 자연스럽게 녹여내세요.\n"
-        "   - [이벤트 태그 - 자율학습/재시험]: 오늘 자율학습이나 재시험(오답 정비 등) 태그가 있다면, 이를 단순히 나열하지 말고 '수업 후 진행된 자율학습(또는 재시험)을 통해 부족한 부분을 끝까지 책임감 있게 보완했습니다'처럼 학생의 성실한 태도와 연결하여 반드시 문장 후반부에 포함시키세요.\n"
-        "4. 상황별 처리:\n"
+        "   - [이벤트 태그 - 자율학습/주간Test/재시험]: 자율학습·주간 테스트·재시험 태그가 있다면 단순 나열하지 말고, '수업 후 주간 테스트를 통해 학습 성취를 점검했습니다' 또는 '재시험으로 부족한 부분을 끝까지 책임감 있게 보완했습니다'처럼 학생의 성실한 태도와 자연스럽게 연결하여 문장 후반부에 반드시 포함시키세요.\n"        "4. 상황별 처리:\n"
         "   - 주의 태그는 직접 지적하지 말고, '조금 피곤해 보였지만 이내 집중하여~' 또는 '다음 시간에 더 몰입할 수 있도록 격려했습니다' 정도로 가볍게 다독이세요.\n"
         "   - 데이터가 완전히 비어있는 결석 상황일 때는 다정한 안부 인사와 다음 수업을 기약하는 코멘트로 대체하세요.\n"
         "5. 출력 형식: 순수 텍스트만 출력 (JSON, 마크다운, 따옴표 금지)"
@@ -103,20 +102,20 @@ def _base_conditions() -> str:
 
 
 # ── 단건 생성 프롬프트 ───────────────────────────────────────────────
-def build_single_prompt(name, textbooks, student_data, progress_data,
+def build_single_prompt(sheet, cls, name, textbooks, student_data, progress_data,
                         existing_note, obs):
     """단건 AI 생성용 프롬프트 조립 (이벤트 반영 최적화)."""
     lines = []
     for tb in textbooks:
-        val = student_data.get((None, None, name, tb), {}).get('value', '')
+        val = student_data.get((sheet, cls, name, tb), {}).get('value', '')
         if val:
-            pd_val = progress_data.get(tb, {})
+            pd_val = progress_data.get((sheet, cls, tb), {})
             lines.append(
                 f"- {tb}: 수행도={val}"
                 + (f", 진도={pd_val['progress']}" if pd_val.get('progress') else "")
                 + (f", 과제={pd_val['homework']}"  if pd_val.get('homework') else "")
             )
-    context = "\n".join(lines) if lines else "수업 진행 완료"
+context = "\n".join(lines) if lines else "오늘 수업 데이터 미입력 (결석 또는 조기 귀가 가능성 있음, 안부 인사로 대체)"
 
     obs_block = _build_obs_context(obs)
 
@@ -215,7 +214,7 @@ def _call_ai_hub(engine_type, api_key, prompt, max_tokens=300, temperature=0.5):
             "Authorization": f"Bearer {api_key}"
         }
         body = {
-            "model":       "gpt-4o",  # 육각형 올라운더 밸런스형
+            "model":       "gpt-4o-mini",  # 비용 효율 범용
             "messages":    [{"role": "user", "content": prompt}],
             "max_tokens":  max_tokens,
             "temperature": temperature
@@ -290,24 +289,14 @@ class AiEngine:
 
         app = self.app
 
-        # 컨텍스트 조립
-        lines = []
-        for tb in textbooks:
-            val = app.student_data.get((sheet, cls, name, tb), {}).get('value', '')
-            pd_val = app.progress_data.get((sheet, cls, tb), {})
-            if val:
-                lines.append(
-                    f"- {tb}: 수행도={val}"
-                    + (f", 진도={pd_val['progress']}" if pd_val.get('progress') else "")
-                    + (f", 과제={pd_val['homework']}"  if pd_val.get('homework') else "")
-                )
-        context = "\n".join(lines) if lines else "수업 진행 완료"
         existing = app.note_data.get((sheet, cls, name), {}).get('value', '').strip()
-
         obs = app.obs_data.get(f"{sheet}|{cls}|{name}", {}).get(today_key(), {})
-        
-        # 고도화된 타겟 프롬프트 생성
-        prompt = build_single_prompt(name, textbooks, app.student_data, app.progress_data, existing, obs)
+
+        # 프롬프트 생성
+        prompt = build_single_prompt(
+            sheet, cls, name, textbooks,
+            app.student_data, app.progress_data, existing, obs
+        )
 
         note_txt.config(state='normal')
         note_txt.delete('1.0', 'end')

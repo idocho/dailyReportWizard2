@@ -493,8 +493,13 @@ class App:
         self.send_status.pack(fill='x', side='bottom')
 
     def _pulse(self, on=True):
-        self._dot_c.itemconfig(self._dot_id, fill=GREEN if on else "#bbf7d0")
-        self.root.after(800, lambda: self._pulse(not on))
+        try:
+            if not self._dot_c.winfo_exists():
+                return
+            self._dot_c.itemconfig(self._dot_id, fill=GREEN if on else "#bbf7d0")
+            self.root.after(800, lambda: self._pulse(not on))
+        except Exception:
+            pass
 
     # ── 상태바 / 푸터 ────────────────────────────────────────────────
     def _build_statusbar(self):
@@ -630,27 +635,12 @@ class App:
         """
         전송 준비 완료 학생만 수집
         ─ 조건: STATUS_READY (과제수행도 완료 + 진도/과제 입력)
-        ─ 표시 필터(_populate_student_list)와 동일한 화이트리스트 방식 적용
-        ─ 부담임 담당 반 → 전송 제외
+        ─ _my_classes() 화이트리스트 + _is_sub_teacher() 부담임 제외 일관 적용
         """
         result = []
-        assignments = self.cfg.get("instructor_assignments", [])
-        assigned_cls = {a['cls'] for a in assignments if a.get('sheet') == sheet}
-        show_all = not assignments  # assignments 없으면 전체 대상
-        asgn_role_map = {(a.get('sheet',''), a.get('cls','')): a.get('role','')
-                         for a in assignments}
-
-        for cls, cls_data in self.cfg['sheets'][sheet]['classes'].items():
-            # 1차: 화이트리스트 — 내 담당 반이 아니면 제외
-            if not show_all and cls not in assigned_cls:
+        for cls, cls_data in self._my_classes(sheet):
+            if self._is_sub_teacher(sheet, cls):
                 continue
-            # 2차: 부담임 반 제외
-            role = asgn_role_map.get((sheet, cls), '')
-            if role == '부담임':
-                continue
-            if not role and cls_data.get('is_sub', False):
-                continue
-
             textbooks  = cls_data.get('textbooks', [])
             class_info = {tb: self.progress_data.get((sheet,cls,tb), {'progress':'','homework':''})
                           for tb in textbooks}
@@ -729,19 +719,6 @@ class App:
                 c, n = lst[i+1]
                 self._select_student(self.cur_sheet, c, n)
 
-    def _clear_current(self):
-        s, c, n = self.cur_sheet, self.cur_cls, self.cur_name
-        if not n: return
-        for tb in self.cfg['sheets'][s]['classes'][c].get('textbooks',[]):
-            key = (s,c,n,tb)
-            if key in self.student_data and 'widget' in self.student_data[key]:
-                self.student_data[key]['widget'].delete('1.0','end')
-                self.student_data[key]['value'] = ''
-        note_key = (s,c,n)
-        if note_key in self.note_data and 'widget' in self.note_data[note_key]:
-            self.note_data[note_key]['widget'].delete('1.0','end')
-            self.note_data[note_key]['value'] = ''
-        self._on_change()
 
     # ── 시트 전환 ────────────────────────────────────────────────────
     def _refresh_student_view(self):
@@ -822,8 +799,8 @@ class App:
                 instr_name = ""
 
             save_config(self.cfg)
-            # 학생 목록 갱신
-            self.root.after(0, lambda: self._switch_sheet(self.cur_sheet))
+            # 학생 목록 갱신 — after() 금지 (이벤트 루프 재진입 TclError 방지)
+            self._switch_sheet(self.cur_sheet)
 
             # ── 1. 학생별 수행도·특이사항 (input/ 노드) ──
             input_data = firebase_get(self.cfg, "input") or {}
