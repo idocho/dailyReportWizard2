@@ -92,7 +92,8 @@ DEFAULT_CONFIG = {
     "room_prefix":    "오직 ",
     "firebase_url":   "",
     "firebase_path":  "",
-    "groq_api_key":   "",
+    "ai_engine_type": "groq",
+    "ai_api_key":     "",
     "instructor_id":  "",
     "sheets": {
         "M": {"classes": {}},
