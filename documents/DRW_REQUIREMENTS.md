@@ -668,3 +668,14 @@ def _my_classes(self, sheet) -> list[tuple[str, dict]]:
 | 웹 카카오톡 전송 | PC 앱 전용 확정 |
 | 모바일 앱 설치형 | APK 전환 계획 없음 |
 | PDF 출력 | Analyzer 단계에서 검토 |
+
+파일: DRW_REQUIREMENTS.md
+위치: AI 프롬프트 / obs 태그 처리 관련 항목
+
+추가:
+- extra 태그 중 weekly_test는 자율학습·재시험과 동일하게
+  학생 성실도와 연결하여 문장 후반부에 자연스럽게 녹일 것
+- understand_sub의 confused 태그는 caution에 준하는 민감 태그로 분류.
+  직접 표현 금지, AI가 완곡하게만 활용
+- 단건 생성 시 수업 데이터 전체 미입력은 결석/조기귀가로 간주하여
+  안부 인사 형태로 대체 (기존 "수업 진행 완료" 폴백 제거)
