@@ -12,6 +12,8 @@ from tkinter import messagebox
 from storage import set_runtime_cwd, RUNTIME_DIR
 from app import App
 
+import ai_engine
+ai_engine.DEBUG_AI_PROMPT = "--debug-ai" in sys.argv
 
 if __name__ == '__main__':
     runtime_dir = set_runtime_cwd()
@@ -23,7 +25,7 @@ if __name__ == '__main__':
         icon_path = resource_path('drw_icon.ico')
         root.iconbitmap(icon_path)
         try:
-            from PIL import Image, ImageTk
+            from PIL import Image, ImageTk  # type: ignore
             _img   = Image.open(icon_path)
             _photo = ImageTk.PhotoImage(_img.resize((256, 256), Image.LANCZOS))
             root.wm_iconphoto(True, _photo)

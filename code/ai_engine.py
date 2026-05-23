@@ -8,10 +8,17 @@ import time
 import urllib.request
 import urllib.error
 
+# 외부(main.py)에서 주입 가능한 디버그 플래그 (기본: 비활성)
+DEBUG_AI_PROMPT: bool = False
+
 from constants import APP_VERSION, AI_COOLDOWN_GROQ, AI_COOLDOWN_PAID, TAGS
 from firebase import fetch_obs_today, today_key
 from storage import save_daily_cache
 
+def dprint(*args, **kwargs):
+    """DEBUG_AI_PROMPT 플래그가 True일 때만 출력되는 디버그 프린트."""
+    if DEBUG_AI_PROMPT:
+        print(*args, **kwargs)
 
 # ── 태그 key → 자연어 변환 테이블 ────────────────────────────────────
 _CONDITION_TEXT = {
@@ -35,12 +42,13 @@ _ENGAGE_TEXT = {
     "question": "모르는 부분을 스스로 질문함",
     "help":     "친구의 이해를 도와주는 모습이 있었음",
     "preview":  "미리 예습하고 수업에 참여함",
+    "error_fix": "풀이 오류를 스스로 발견하고 정정함",
 }
 _CAUTION_TEXT = {
-    "sleepy":   "집중력 저하",
-    "phone":    "수업 집중도 저하",
-    "chat":     "수업 참여도 저하",
+    "sleepy":   "수업 중 졸음 증상",
+    "chat":     "잡담으로 수업 참여도 저하",
     "attitude": "수업 태도 개선 필요",
+    "late":     "지각",
 }
 _EXTRA_TEXT = {
     "self_study":  "자율학습을 실시함",
@@ -72,13 +80,15 @@ def _build_obs_context(obs: dict) -> str:
     if engage_notes:
         lines.append(f"- 참여 행동: {', '.join(engage_notes)}")
 
-    caution_keys = [k for k in (obs.get("caution") or []) if k in _CAUTION_TEXT]
-    if caution_keys:
-        lines.append("- 오늘 전반적인 집중도가 평소보다 낮은 편이었음 (참고용, 직접 언급 자제)")
-
-    extra_notes = [_EXTRA_TEXT[k] for k in (obs.get("extra") or []) if k in _EXTRA_TEXT]
+    caution_notes = [_CAUTION_TEXT[k] for k in (obs.get("caution") or []) if k in _CAUTION_TEXT]
+    if caution_notes:
+        lines.append(f"- 주의 관찰 (학부모 전달용, 과도한 비난 표현 금지): {', '.join(caution_notes)}")
+        extra_notes = [_EXTRA_TEXT[k] for k in (obs.get("extra") or []) if k in _EXTRA_TEXT]
     if extra_notes:
         lines.append(f"- 특수 이벤트: {', '.join(extra_notes)}")
+    if DEBUG_AI_PROMPT:
+        print(f"[OBS DEBUG] raw={obs}")
+        print(f"[OBS DEBUG] built=\n{chr(10).join(lines) if lines else '(없음)'}")
 
     return "\n".join(lines)
 
@@ -91,8 +101,8 @@ def _base_conditions() -> str:
         "2. 금지: '어머님·학부모님' 호칭, 시스템 표현('미입력·데이터 없음' 등), "
         "제공된 데이터에 없는 사실 추가(할루시네이션) 절대 금지.\n"
         "3. 이벤트 반영: [수업 관찰 및 이벤트 정보]에 명시된 항목만 반영. "
-        "데이터에 없는 자율학습·재시험·주간테스트 등은 언급하지 마세요.\n"
-        "4. 주의 태그: 직접 지적 금지. '조금 피곤해 보였지만 이내 집중하여~' 수준으로 완곡하게.\n"
+        "이 섹션에 명시되지 않은 자율학습·재시험·주간테스트 등을 임의로 추가하지 마세요.\n"
+        "4. 주의 태그: 학부모에게 사실 전달은 가능하나 과도한 비난·단정적 표현은 금지. 사실 기반으로 자연스럽게 녹여 작성.\n"
         "5. 결석: 데이터가 없으면 안부 인사와 다음 수업 기약 코멘트로 대체.\n"
         "6. 출력: 순수 텍스트만 (JSON·마크다운·따옴표 금지). 2~3문장, 100자 내외."
     )
@@ -214,6 +224,12 @@ def _call_ai_hub(engine_type, api_key, prompt, max_tokens=300, temperature=0.5):
         }
     else:
         raise ValueError(f"지원하지 않는 엔진 선택 유형: {engine_type}")
+    
+    dprint("\n" + "="*60)
+    dprint(f"[AI DEBUG] engine={engine_type}  max_tokens={max_tokens}  temp={temperature}")
+    dprint(f"[AI DEBUG] URL: {url}")
+    dprint(f"[AI DEBUG] PROMPT ↓\n{prompt}")
+    dprint("="*60 + "\n")
 
     req = urllib.request.Request(
         url,
