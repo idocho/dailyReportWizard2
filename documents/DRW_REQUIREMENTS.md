@@ -1,7 +1,7 @@
 # DailyReportWizard — 요구사항 명세서
 
 **Crafted by IDO(idocho@kakao.com) · Powered by Claude AI**  
-**문서 버전**: 3.1 · **앱 버전**: v2.0.0 · **최종 수정**: 2026-05-23
+**문서 버전**: 3.0 · **앱 버전**: v2.0.0 · **최종 수정**: 2026-05-23
 
 ---
 
@@ -15,7 +15,6 @@
 | 1.3 | 2026-05-20 | v0.9.3 가져오기 정책 고정 / v0.9.4 웹 초기화 보안 |
 | 2.0 | 2026-05-21 | DRW 2.0 — 입력 데이터 다각화, DailyReportAnalyzer 연계 목적 |
 | 3.0 | 2026-05-23 | DRW_REQUIREMENTS + DRW2_REQUIREMENTS 통합. 모듈 구조 반영. 멀티 AI 엔진 반영. 구버전 잔재 정리 |
-| 3.1 | 2026-05-23 | 버그픽스 반영: 신규 강사 전체 학생 노출, 특이사항 Enter/이모지/Ctrl+Z/높이, 웹 교재 추가 간헐적 실패, 웹 데이터 수동 갱신 정책 명시, 초기화 접근성 |
 
 ---
 
@@ -149,14 +148,9 @@ DRW 2.0이 저장하는 수업 관찰 데이터(`obs/`)와 성적 데이터(`sco
    - ON: 초록 `"⚡ 강제 완료 (ON) — 클릭하여 해제"`
    - 부담임 반: `state='disabled'`
 4. **특이사항** — `tk.Text` 위젯
-   - 담임 반: 직접 편집 가능
-   - **Enter**: `_save_note()` 호출 후 이벤트 `break` — 줄바꿈 방지, 저장 트리거
-   - **Shift+Enter**: 줄바꿈 삽입 (`\n` insert 후 `break`)
-   - **FocusOut**: `_save_note()` 호출 (기존 유지)
-   - `undo=True` 옵션 — Ctrl+Z / Ctrl+Y 지원
-   - `font=("Segoe UI Emoji", 9)` (Windows) — 이모지 입력 지원 + surrogate pair 정규화
-   - `height=6` (기존 3에서 확장 — AI 생성 텍스트 잘림 방지)
+   - 담임 반: 직접 편집 가능. `FocusOut` 시 `note_data` 자동 저장
    - 부담임 반: `state='disabled'` (읽기 전용)
+   - Windows 이모지: `Segoe UI Emoji` 폰트 + surrogate pair 정규화
 5. **✨ AI생성 버튼**
    - 부담임 반: `state='disabled'` (`"✨ AI생성 (부담임)"`)
    - 쿨다운 중: `"⏳ Ns"` 카운트다운
@@ -221,8 +215,6 @@ DRW 2.0이 저장하는 수업 관찰 데이터(`obs/`)와 성적 데이터(`sco
 | AI 엔진 설정 | 엔진 종류 선택(groq/openai/claude) + API Key + 👁 토글 |
 | 학급·학생·교재·프리셋 | 웹 PWA 전담 안내 |
 
-> **초기화 접근**: 진도/과제 초기화 버튼은 진도입력창 하단 고정. 추가로 설정 창 하단 또는 탭바 우측에서도 접근 가능하도록 노출 위치를 확보한다.
-
 **AI 엔진 설정 저장 키**
 
 | 키 | 내용 |
@@ -247,9 +239,8 @@ DRW 2.0이 저장하는 수업 관찰 데이터(`obs/`)와 성적 데이터(`sco
 | 항목 | Windows | macOS |
 |------|---------|-------|
 | UI | ✅ | ✅ |
-| 폰트 | 맑은 고딕 / Segoe UI Emoji | Apple SD Gothic Neo |
-| 이모지 입력 | `font=("Segoe UI Emoji", 9)` + surrogate pair 정규화 | TkDefaultFont |
-| Ctrl+Z (undo) | `undo=True` | `undo=True` |
+| 폰트 | 맑은 고딕 | Apple SD Gothic Neo |
+| 이모지 입력 | Segoe UI Emoji + surrogate pair | TkDefaultFont |
 | 단축키 | Ctrl | Command |
 | 카카오톡 전송 | ✅ | ❌ (AUTOMATION=False) |
 
@@ -260,12 +251,8 @@ DRW 2.0이 저장하는 수업 관찰 데이터(`obs/`)와 성적 데이터(`sco
 ```python
 def _my_classes(self, sheet) -> list[tuple[str, dict]]:
     # assignments 있음 → 해당 sheet의 담당 반만 (부담임 포함)
-    # assignments 없음 → 빈 목록 반환 (전체 노출 금지)
+    # assignments 없음 → 해당 sheet 전체 (show_all)
 ```
-
-> **v3.1 변경**: assignments가 비어 있을 때 전체 반을 반환하던 폴백 로직 제거.  
-> 신규 강사 등록 직후 assignments가 없는 상태에서는 빈 화면이 표시되어야 한다.  
-> 강사가 담당 수업을 배정(웹 설정 > 내 담당 수업)하기 전까지 학생 목록 노출 없음.
 
 **적용 함수 목록**
 
@@ -287,15 +274,6 @@ def _my_classes(self, sheet) -> list[tuple[str, dict]]:
 | ✨ AI생성 버튼 | `state='disabled'` |
 | 전송 대상 | 제외 |
 | 전체 AI생성 대상 | 제외 |
-
-### 2.13 강사 등록 및 조회 (`_lookup_instr`)
-
-1. Firebase에서 `config/instructors/{name}` 조회
-2. **기존 강사**: assignments, presets 로드 후 적용
-3. **신규 강사**: `{"assignments": [], "presets": []}` 구조로 등록
-   - `config/sheets`는 로드해 `self.cfg['sheets']`에 반영 (학생 명단 표시 데이터 갱신 목적)
-   - 단, `instructor_assignments`는 반드시 `[]`로 설정 — **빈 assignments로 인한 전체 학생 노출 방지**
-4. 설정 완료 안내 토스트: `"신규 강사 [{name}] 등록 완료. 웹에서 담당 수업을 배정하세요."`
 
 ---
 
@@ -355,7 +333,6 @@ def _my_classes(self, sheet) -> list[tuple[str, dict]]:
 - **밀도**: 12명 이내 한 반이 스크롤 없이 한 화면에 표시 (행 높이 ≤ 54px)
 - **입력 방식**: 버튼 선택 중심, 텍스트 최소화
 - **소형 화면 차단**: 1024px 미만 전체 오버레이 마스킹
-- **"앱으로 설치" 안내**: 불필요 — 제거 또는 미노출 유지
 
 ### 4.2 레이아웃
 
@@ -495,30 +472,12 @@ def _my_classes(self, sheet) -> list[tuple[str, dict]]:
 | `drw_instr` | 현재 강사 정보 |
 | `drw_cfg` | config 로컬 캐시 |
 
-### 4.10 데이터 동기화 정책 (웹 ↔ Firebase)
-
-**자동 동기화 없음** — 웹 PWA는 localStorage 캐시를 우선 사용하며 Firebase 자동 polling을 수행하지 않는다.
-
-| 시나리오 | 조치 |
-|----------|------|
-| 태블릿에서 입력한 데이터를 다른 기기(PC 웹브라우저 등)에서 확인 | **"학생 명단 불러오기" 버튼 수동 클릭** 필요 |
-| 태블릿 → PC 앱 | 📥 데이터 가져오기 버튼으로 Firebase에서 풀 로드 |
-| 같은 기기에서 탭 새로 열기 | localStorage에서 캐시 복원 (최신 반영 여부 불확실) |
-
-> **운용 지침**: 수업 후 PC 앱에서 반드시 📥 데이터 가져오기를 실행해야 최신 입력 데이터가 반영된다.  
-> PC 웹브라우저에서 확인 시에도 "학생 명단 불러오기"로 수동 갱신이 필요하다는 점을 사용자가 인지해야 한다.
-
-### 4.11 UI 구현 규칙
+### 4.10 UI 구현 규칙
 
 **학급·교재 칩 (`buildClsAccordion`)**
 - DOM ID 미사용 → `data-sh`, `data-cls`, `data-chip-type` 어트리뷰트로 식별
   (한글 클래스명 정규화 시 동일 길이 이름 간 ID 충돌 방지)
 - `refreshTbChips` / `refreshStuChips`: `querySelector('[data-chip-type="..."]')` 방식
-
-**`addTbInline` 교재 추가 안정성**
-- `doAdd()` 실행 후 `pushCfg()` 성공/실패 여부를 `try-catch`로 확인
-- Firebase 저장 실패 시 toast 경고 출력 (`"교재 저장 실패: {error}"`)
-- `refreshTbChips` 실패(대상 DOM 없음) 시 폴백으로 `renderMain()` 호출
 
 **`ensPath(sh, cls)`**
 - 기존 클래스 객체라도 `students` / `textbooks` 배열 각각 존재 여부 별도 검사 후 초기화
@@ -561,8 +520,8 @@ def _my_classes(self, sheet) -> list[tuple[str, dict]]:
         condition:      "great" | "good" | "normal" | "bad"
         understand:     "fast" | "normal_u" | "slow"
         understand_sub: ["self_solve", "retry", "confused"]
-        engage:         ["present", "question", "help", "preview"]
-        caution:        ["sleepy", "phone", "chat", "attitude"]
+        engage:         ["present", "question", "help", "preview", "error_fix"]
+        caution:        ["sleepy", "chat", "attitude", "late"]
         extra:          ["self_study", "weekly_test", "retest"]
 
   session/                  ← 웹 쓰기 / PC 읽기
@@ -600,7 +559,7 @@ def _my_classes(self, sheet) -> list[tuple[str, dict]]:
 | 축 | 원천 | 산출 방식 |
 |---|---|---|
 | ① 수업 태도 | `condition` | 긍정(great+good) 비율 |
-| ② 참여도 | `engage` (발표+질문) | 발생 횟수 / 수업수 |
+| ② 참여도 | `engage` (발표+질문+오류정정) | 발생 횟수 / 수업수 |
 | ③ 과제 성실도 | `assign` (input/) | 성실 계열 횟수 / 수업수 |
 | ④ 이해도 | `understand` + `understand_sub` | 빠름 비율 + 긍정 태그 빈도 |
 | ⑤ 성취도 | `scores/` | 최근 시험 학급 내 백분율 |
@@ -619,13 +578,6 @@ def _my_classes(self, sheet) -> list[tuple[str, dict]]:
 | 전체 초기화 | `_my_classes()` 범위 전체 | 없음 |
 | 전송 후 자동 | student + note + force | 없음 |
 
-**초기화 접근 위치**
-
-| 위치 | 대상 |
-|------|------|
-| 진도입력창 하단 "🗑 진도/과제 초기화" 버튼 | 진도/과제 데이터만 |
-| 설정 창 하단 (추가 예정) | 전체 또는 선택적 초기화 |
-
 ### 웹 초기화 (4단계)
 
 | 레벨 | 로컬 범위 | Firebase 범위 | 권한 |
@@ -634,6 +586,18 @@ def _my_classes(self, sheet) -> list[tuple[str, dict]]:
 | Lv2 | inputData + progressData — assignments 해당 키만 | input/ + session/ — 해당 키 null PATCH | 일반 강사 |
 | Lv3 | inputData + progressData 전체 | input/ + session/ + 전 강사 assignments 초기화 | **관리자** |
 | Lv4 | 전체 | config/ + input/ + session/ 전체 | **관리자** |
+
+**caution 태그 학부모 전달 정책**
+
+| key | label | 전달 방식 |
+|---|---|---|
+| `late` | ⏰ 지각 | **직접 언급** — 시간 엄수 습관을 권유하는 수준으로 전달 |
+| `sleepy` | 💤 졸음 | **완곡** — 컨디션 관리 필요성 암시 |
+| `chat` | 🗣 잡담 | **완곡** — 집중력 유지 필요성 암시 |
+| `attitude` | 😤 태도불량 | **완곡** — 수업 참여 자세에 대한 대화 필요성 암시 |
+
+> `phone` 태그 폐기. caution은 직접 언급 금지 원칙에서 **태그별 차등 전달**로 변경.
+> `late`는 사실 관계 전달이 가능하며 훈육 메시지로 긍정적으로 활용한다.
 
 **FR-RESET 요구사항**
 
@@ -692,12 +656,10 @@ def _my_classes(self, sheet) -> list[tuple[str, dict]]:
 - `_pull_mobile_data`: Firebase config 로드 후 UI 갱신(`_switch_sheet`)은 messagebox 이후 동기 호출. `after()` 예약 금지 — 이벤트 루프 재진입으로 인한 TclError 유발
 - `_populate_student_list`: `sl_inner` 자식 파괴 전 `status_w` 해당 sheet 항목 일괄 삭제 (stale Canvas ref 방지)
 - `_update_dot`: TclError 방어 처리 필수
-- 특이사항 `tk.Text`: `undo=True` 필수. `<Return>` 바인딩 시 `return 'break'` 반환 누락 시 줄바꿈 삽입됨에 주의
 
 **웹 PWA**
 - 아코디언 상태는 `openSaIds: Set`로 DOM 재생성 후에도 복원
 - `esc(s)`: onclick 어트리뷰트 내 작은따옴표 충돌 방지 필수
-- `addTbInline`: `pushCfg()` 비동기 실패 시 toast로 사용자 안내 필수 (조용한 실패 금지)
 
 ---
 
@@ -708,9 +670,6 @@ def _my_classes(self, sheet) -> list[tuple[str, dict]]:
 | 최종 메시지 직접 수정 | 미리보기 패널 편집 가능화. AI생성 후 편집 시 재생성 경고 필요 |
 | PC 강사 배정 UI | 현재 웹에서만 가능 |
 | Firebase Security Rules | 현재 기본 설정. 최종 단계에서 강화 예정 |
-| 설정 창 초기화 버튼 추가 | 진도입력창 외에 설정 창에서도 접근 가능하도록 |
-
----
 
 ## 11. 스코프 제외
 
@@ -721,4 +680,3 @@ def _my_classes(self, sheet) -> list[tuple[str, dict]]:
 | 웹 카카오톡 전송 | PC 앱 전용 확정 |
 | 모바일 앱 설치형 | APK 전환 계획 없음 |
 | PDF 출력 | Analyzer 단계에서 검토 |
-| 웹 PWA 앱 설치 안내 | 불필요, 제거 |
