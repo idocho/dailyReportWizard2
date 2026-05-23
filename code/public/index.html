@@ -708,6 +708,7 @@ function renderSettings(mc){
         <div class="sr"><div class="sl">DB URL</div><input class="inp" id="sUrl" value="${esc(fbUrl)}" placeholder="https://your-project.firebaseio.com" type="url"></div>
         <div class="sr"><div class="sl">경로 (Secret Path)</div><input class="inp" id="sPth" value="${esc(fbPath)}" placeholder="drw_a7f3k9x2"></div>
         <div style="padding:10px 14px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn bp bsm" onclick="saveFb()">💾 저장</button><button class="btn bsm" onclick="loadCfg()">📥 학생 명단 불러오기</button></div>
+        <div style="padding:0 14px 10px;font-size:10px;color:var(--sub)">💡 다른 기기에서 입력한 데이터는 위 버튼으로 수동 갱신하세요.</div>
       </div>
     </div>
 
@@ -1094,14 +1095,14 @@ function addTbInline(sh,cls,btnEl){
   cancel.textContent='×';
   cancel.style.cssText='cursor:pointer;color:var(--gray);font-size:13px;line-height:1;';
   cancel.onclick=()=>wrapper.remove();
-  function doAdd(){
+  async function doAdd(){
     const t=inp.value.trim();
     if(!t){wrapper.remove();return;}
     ensPath(sh,cls);
     cfg.sheets[sh].classes[cls].textbooks.push(t);
     wrapper.remove();
-    refreshTbChips(sh,cls);
-    pushCfg();
+    try{refreshTbChips(sh,cls);}catch(e){renderMain();}
+    try{await pushCfg();}catch(e){toast('교재 저장 실패: '+e);}
   }
   ok.onclick=doAdd;
   inp.addEventListener('keydown',e=>{

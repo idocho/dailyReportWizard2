@@ -28,7 +28,7 @@ _UNDERSTAND_TEXT = {
 _UNDERSTAND_SUB_TEXT = {
     "self_solve": "막힌 문제를 스스로 돌파하는 모습이 있었음",
     "retry":      "틀린 문제를 다시 풀며 오답을 점검함",
-    "confused":   "개념 정착에 조금 더 시간이 필요한 부분이 있었음 (참고용, 직접 언급 자제)",
+    "confused":   "이전에 배운 개념과 혼동하는 부분이 관찰됨",
 }
 _ENGAGE_TEXT = {
     "present":  "수업 중 발표에 적극 참여함",
@@ -84,21 +84,17 @@ def _build_obs_context(obs: dict) -> str:
 
 
 def _base_conditions() -> str:
-    """모든 AI 생성 호출에 공통으로 들어가는 조건 문자열. (8B 최적화 정제 가이드라인)"""
+    """모든 AI 생성 호출에 공통으로 들어가는 조건 문자열."""
     return (
         "[작성 지침]\n"
-        "1. 톤앤매너: 학부모가 읽기에 따뜻하고 신뢰감 높은 다정한 문체 (~했어요, ~했습니다 사용)\n"
-        "2. 금지 사항:\n"
-        "   - '어머님', '학부모님' 호칭 절대 금지 (학생 이름으로 시작)\n"
-        "   - '미입력', '확인되었습니다', '데이터 없음' 등 기계적/시스템 로그 표현 절대 금지\n"
-        "   - 입력되지 않은 교재는 문장에 언급하지 마세요.\n"
-        "3. 수업 관찰 및 이벤트 태그 반영 규칙 (필수):\n"
-        "   - [기본 태그]: 집중도나 이해도 태그는 첫 부분에 자연스럽게 녹여내세요.\n"
-        "   - [이벤트 태그 - 자율학습/주간Test/재시험]: 자율학습·주간 테스트·재시험 태그가 있다면 단순 나열하지 말고, '수업 후 주간 테스트를 통해 학습 성취를 점검했습니다' 또는 '재시험으로 부족한 부분을 끝까지 책임감 있게 보완했습니다'처럼 학생의 성실한 태도와 자연스럽게 연결하여 문장 후반부에 반드시 포함시키세요.\n"
-        "4. 상황별 처리:\n"
-        "   - 주의 태그는 직접 지적하지 말고, '조금 피곤해 보였지만 이내 집중하여~' 또는 '다음 시간에 더 몰입할 수 있도록 격려했습니다' 정도로 가볍게 다독이세요.\n"
-        "   - 데이터가 완전히 비어있는 결석 상황일 때는 다정한 안부 인사와 다음 수업을 기약하는 코멘트로 대체하세요.\n"
-        "5. 출력 형식: 순수 텍스트만 출력 (JSON, 마크다운, 따옴표 금지)"
+        "1. 문체: ~했습니다 체로 통일 (했어요 혼용 금지). 학생 이름으로 시작.\n"
+        "2. 금지: '어머님·학부모님' 호칭, 시스템 표현('미입력·데이터 없음' 등), "
+        "제공된 데이터에 없는 사실 추가(할루시네이션) 절대 금지.\n"
+        "3. 이벤트 반영: [수업 관찰 및 이벤트 정보]에 명시된 항목만 반영. "
+        "데이터에 없는 자율학습·재시험·주간테스트 등은 언급하지 마세요.\n"
+        "4. 주의 태그: 직접 지적 금지. '조금 피곤해 보였지만 이내 집중하여~' 수준으로 완곡하게.\n"
+        "5. 결석: 데이터가 없으면 안부 인사와 다음 수업 기약 코멘트로 대체.\n"
+        "6. 출력: 순수 텍스트만 (JSON·마크다운·따옴표 금지). 2~3문장, 100자 내외."
     )
 
 
@@ -116,23 +112,22 @@ def build_single_prompt(sheet, cls, name, textbooks, student_data, progress_data
                 + (f", 진도={pd_val['progress']}" if pd_val.get('progress') else "")
                 + (f", 과제={pd_val['homework']}"  if pd_val.get('homework') else "")
             )
-    context = "\n".join(lines) if lines else "오늘 수업 데이터 미입력 (결석 또는 조기 귀가 가능성 있음, 안부 인사로 대체)"
+    context = "\n".join(lines) if lines else "수업 진행 완료"
 
     obs_block = _build_obs_context(obs)
 
     prompt = (
-        "수학학원 교사가 학부모에게 보낼 데일리 리포트 '특이사항'을 작성합니다.\n"
-        "오늘 진행된 수업 내용과 자율학습/재시험 등의 활동 내용을 유기적으로 연결하여 완성도 높은 문장을 만들어 주세요.\n\n"
-        f"[학생 정보]\n- 이름: {name}\n\n"
+        "수학학원 교사가 학부모에게 보낼 데일리 리포트 특이사항을 작성합니다.\n"
+        "아래 제공된 데이터만을 근거로 작성하고, 데이터에 없는 내용은 절대 추가하지 마세요.\n\n"
+        f"[학생 이름]\n{name}\n\n"
         f"[수업 데이터]\n{context}\n\n"
     )
     if obs_block:
         prompt += f"[수업 관찰 및 이벤트 정보]\n{obs_block}\n\n"
     if existing_note:
-        prompt += f"[기존 특이사항]\n{existing_note}\n\n"
-        
-    prompt += f"{_base_conditions()}\n\n"
-    prompt += "핵심 내용(수업 성취 + 자율/재시험 행동)을 모아 깔끔하게 3문장 내외로 작성해 주세요."
+        prompt += f"[기존 특이사항 참고]\n{existing_note}\n\n"
+
+    prompt += f"{_base_conditions()}"
     return prompt
 
 
@@ -161,16 +156,13 @@ def build_batch_prompt(targets):
     students_json = json.dumps(students_payload, ensure_ascii=False, indent=2)
 
     prompt = (
-        "수학학원 교사가 여러 명의 학생들을 위한 데일리 리포트 '특이사항'을 일괄 작성합니다.\n"
-        "제공된 데이터 속 '수업관찰및이벤트'에 자율학습이나 재시험 관련 내용이 있다면 이를 놓치지 말고 리포트 문장에 녹여내야 합니다.\n\n"
-        f"{_base_conditions()}\n"
-        "6. 추가 지침:\n"
-        "   - 학생당 분량은 2~3문장으로 제한합니다.\n"
-        "   - '수업 내용(앞부분) + 자율학습/재시험 성과(뒷부분)'의 흐름으로 문장이 꼬이지 않고 깔끔하게 이어지도록 하세요.\n\n"
-        "⚠️ 주의: 반드시 아래 지정된 JSON 배열 형식으로만 응답해야 합니다.\n"
-        "포맷 예시:\n"
-        '[{"cls":"반명","name":"이름","note":"여기에 수업 성취와 자율/재시험 결과가 균형 있게 정제된 특이사항 작성"}, ...]\n\n'
-        f"[학생들 데이터]\n{students_json}"
+        "수학학원 교사가 학부모용 데일리 리포트 특이사항을 일괄 작성합니다.\n"
+        "⚠️ 각 학생의 '수업관찰및이벤트' 필드에 명시된 항목만 반영하세요. "
+        "필드에 없는 자율학습·재시험·주간테스트 등은 절대 언급하지 마세요.\n\n"
+        f"{_base_conditions()}\n\n"
+        "⚠️ 반드시 JSON 배열로만 응답 (다른 텍스트 금지):\n"
+        '[{"cls":"반명","name":"이름","note":"특이사항"}, ...]\n\n'
+        f"[학생데이터]\n{students_json}"
     )
     return prompt
 
@@ -202,7 +194,7 @@ def _call_ai_hub(engine_type, api_key, prompt, max_tokens=300, temperature=0.5):
             "Content-Type":      "application/json"
         }
         body = {
-            "model":      "claude-sonnet-4-5",  #  최신 Sonnet (2025)
+            "model":      "claude-sonnet-4-5",            # 최신 Sonnet
             "max_tokens":  max_tokens,
             "temperature": temperature,
             "messages":    [{"role": "user", "content": prompt}]

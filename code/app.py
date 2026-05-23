@@ -143,6 +143,10 @@ class App:
                   bg="#E2E8F0", fg=SUBTEXT, relief='flat', cursor='hand2',
                   command=self._open_settings
                   ).pack(side='right', padx=4, pady=3)
+        tk.Button(bar, text="🗑 초기화", font=FS,
+                  bg="#E2E8F0", fg="#EF4444", relief='flat', cursor='hand2',
+                  command=self._open_reset_dialog
+                  ).pack(side='right', padx=0, pady=3)
         tk.Button(bar, text="📥 데이터 가져오기", font=FS,
                   bg=GREEN, fg='white', relief='flat', cursor='hand2',
                   command=self._pull_mobile_data
@@ -423,8 +427,11 @@ class App:
 
         # Text 위젯 — 담임: 편집 가능 / 부담임: 읽기 전용
         is_sub = self._is_sub_teacher(sheet, cls)
-        note_txt = tk.Text(pad, font=FE, bg="#F8FAFC", fg=TEXT,
-                           relief='flat', wrap='word', height=3,
+        import sys as _sys
+        _note_font = ("Segoe UI Emoji", 9) if _sys.platform == "win32" else FE
+        note_txt = tk.Text(pad, font=_note_font, bg="#F8FAFC", fg=TEXT,
+                           relief='flat', wrap='word', height=6,
+                           undo=True,
                            highlightbackground=BORDER, highlightthickness=1,
                            padx=6, pady=4)
         note_txt.pack(fill='x', pady=(0, 2))
@@ -436,7 +443,7 @@ class App:
             note_txt.config(state='disabled', bg="#F1F5F9", fg=GRAY)
         else:
             def _save_note(event=None):
-                """FocusOut 시 note_data 로컬 캐시 저장 (DB 쓰기 없음)"""
+                """note_data 로컬 캐시 저장 (DB 쓰기 없음)"""
                 raw = note_txt.get('1.0', 'end').rstrip('\n')
                 # 이모지 surrogate pair 정규화 (Windows tkinter 대응)
                 try:
@@ -447,7 +454,19 @@ class App:
                 save_daily_cache(self.progress_data, self.student_data, self.note_data, self.force_data)
                 self._update_preview()
 
+            def _on_return(event):
+                """Enter = 저장 트리거 (줄바꿈 방지)"""
+                _save_note()
+                return 'break'
+
+            def _on_shift_return(event):
+                """Shift+Enter = 줄바꿈 삽입"""
+                note_txt.insert('insert', '\n')
+                return 'break'
+
             note_txt.bind('<FocusOut>', _save_note)
+            note_txt.bind('<Return>', _on_return)
+            note_txt.bind('<Shift-Return>', _on_shift_return)
 
         ai_btn.config(command=lambda: self._gen_ai_note(
             sheet, cls, name, textbooks, note_txt, ai_btn))
@@ -725,6 +744,37 @@ class App:
         """프리셋 변경 후 현재 학생 입력 화면 즉시 갱신"""
         if self.cur_sheet and self.cur_cls and self.cur_name:
             self._render_student(self.cur_sheet, self.cur_cls, self.cur_name)
+
+    def _open_reset_dialog(self):
+        """🗑 초기화 선택 다이얼로그"""
+        win = tk.Toplevel(self.root)
+        win.title("초기화")
+        win.geometry("320x190")
+        win.resizable(False, False)
+        win.configure(bg=BG)
+        win.grab_set()
+
+        tk.Label(win, text="초기화 범위를 선택하세요", font=FT,
+                 bg=BG, fg=TEXT).pack(pady=(16, 10))
+
+        tk.Button(win, text="현재 반 초기화  (수행도·특이사항)",
+                  font=FS, bg="#FEF2F2", fg="#EF4444", relief='flat',
+                  cursor='hand2', pady=7,
+                  command=lambda: [
+                      self._reset_class_data(self.cur_sheet, self.cur_cls),
+                      win.destroy()]
+                  ).pack(fill='x', padx=16, pady=2)
+
+        tk.Button(win, text="전체 반 초기화  (수행도·특이사항)",
+                  font=FS, bg="#FEF2F2", fg="#EF4444", relief='flat',
+                  cursor='hand2', pady=7,
+                  command=lambda: [self._reset_all_data(), win.destroy()]
+                  ).pack(fill='x', padx=16, pady=2)
+
+        tk.Button(win, text="취소", font=FS, bg=PANEL, fg=SUBTEXT,
+                  relief='flat', cursor='hand2', pady=7,
+                  command=win.destroy
+                  ).pack(fill='x', padx=16, pady=(2, 16))
 
     def _reset_class_data(self, sheet=None, cls=None):
         """반별 학생 입력 데이터 로컬 초기화 (과제수행도·특이사항) — DB 쓰기 없음"""
@@ -1172,18 +1222,25 @@ class App:
                 try:
                     from firebase import firebase_get, firebase_put
                     data = firebase_get(self.cfg, f"config/instructors/{name}")
-                    if not data:
-                        firebase_put(self.cfg, f"config/instructors/{name}", {"classes": {}})
-                        win.after(0, lambda: messagebox.showinfo("안내", f"신규 강사 계정 [{name}]을 등록했습니다.", parent=win))
-                    
+                    is_new = not data
+                    if is_new:
+                        firebase_put(self.cfg, f"config/instructors/{name}", {"assignments": [], "presets": []})
+
                     self.cfg['instructor_id'] = name
-                    from firebase import firebase_get
                     sheets_data = firebase_get(self.cfg, "config/sheets")
                     if isinstance(sheets_data, dict):
                         self.cfg['sheets'] = sheets_data
-                    
-                    asgn = firebase_get(self.cfg, f"config/instructors/{name}/classes")
-                    self.cfg['instructor_assignments'] = list(asgn.values()) if isinstance(asgn, dict) else []
+
+                    if is_new:
+                        # 신규 강사: assignments 없음 → 전체 학생 노출 방지
+                        self.cfg['instructor_assignments'] = []
+                        win.after(0, lambda: messagebox.showinfo(
+                            "안내",
+                            f"신규 강사 계정 [{name}]을 등록했습니다.\n웹에서 담당 수업을 배정하세요.",
+                            parent=win))
+                    else:
+                        asgn = data.get("assignments", [])
+                        self.cfg['instructor_assignments'] = asgn if isinstance(asgn, list) else []
                     
                     win.after(0, lambda: [
                         cur_lbl.config(text=f"현재 계정: {name}", fg=INDIGO),

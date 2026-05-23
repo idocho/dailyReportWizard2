@@ -45,7 +45,7 @@ _FONT = ("맑은 고딕"            if _SYS == "Windows" else
 FT = (_FONT, 10, "bold")
 FB = (_FONT, 9)
 FS = (_FONT, 8)
-FE = ("Segoe UI Emoji", 9) if _SYS == "Windows" else ("TkDefaultFont", 9)
+FE = ("맑은 고딕", 9) if _SYS == "Windows" else ("TkDefaultFont", 9)
 _MOD = "command" if _SYS == "Darwin" else "ctrl"
 
 # ── 관찰 태그 정의 (key=Firebase 저장값, label=표시) ──────────────────
