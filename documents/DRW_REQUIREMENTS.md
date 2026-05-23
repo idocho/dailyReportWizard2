@@ -643,7 +643,10 @@ def _my_classes(self, sheet) -> list[tuple[str, dict]]:
 
 | 항목 | 값 | 위치 |
 |------|-----|------|
-| AI 쿨다운 | 30초 | `AI_COOLDOWN` 상수 |
+| AI 쿨다운 |  | `AI_COOLDOWN` 상수 |
+
+  - Groq: 30초 (무료 RPM 제한 대응)
+  - Claude/OpenAI: 3초 (중복 클릭 방지 최소치)
 | Groq 모델 | `llama-3.1-8b-instant` | ai_engine.py 하드코딩 |
 | Claude 모델 | `claude-3-5-sonnet-20241022` | ai_engine.py 하드코딩 |
 | OpenAI 모델 | `gpt-4o-mini` | ai_engine.py 하드코딩 |

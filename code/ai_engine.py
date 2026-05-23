@@ -8,7 +8,7 @@ import time
 import urllib.request
 import urllib.error
 
-from constants import APP_VERSION, AI_COOLDOWN, TAGS
+from constants import APP_VERSION, AI_COOLDOWN_GROQ, AI_COOLDOWN_PAID, TAGS
 from firebase import fetch_obs_today, today_key
 from storage import save_daily_cache
 
@@ -239,7 +239,9 @@ class AiEngine:
         self._last_call = 0.0
 
     def _check_cooldown(self):
-        remaining = max(0, AI_COOLDOWN - (time.time() - self._last_call))
+        engine_type = self.app.cfg.get('ai_engine_type', 'groq').strip().lower()
+        cooldown = AI_COOLDOWN_GROQ if engine_type == 'groq' else AI_COOLDOWN_PAID
+        remaining = max(0, cooldown - (time.time() - self._last_call))
         if remaining > 0:
             from tkinter import messagebox
             messagebox.showwarning(
@@ -414,7 +416,9 @@ class AiEngine:
             try:
                 if not btn.winfo_exists():
                     return
-                remaining = max(0, AI_COOLDOWN - (time.time() - self._last_call))
+                engine_type = self.app.cfg.get('ai_engine_type', 'groq').strip().lower()
+                cooldown = AI_COOLDOWN_GROQ if engine_type == 'groq' else AI_COOLDOWN_PAID
+                remaining = max(0, cooldown - (time.time() - self._last_call))        
                 if remaining > 0:
                     btn.config(state='disabled', text=f"⏳ {int(remaining)}s")
                     self.app.root.after(1000, _tick)

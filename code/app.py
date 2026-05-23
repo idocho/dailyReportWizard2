@@ -44,7 +44,7 @@ def make_scroll_frame(parent, bg=None):
 
 
 from constants import (
-    APP_TITLE, APP_VERSION, APP_CREDIT, AI_COOLDOWN,
+    APP_TITLE, APP_VERSION, APP_CREDIT, AI_COOLDOWN_GROQ, AI_COOLDOWN_PAID,
     BG, PANEL, DARK, DARK2, ACCENT, INDIGO, INDIGO_L,
     GREEN, YELLOW, GRAY, BORDER, TEXT, SUBTEXT, BLUE,
     STATUS_EMPTY, STATUS_PARTIAL, STATUS_READY, DOT_COLOR,
@@ -420,7 +420,9 @@ class App:
                           bg="#F1F5F9", fg=GRAY, cursor='arrow')
         else:
             # 쿨다운 잔여 시간에 따라 초기 상태 설정
-            _rem = max(0, AI_COOLDOWN - (time.time() - self._ai_last_call))
+            _engine = self.cfg.get('ai_engine_type', 'groq').strip().lower()
+            _cooldown = AI_COOLDOWN_GROQ if _engine == 'groq' else AI_COOLDOWN_PAID
+            _rem = max(0, _cooldown - (time.time() - self._ai_last_call))
             if _rem > 0:
                 ai_btn.config(state='disabled', text=f"⏳ {int(_rem)}s")
                 self._start_cooldown_tick(ai_btn)

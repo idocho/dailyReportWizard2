@@ -9,7 +9,8 @@ APP_TITLE   = "Daily Report Wizard"
 APP_VERSION = "v2.0.0"
 APP_CREDIT  = "Crafted by IDO(idocho@kakao.com)  ·  Powered by Claude AI"
 
-AI_COOLDOWN = 30  # AI 생성 쿨다운 (초)
+AI_COOLDOWN_GROQ = 30  # Groq 무료 플랜 RPM 제한 대응
+AI_COOLDOWN_PAID = 3   # 유료 엔진 (Claude/OpenAI) 중복 클릭 방지 최소치
 
 # ── 색상 ─────────────────────────────────────────────────────────────
 BG       = "#F5F6FA"
