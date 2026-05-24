@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jq -r '.tool_input.file_path // \"\"' | { read -r f; if echo \"$f\" | grep -qE '(code/.*\\.py|code/index\\.html)'; then echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PostToolUse\",\"additionalContext\":\"[AUTO-REMINDER] 코드 파일 수정됨. 이 변경이 기능/동작 스펙에 영향을 준다면 documents/DRW_REQUIREMENTS.md 업데이트 필요.\"}}'; fi; } 2>/dev/null || true",
+            "statusMessage": "요구사항 문서 업데이트 확인 중..."
+          }
+        ]
+      }
+    ]
+  }
+}

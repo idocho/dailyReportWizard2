@@ -111,8 +111,10 @@ def _base_conditions() -> str:
     """모든 AI 생성 호출에 공통으로 들어가는 조건 문자열."""
     return (
         "[작성 지침]\n"
-        "1. 문체: ~했습니다 체로 통일 (했어요 혼용 금지). 학생 이름 또는 오늘 수업 내용으로 자연스럽게 시작 "
-        "(매 문장을 이름으로만 시작하지 말 것 — 단조로운 패턴 금지).\n"
+        "1. 문체: ~했습니다 체로 통일 (했어요 혼용 금지).\n"
+        "첫 문장은 학생 이름('OO 학생은')으로 시작하지 않는 것을 기본 원칙으로 함.\n"
+        "수업 내용·성취·이해도·관찰된 행동 중심으로 자연스럽게 시작.\n"
+        "학생 이름을 첫 주어로 사용하는 표현은 예외 상황 외 금지.\n"
         "2. 직접 작성 메모: [직접 작성 메모 — 반드시 반영] 섹션이 있으면 핵심 사실을 빠뜨리지 말고 "
         "최종 문장에 자연스럽게 포함하세요. 특히 일정·보강·시험·상담·준비물 등 운영 메모는 반드시 보존.\n"
         "3. 금지: '어머님·학부모님' 호칭, 시스템 표현('미입력·데이터 없음' 등), "
@@ -235,10 +237,11 @@ def _call_ai_hub(engine_type, api_key, prompt, max_tokens=300, temperature=0.5, 
             messages.append({"role": "system", "content": system})
         messages.append({"role": "user", "content": prompt})
         body = {
-            "model":       "llama-3.1-8b-instant",
+            "model":       "qwen/qwen3-32b",
             "messages":    messages,
             "max_tokens":  max_tokens,
-            "temperature": temperature
+            "temperature": temperature,
+            "reasoning_effort": "none"
         }
 
     elif engine_type == "claude":
