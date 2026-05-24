@@ -25,7 +25,7 @@ def nickname_suffix(full_name):
     return f"{nick}는"
 
 
-def build_message(date_str, class_info, student_name, assign_map, note):
+def build_message(date_str, class_info, student_name, assign_map, note, tb_grade=None):
     """
     Args:
         date_str:     "5/22 (금)"
@@ -33,23 +33,34 @@ def build_message(date_str, class_info, student_name, assign_map, note):
         student_name: "김지민"
         assign_map:   { tb: "과제 완벽 수행 ✅" }
         note:         "오늘은 근의 공식을 첫 설명에 바로..."
+        tb_grade:     { tb: grade_sem } — optional, per-class map
     """
     textbooks = list(class_info.keys())
     multi     = len(textbooks) > 1
+    _tg       = tb_grade or {}
+
+    def tb_label(tb):
+        """교재 레이블: 멀티 교재 시 '중1-1 최상위수학', 단일 시 None."""
+        if not multi:
+            return None
+        gs = _tg.get(tb, '')
+        return f"{gs} {tb}".strip() if gs else tb
 
     def section(field):
         lines = []
         for tb, info in class_info.items():
             v = info.get(field, '').strip()
             if v:
-                lines.append(f"[{tb}] {v}" if multi else v)
+                lbl = tb_label(tb)
+                lines.append(f"[{lbl}] {v}" if lbl else v)
         return '\n'.join(lines)
 
     assign_lines = []
     for tb in textbooks:
         a = assign_map.get(tb, '').strip()
         if a:
-            assign_lines.append(f"[{tb}] {a}" if multi else a)
+            lbl = tb_label(tb)
+            assign_lines.append(f"[{lbl}] {a}" if lbl else a)
 
     return (
         f"[데일리 리포트] {date_str}\n"

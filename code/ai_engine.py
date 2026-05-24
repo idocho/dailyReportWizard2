@@ -91,7 +91,10 @@ def _build_tags_context(tags: dict) -> str:
         lines.append(f"- 주의 관찰 (학부모 전달용, 과도한 비난 표현 금지): {', '.join(caution_notes)}")
     extra_notes = [_EXTRA_TEXT[k] for k in (tags.get("extra") or []) if k in _EXTRA_TEXT]
     if extra_notes:
-        lines.append(f"- 특수 이벤트: {', '.join(extra_notes)}")
+        lines.append(
+            f"- 별도 전달 이벤트 (다른 수업 묘사와 섞지 말고 독립 문장으로 강조): "
+            f"{', '.join(extra_notes)}"
+        )
 
     hl = tags.get("highlight")
     if hl and hl in _HIGHLIGHT_TEXT:
@@ -110,29 +113,36 @@ def _base_conditions() -> str:
         "[작성 지침]\n"
         "1. 문체: ~했습니다 체로 통일 (했어요 혼용 금지). 학생 이름 또는 오늘 수업 내용으로 자연스럽게 시작 "
         "(매 문장을 이름으로만 시작하지 말 것 — 단조로운 패턴 금지).\n"
-        "2. 금지: '어머님·학부모님' 호칭, 시스템 표현('미입력·데이터 없음' 등), "
+        "2. 직접 작성 메모: [직접 작성 메모 — 반드시 반영] 섹션이 있으면 핵심 사실을 빠뜨리지 말고 "
+        "최종 문장에 자연스럽게 포함하세요. 특히 일정·보강·시험·상담·준비물 등 운영 메모는 반드시 보존.\n"
+        "3. 금지: '어머님·학부모님' 호칭, 시스템 표현('미입력·데이터 없음' 등), "
         "제공된 데이터에 없는 사실 추가(할루시네이션) 절대 금지.\n"
-        "3. 이벤트 반영: [수업 관찰 및 이벤트 정보]에 명시된 항목만 반영. "
+        "4. 이벤트 반영: [수업 관찰 및 이벤트 정보]에 명시된 항목만 반영. "
         "이 섹션에 없는 자율학습·재시험·주간테스트 등을 임의로 추가하지 마세요.\n"
-        "4. 주의 태그: '졸음·잡담·태도불량' 등 직접 단어 사용 절대 금지. "
+        "5. 별도 전달 이벤트: 자율학습·주간 테스트·재시험 등은 수업 태도/이해도 문장에 섞지 말고 "
+        "가능하면 별도 문장으로 분리해 명확히 전달하세요.\n"
+        "6. 주의 태그: '졸음·잡담·태도불량' 등 직접 단어 사용 절대 금지. "
         "'오늘은 조금 피곤해 보이는 날이었습니다' / '집중이 다소 어려웠던 날이었지만' 수준으로 완곡하게 녹여 작성.\n"
-        "5. 하이라이트: ⭐ 오늘의 하이라이트가 있으면 메시지에서 가장 먼저 또는 가장 인상적으로 표현.\n"
-        "6. 결석: 데이터가 없으면 안부 인사와 다음 수업 기약 코멘트로 대체.\n"
-        "7. 출력: 순수 텍스트만 (JSON·마크다운·따옴표 금지). 2~3문장, 100자 내외."
+        "7. 하이라이트: ⭐ 오늘의 하이라이트가 있으면 메시지에서 가장 먼저 또는 가장 인상적으로 표현.\n"
+        "8. 결석: 데이터가 없으면 안부 인사와 다음 수업 기약 코멘트로 대체.\n"
+        "9. 출력: 순수 텍스트만 (JSON·마크다운·따옴표 금지). 2~3문장, 100자 내외."
     )
 
 
 # ── 단건 생성 프롬프트 ───────────────────────────────────────────────
 def build_single_prompt(sheet, cls, name, textbooks, student_data, progress_data,
-                        existing_note, tags):
+                        existing_note, tags, tb_grade=None):
     """단건 AI 생성용 프롬프트 조립 (이벤트 반영 최적화)."""
+    _tg = tb_grade or {}
     lines = []
     for tb in textbooks:
         val = student_data.get((sheet, cls, name, tb), {}).get('value', '')
         if val:
+            gs = _tg.get(tb, '')
+            tb_lbl = f"{gs} {tb}".strip() if gs else tb
             pd_val = progress_data.get((sheet, cls, tb), {})
             lines.append(
-                f"- {tb}: 수행도={val}"
+                f"- {tb_lbl}: 수행도={val}"
                 + (f", 진도={pd_val['progress']}" if pd_val.get('progress') else "")
                 + (f", 과제={pd_val['homework']}"  if pd_val.get('homework') else "")
             )
@@ -153,7 +163,12 @@ def build_single_prompt(sheet, cls, name, textbooks, student_data, progress_data
     if tags_block:
         prompt += f"[수업 관찰 및 이벤트 정보]\n{tags_block}\n\n"
     if existing_note:
-        prompt += f"[기존 특이사항 참고]\n{existing_note}\n\n"
+        prompt += (
+            "[직접 작성 메모 — 반드시 반영]\n"
+            f"{existing_note}\n"
+            "위 메모는 교사가 직접 입력한 핵심 전달 사항입니다. "
+            "최종 특이사항에 빠뜨리지 말고 자연스럽게 포함하세요.\n\n"
+        )
 
     prompt += f"{_base_conditions()}"
     return prompt
@@ -175,7 +190,7 @@ def build_batch_prompt(targets):
             "수업데이터": ", ".join(valid_data) if valid_data else "정상 수업 진행"
         }
         if t.get("existing"):
-            entry["기존특이사항"] = t["existing"]
+            entry["직접작성메모_반드시반영"] = t["existing"]
         tags_block = _build_tags_context(t.get("tags") or {})
         if tags_block:
             entry["수업관찰및이벤트"] = tags_block
@@ -190,6 +205,10 @@ def build_batch_prompt(targets):
         "[문체 기준] 2~3문장 100자 내외. 학부모가 읽기 편한 따뜻한 어조. "
         "학생 이름 또는 수업 내용으로 자연스럽게 시작 (매번 이름으로만 시작하지 말 것). "
         "'졸음·잡담·태도불량' 직접 단어 사용 금지 — 완곡하게 표현.\n"
+        "자율학습·주간 테스트·재시험 등 별도 전달 이벤트는 다른 수업 묘사와 섞지 말고 "
+        "가능하면 독립 문장으로 명확히 작성하세요.\n"
+        "각 학생의 '직접작성메모_반드시반영' 필드는 교사가 직접 입력한 핵심 전달 사항이므로 "
+        "최종 note에 반드시 자연스럽게 포함하세요.\n"
         "⭐ 하이라이트 항목이 있으면 가장 인상적인 표현으로 강조.\n\n"
         f"{_base_conditions()}\n\n"
         "⚠️ 반드시 JSON 배열로만 응답 (다른 텍스트 금지):\n"
@@ -323,7 +342,7 @@ class AiEngine:
         self.app._ai_last_call = self._last_call
 
     # ── 단건 생성 실행 ────────────────────────────────────────────────
-    def gen_single(self, sheet, cls, name, textbooks, note_txt, ai_btn=None):
+    def gen_single(self, sheet, cls, name, textbooks, note_txt, ai_btn=None, tb_grade=None):
         if not self._check_cooldown():
             return
         engine_type, api_key = self._get_engine_settings()
@@ -332,7 +351,15 @@ class AiEngine:
 
         app = self.app
 
-        existing = app.note_data.get((sheet, cls, name), {}).get('value', '').strip()
+        note_key = (sheet, cls, name)
+        try:
+            raw_note = note_txt.get('1.0', 'end').rstrip('\n')
+            existing_note = raw_note.encode('utf-16', 'surrogatepass').decode('utf-16')
+            app.note_data[note_key] = {'value': existing_note}
+            save_daily_cache(app.progress_data, app.student_data, app.note_data, app.force_data)
+        except Exception:
+            existing_note = app.note_data.get(note_key, {}).get('value', '')
+        existing = existing_note.strip()
         okey = f"{sheet}|{cls}|{name}"
         tags = app.tag_data.get(okey, {}).get(today_key(), {})
 
@@ -341,11 +368,13 @@ class AiEngine:
             print(f"\n[SINGLE] student={name}  cls={cls}  today={today_key()}")
             print(f"[SINGLE] tag_key={okey!r}  dates_in_cache={all_dates}")
             print(f"[SINGLE] tags_today={tags if tags else '(없음)'}")
+            print(f"[SINGLE] existing_note={existing if existing else '(없음)'}")
 
         # 프롬프트 생성
         prompt = build_single_prompt(
             sheet, cls, name, textbooks,
-            app.student_data, app.progress_data, existing, tags
+            app.student_data, app.progress_data, existing, tags,
+            tb_grade=tb_grade
         )
 
         note_txt.config(state='normal')
@@ -359,7 +388,6 @@ class AiEngine:
                 text = _call_ai_hub(engine_type, api_key, prompt,
                                     max_tokens=400, temperature=0.75,
                                     system=_base_conditions())
-                note_key = (sheet, cls, name)
                 app.note_data[note_key] = {'value': text}
                 save_daily_cache(app.progress_data, app.student_data, app.note_data, app.force_data)
 
@@ -397,18 +425,21 @@ class AiEngine:
         for cls, cls_data in app._my_classes(sheet):
             if app._is_sub_teacher(sheet, cls):
                 continue
-            tbs = cls_data.get('textbooks', [])
+            tbs      = cls_data.get('textbooks', [])
+            tb_grade = cls_data.get('tb_grade', {})
             for stu in cls_data.get('students', []):
                 name = stu['name']
                 if app._student_status(sheet, cls, name) != 'ready':
                     continue
-                
+
                 # 유효 데이터 필터링 맵 구조 조립
                 student_book_data = {}
                 for tb in tbs:
                     val = app.student_data.get((sheet, cls, name, tb), {}).get('value', '')
                     if val:
-                        student_book_data[tb] = val
+                        gs = tb_grade.get(tb, '')
+                        key = f"{gs} {tb}".strip() if gs else tb
+                        student_book_data[key] = val
 
                 okey_b = f"{sheet}|{cls}|{name}"
                 tags = app.tag_data.get(okey_b, {}).get(today_key(), {})

@@ -1,3 +1,58 @@
+// ── 수학 커리큘럼 (2022 개정) — data/curriculum.js 에서 CURRICULUM_RAW 로드
+let CURRICULUM = {};
+
+function _normalizeCurriculum(raw){
+  const root = raw?.curriculum || raw?.['2022_revised_math_curriculum'] || raw;
+  const out = {};
+  const add = (key, arr) => {
+    if(!Array.isArray(arr))return;
+    out[key] = arr.map(ch => ({
+      main: ch.main || ch.main_chapter || "",
+      subs: ch.subs || ch.sub_chapters || []
+    })).filter(ch => ch.main);
+  };
+
+  const elem = root?.elementary_school || {};
+  for(let g=3; g<=6; g++){
+    add(`초${g}-1`, elem[`grade_${g}`]?.semester_1);
+    add(`초${g}-2`, elem[`grade_${g}`]?.semester_2);
+  }
+
+  const middle = root?.middle_school || {};
+  for(let g=1; g<=3; g++){
+    add(`중${g}-1`, middle[`grade_${g}`]?.semester_1);
+    add(`중${g}-2`, middle[`grade_${g}`]?.semester_2);
+  }
+
+  const highCredit = root?.high_school_credit_system || {};
+  const common = highCredit.level_1_common_courses || {};
+  const elective = highCredit.level_2_general_elective_courses || {};
+  add("공통수학1", common.common_math_1);
+  add("공통수학2", common.common_math_2);
+  add("대수", elective.algebra);
+  add("미적분I", elective.calculus_1);
+  add("확통", elective.probability_and_statistics);
+
+  return out;
+}
+
+function loadCurriculum(){
+  CURRICULUM = _normalizeCurriculum(typeof CURRICULUM_RAW !== 'undefined' ? CURRICULUM_RAW : {});
+}
+
+const GRADE_SEM_LIST = [
+  {val:'초3-1',label:'초3-1'},{val:'초3-2',label:'초3-2'},
+  {val:'초4-1',label:'초4-1'},{val:'초4-2',label:'초4-2'},
+  {val:'초5-1',label:'초5-1'},{val:'초5-2',label:'초5-2'},
+  {val:'초6-1',label:'초6-1'},{val:'초6-2',label:'초6-2'},
+  {val:'중1-1',label:'중1-1'},{val:'중1-2',label:'중1-2'},
+  {val:'중2-1',label:'중2-1'},{val:'중2-2',label:'중2-2'},
+  {val:'중3-1',label:'중3-1'},{val:'중3-2',label:'중3-2'},
+  {val:'공통수학1',label:'공통수학1'},{val:'공통수학2',label:'공통수학2'},
+  {val:'대수',label:'대수'},{val:'미적분I',label:'미적분I'},
+  {val:'확통',label:'확통'},
+];
+
 const BC=['#22C55E','#3B82F6','#F59E0B','#EF4444','#94A3B8','#4338CA','#8B5CF6','#F97316','#14B8A6','#EC4899'];
 
 // ── 관찰 태그 정의 (key=Firebase 저장값, label=표시) ──────────────
@@ -83,6 +138,39 @@ function today(){const d=new Date();return `${d.getMonth()+1}/${d.getDate()} (${
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
 function toast(m,ms=2500){const e=document.getElementById('toast');e.textContent=m;e.classList.add('show');clearTimeout(e._t);e._t=setTimeout(()=>e.classList.remove('show'),ms);}
 function setSync(ok){/* syncBadge 제거됨 (v0.9.4) */}
+function _normWs(s){return String(s||'').replace(/\s+/g,' ').trim();}
+function _normTbName(s){return _normWs(s);}
+function _normGradeSem(s){
+  let v=_normWs(s)
+    .replace(/[－–—]/g,'-')
+    .replace(/\s*-\s*/g,'-')
+    .replace(/학기/g,'')
+    .replace(/([0-9])\s*학년\s*([12])/g,'$1-$2')
+    .replace(/(초|중|고)\s*([0-9])\s*-\s*([12])/g,'$1$2-$3');
+  v=v.replace(/미적분\s*1/i,'미적분I').replace(/미적분\s*I/i,'미적분I');
+  return v;
+}
+function getCurriculumByGradeSem(gradeSem){
+  const g=_normGradeSem(gradeSem);
+  if(!g)return [];
+  const direct=CURRICULUM[g];
+  if(Array.isArray(direct))return direct;
+  for(const [k,v] of Object.entries(CURRICULUM||{})){
+    if(_normGradeSem(k)===g&&Array.isArray(v))return v;
+  }
+  return [];
+}
+function getTbGrade(sheet,cls,tb){
+  const map=cfg?.sheets?.[sheet]?.classes?.[cls]?.tb_grade;
+  if(!map||typeof map!=='object')return '';
+  if(Object.prototype.hasOwnProperty.call(map,tb))return map[tb]||'';
+  const nt=_normTbName(tb);
+  if(Object.prototype.hasOwnProperty.call(map,nt))return map[nt]||'';
+  for(const [k,v] of Object.entries(map)){
+    if(_normTbName(k)===nt)return v||'';
+  }
+  return '';
+}
 
 async function pushInput(key,val){
   inputData[key]=val;saveLocal();
@@ -304,16 +392,86 @@ function renderInput(mc){
       const sel=i===curAI;
       const bg=sel?'var(--indigo)':'var(--bg)';
       const fg=sel?'#fff':'var(--sub)';
-      return '<button onclick="selA('+i+')" style="padding:5px 12px;border-radius:16px;border:1px solid var(--border);background:'+bg+';color:'+fg+';font-size:11px;font-weight:700;white-space:nowrap;cursor:pointer;font-family:inherit">'+esc(x.cls)+' '+esc(x.tb)+'</button>';
+      const xGs=getTbGrade(x.sheet,x.cls,x.tb)||'';const xGsL=xGs?(GRADE_SEM_LIST.find(g=>g.val===xGs)?.label||xGs):'';
+      return '<button onclick="selA('+i+')" style="padding:5px 12px;border-radius:16px;border:1px solid var(--border);background:'+bg+';color:'+fg+';font-size:11px;font-weight:700;white-space:nowrap;cursor:pointer;font-family:inherit">'+esc(x.cls)+(xGsL?' <span style="opacity:.7;font-size:9px">'+esc(xGsL)+'</span> ':' ')+esc(x.tb)+'</button>';
     }).join('');
     mTabs='<div class="m">'+sheetTabHtml+'<div style="display:flex;gap:6px;padding:10px 12px;overflow-x:auto;background:var(--panel);border-bottom:1px solid var(--border)">'+tabs+'</div></div>';
   }
 
+  // 진도 피커 초기값 파싱 — grade_sem은 학급-교재 조합에 종속 (tb_grade)
+  const gradeSem=getTbGrade(a.sheet,a.cls,a.tb)||'';
+  const gsLabel=gradeSem?(GRADE_SEM_LIST.find(g=>g.val===gradeSem)?.label||gradeSem):'';
+  const curCurr=getCurriculumByGradeSem(gradeSem);
+  const pgVal=pd.progress||'';
+  // pgVal 형식: "대단원 › 소단원" or "대단원" or 자유텍스트
+  let pgMainIdx=-1,pgSubIdx=-1,pgFreeVal='',pgIsFree=false;
+  if(pgVal&&curCurr.length){
+    const sep=pgVal.indexOf(' › ');
+    const mainStr=sep>=0?pgVal.slice(0,sep):pgVal;
+    const subStr=sep>=0?pgVal.slice(sep+3):'';
+    pgMainIdx=curCurr.findIndex(c=>stripIdx(c.main)===mainStr||c.main===mainStr);
+    if(pgMainIdx>=0&&subStr){pgSubIdx=curCurr[pgMainIdx].subs.findIndex(s=>stripIdx(s)===subStr||s===subStr);}
+    if(pgMainIdx<0){pgIsFree=true;pgFreeVal=pgVal;}
+  } else if(pgVal){pgIsFree=true;pgFreeVal=pgVal;}
+  if(!curCurr.length){
+    pgIsFree=true;
+    if(!pgFreeVal)pgFreeVal=pgVal||'';
+  }
+  const pgMainOpts=curCurr.length
+    ? curCurr.map((c,i)=>'<option value="'+i+'"'+(i===pgMainIdx?' selected':'')+'>'+esc(stripIdx(c.main))+'</option>').join('')
+    : '';
+  const pgSubOpts=pgMainIdx>=0&&curCurr.length
+    ? curCurr[pgMainIdx].subs.map((s,i)=>'<option value="'+i+'"'+(i===pgSubIdx?' selected':'')+'>'+esc(stripIdx(s))+'</option>').join('')
+    : '';
+  const pgPreviewVal=pgMainIdx>=0&&curCurr.length
+    ? (pgSubIdx>=0?stripIdx(curCurr[pgMainIdx].main)+' › '+stripIdx(curCurr[pgMainIdx].subs[pgSubIdx]):stripIdx(curCurr[pgMainIdx].main))
+    : '';
+  const pgPicker=('<div class="pg-picker">'
+    +'<select class="sel" id="pg-main" data-pkey="'+esc(pkey)+'" onchange="pgMainChange(this,\''+esc(pkey)+'\')">'
+    +'<option value="">'+(curCurr.length?'대단원 선택...':'단원 데이터 없음 (직접 입력 사용)')+'</option>'
+    +pgMainOpts
+    +'<option value="sep" disabled>──────</option>'
+    +'<option value="free"'+(pgIsFree?' selected':'')+'>✏️ 직접 입력</option>'
+    +'</select>'
+    +'<div class="pg-sub'+(pgMainIdx>=0&&!pgIsFree?' show':'')+'" id="pg-sub-wrap">'
+    +'<select class="sel" id="pg-sub" data-pkey="'+esc(pkey)+'" onchange="pgBuild(\''+esc(pkey)+'\')">'
+    +'<option value="">소단원 선택...</option>'
+    +pgSubOpts
+    +'<option value="all"'+(pgSubIdx<0&&pgMainIdx>=0?' selected':'')+'>단원 전체</option>'
+    +'</select>'
+    +'</div>'
+    +'<input class="inp pg-free'+(pgIsFree?' show':'')+'" id="pg-free" placeholder="직접 입력" value="'+esc(pgFreeVal)+'" data-pkey="'+esc(pkey)+'" oninput="pgBuild(\''+esc(pkey)+'\')">'
+    +'<div class="pg-preview'+(pgPreviewVal||pgIsFree?' show':'')+(pgIsFree?' free':'')+'" id="pg-preview">'
+    +'<span>'+(pgIsFree?'📝':'📖')+'</span>'
+    +'<span id="pg-pv">'+esc(pgIsFree?pgFreeVal:pgPreviewVal)+'</span>'
+    +'</div>'
+    +'</div>');
+
+  const hw=_parseHwStr(pd.homework||'');
+  const hwTypeBtns=['page','prob','free'].map(t=>{
+    const sel=t===hw.type;
+    const lbl={page:'p. 페이지',prob:'# 번호',free:'직접 입력'}[t];
+    return `<button class="hw-tb${sel?' sel '+t:''}" data-t="${t}" onclick="hwSetType('${t}','${esc(pkey)}')">${lbl}</button>`;
+  }).join('');
+  const hwPrevVal=hw.type!=='free'&&hw.to?(hw.from?(hw.type==='page'?`p.${hw.from}~p.${hw.to}`:`#${hw.from}~#${hw.to}`):(hw.type==='page'?`~p.${hw.to}`:`~#${hw.to}`)):'';
+  const hwPicker=`<div class="hw-picker">
+    <div class="hw-types">${hwTypeBtns}</div>
+    <div class="hw-num-row${hw.type!=='free'?' show':''}" id="hw-nums">
+      <input class="hw-num" id="hw-from" type="number" min="1" placeholder="시작" value="${esc(hw.from)}" oninput="hwBuild('${esc(pkey)}')">
+      <span class="hw-tilde">~</span>
+      <input class="hw-num" id="hw-to" type="number" min="1" placeholder="끝" value="${esc(hw.to)}" oninput="hwBuild('${esc(pkey)}')">
+    </div>
+    <input class="inp hw-free${hw.type==='free'?' show':''}" id="hw-free" placeholder="직접 입력" value="${esc(hw.raw)}" oninput="hwBuild('${esc(pkey)}')">
+    <div class="hw-preview ${hw.type==='free'?'empty':hwPrevVal?hw.type:'empty '+hw.type}" id="hw-preview" style="${hw.type==='free'?'display:none':''}">
+      <span id="hw-pi">${hw.type==='page'?'📄':'🔢'}</span>
+      <span id="hw-pv" style="font-family:monospace;font-size:10px">${esc(hwPrevVal)||'—'}</span>
+    </div>
+  </div>`;
   const pForm=`<div class="pf">
-    <div style="font-size:12px;font-weight:700;color:var(--sub);margin-bottom:10px">📚 오늘 수업 — ${esc(a.cls)} · ${esc(a.tb)}</div>
+    <div style="font-size:12px;font-weight:700;color:var(--sub);margin-bottom:10px">📚 오늘 수업 — ${esc(a.cls)} · ${gsLabel?`<span style="color:var(--indigo);font-size:10px;font-weight:700;margin-right:3px">${esc(gsLabel)}</span>`:''}${esc(a.tb)}</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-      <div><div class="fl">진도</div><input class="inp" value="${esc(pd.progress||'')}" placeholder="오늘 진도" data-pkey="${esc(pkey)}" data-field="progress" oninput="onPI(this)"></div>
-      <div><div class="fl">과제</div><input class="inp" value="${esc(pd.homework||'')}" placeholder="오늘 과제" data-pkey="${esc(pkey)}" data-field="homework" oninput="onPI(this)"></div>
+      <div><div class="fl">진도</div>${pgPicker}</div>
+      <div><div class="fl">과제</div>${hwPicker}</div>
     </div>
   </div>`;
 
@@ -402,7 +560,7 @@ function renderInput(mc){
   }
 
   const noStu=`<div class="empty" style="padding:20px;font-size:12px">이 반에 학생이 없습니다.</div>`;
-  mc.innerHTML=makeTb(`${a.cls} · ${a.tb}`,today())+mTabs+
+  mc.innerHTML=makeTb(`${a.cls} · ${gsLabel?gsLabel+' ':''}${a.tb}`,today())+mTabs+
     `<div style="padding:14px 14px 10px"><div class="card">${pForm}</div></div>
      <div style="padding:0 14px 14px">
        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
@@ -432,6 +590,129 @@ function onPB(btn){
   if(a){const sts=cfg?.sheets?.[a.sheet]?.classes?.[a.cls]?.students||[];const done=sts.filter(s=>inputData[`${a.sheet}|${a.cls}|${s.name}|${a.tb}`]?.assign?.trim()).length;const dc=document.getElementById('doneCount');if(dc)dc.textContent=`${done}/${sts.length}명 완료`;}
 }
 function onNI(el){pushInput(el.dataset.key,{note:el.value});}
+// ── 진도 cascade 피커 ─────────────────────────────────────────────
+// 단원명에서 앞 번호 제거: "Ⅰ. 소인수분해" → "소인수분해", "1. 덧셈과 뺄셈" → "덧셈과 뺄셈"
+function stripIdx(s){return s.replace(/^[ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩ]+\.\s*/u,'').replace(/^\d+\.\s*/,'');}
+
+function pgMainChange(sel, pkey) {
+  const val = sel.value;
+  const subWrap = document.getElementById('pg-sub-wrap');
+  const freeInp = document.getElementById('pg-free');
+  const preview = document.getElementById('pg-preview');
+  const subSel = document.getElementById('pg-sub');
+  if (!subWrap) return;
+  if (val === 'free') {
+    subWrap.classList.remove('show');
+    freeInp.classList.add('show');
+    if (preview) preview.classList.remove('show');
+    freeInp.focus();
+    pgBuild(pkey);
+    return;
+  }
+  freeInp.classList.remove('show');
+  if (!val || val === 'sep') {
+    subWrap.classList.remove('show');
+    if (preview) preview.classList.remove('show');
+    return;
+  }
+  // 소단원 목록 채우기
+  const mainSel = document.getElementById('pg-main');
+  const gradeSem2 = (function() {
+    const pkey2 = mainSel ? mainSel.dataset.pkey || '' : '';
+    const parts = pkey2.split('|');
+    const tbKey = parts.length >= 3 ? parts.slice(2).join('|') : '';
+    return getTbGrade(parts[0],parts[1],tbKey)||'';
+  })();
+  const curr = getCurriculumByGradeSem(gradeSem2);
+  const idx = parseInt(val);
+  if (!isNaN(idx) && curr[idx]) {
+    subSel.innerHTML = '<option value="">소단원 선택...</option>' +
+      curr[idx].subs.map(function(s, i) { return '<option value="' + i + '">' + esc(stripIdx(s)) + '</option>'; }).join('') +
+      '<option value="all">단원 전체</option>';
+  }
+  subWrap.classList.add('show');
+  pgBuild(pkey);
+}
+function pgBuild(pkey) {
+  const mainSel = document.getElementById('pg-main');
+  const subSel = document.getElementById('pg-sub');
+  const freeInp = document.getElementById('pg-free');
+  const preview = document.getElementById('pg-preview');
+  const pvEl = document.getElementById('pg-pv');
+  if (!mainSel) return;
+  const mainVal = mainSel.value;
+  const isFree = mainVal === 'free';
+  let result = '';
+  if (isFree) {
+    result = freeInp ? freeInp.value || '' : '';
+    if (preview) {
+      if (result) { preview.className = 'pg-preview show free'; if (pvEl) pvEl.textContent = result; }
+      else preview.className = 'pg-preview';
+    }
+  } else {
+    const parts = pkey.split('|');
+    const tbKey = parts.length >= 3 ? parts.slice(2).join('|') : '';
+    const gradeSem3 = getTbGrade(parts[0],parts[1],tbKey)||'';
+    const curr = getCurriculumByGradeSem(gradeSem3);
+    const mainIdx = parseInt(mainVal);
+    if (isNaN(mainIdx) || !curr[mainIdx]) { if (preview) preview.className = 'pg-preview'; return; }
+    const mainText = stripIdx(curr[mainIdx].main);
+    const subVal = subSel ? subSel.value || '' : '';
+    let subText = '';
+    if (subVal === 'all') subText = '';
+    else if (subVal !== '' && subVal !== 'sep') subText = stripIdx(curr[mainIdx].subs[parseInt(subVal)] || '');
+    result = subText || mainText;
+    if (preview) {
+      preview.className = 'pg-preview show';
+      if (pvEl) pvEl.textContent = result;
+    }
+  }
+  const cur = Object.assign({}, progressData[pkey] || {});
+  cur.progress = result;
+  pushProgress(pkey, cur);
+  _updateDotsForPkey(pkey);
+}
+
+// ── 과제 피커 ─────────────────────────────────────────────────
+function _parseHwStr(s){
+  if(!s)return{type:'page',from:'',to:'',raw:''};
+  let m;
+  m=s.match(/^~p\.(\d+)$/i);if(m)return{type:'page',from:'',to:m[1],raw:s};
+  m=s.match(/^~#(\d+)$/);if(m)return{type:'prob',from:'',to:m[1],raw:s};
+  m=s.match(/^p\.(\d+)~p\.(\d+)$/i);if(m)return{type:'page',from:m[1],to:m[2],raw:s};
+  m=s.match(/^#(\d+)~#(\d+)$/);if(m)return{type:'prob',from:m[1],to:m[2],raw:s};
+  return{type:'free',from:'',to:'',raw:s};
+}
+function hwSetType(type,pkey){
+  document.querySelectorAll('.hw-tb').forEach(b=>{b.className='hw-tb'+(b.dataset.t===type?' sel '+type:'');});
+  const nr=document.getElementById('hw-nums');
+  const fr=document.getElementById('hw-free');
+  const pv=document.getElementById('hw-preview');
+  if(nr)nr.className='hw-num-row'+(type!=='free'?' show':'');
+  if(fr)fr.className='inp hw-free'+(type==='free'?' show':'');
+  if(pv)pv.style.display=type==='free'?'none':'';
+  hwBuild(pkey);
+}
+function hwBuild(pkey){
+  const sel=document.querySelector('.hw-tb.sel');
+  const type=sel?sel.dataset.t:'page';
+  const from=(document.getElementById('hw-from')?.value||'').trim();
+  const to=(document.getElementById('hw-to')?.value||'').trim();
+  const raw=document.getElementById('hw-free')?.value||'';
+  let result='';
+  if(type==='free'){result=raw;}
+  else if(to){result=from?(type==='page'?`p.${from}~p.${to}`:`#${from}~#${to}`):(type==='page'?`~p.${to}`:`~#${to}`);}
+  const pv=document.getElementById('hw-preview');
+  const pvv=document.getElementById('hw-pv');
+  const pvi=document.getElementById('hw-pi');
+  if(pv&&type!=='free'){
+    pv.className='hw-preview '+(to?type:'empty '+type);
+    if(pvv)pvv.textContent=result||'—';
+    if(pvi)pvi.textContent=type==='page'?'📄':'🔢';
+  }
+  const cur={...progressData[pkey]||{}};cur.homework=result;
+  pushProgress(pkey,cur);_updateDotsForPkey(pkey);
+}
 function onPI(el){
   const pkey=el.dataset.pkey,field=el.dataset.field;
   const cur={...progressData[pkey]||{}};cur[field]=el.value;pushProgress(pkey,cur);
@@ -482,6 +763,7 @@ function _saOpen(id){
 
 function renderSettings(mc){
   renderMhdr('설정');
+  if(cfg)_ensureConfigShape();
   const instr=instructor||{};
 
   // ── 내 계정 상태 요약 ──
@@ -497,7 +779,7 @@ function renderSettings(mc){
   if(cfg){
     let clsOpts='<option value="">-- 반 선택 --</option>',firstSh='',firstCls='';
     for(const[sh,shD]of Object.entries(cfg.sheets||{})){for(const[cls]of Object.entries(shD.classes||{})){if(!firstSh){firstSh=sh;firstCls=cls;}clsOpts+=`<option value="${esc(sh)}|${esc(cls)}">${esc(cls)}</option>`;}}
-    const tbOpts=firstSh?(cfg?.sheets?.[firstSh]?.classes?.[firstCls]?.textbooks||[]).map(t=>`<option>${esc(t)}</option>`).join(''):''
+    const tbOpts=firstSh?('<option value="">-- 교재 선택 --</option>'+[...(cfg?.sheets?.[firstSh]?.classes?.[firstCls]?.textbooks||[])].sort((a,b)=>a.localeCompare(b,'ko')).map(t=>`<option>${esc(t)}</option>`).join('')):''
     addAsgn=`<div style="padding:10px 12px;border-top:1px solid var(--border)"><div style="font-size:11px;font-weight:700;color:var(--sub);margin-bottom:8px">수업 추가</div><div style="display:grid;grid-template-columns:1fr 1fr 72px;gap:6px;margin-bottom:8px"><div><div class="sl">반</div><select class="inp sm" id="aCls" onchange="onCC()">${clsOpts}</select></div><div><div class="sl">교재</div><select class="inp sm" id="aTb">${tbOpts}</select></div><div><div class="sl">역할</div><select class="inp sm" id="aRole"><option>담임</option><option>부담임</option></select></div></div><button class="btn bsm" onclick="addA()">+ 추가</button></div>`;
   }else{addAsgn=`<div style="padding:10px 12px;font-size:11px;color:var(--gray)">학생 명단을 먼저 불러오세요.</div>`;}
 
@@ -514,6 +796,31 @@ function renderSettings(mc){
 
   // ── 초기화 UI (다중 선택형) ──
   const resetHtml=_renderResetHtml();
+
+  // ── 관리자: 교재 목록 관리 (교재명 레지스트리 — 학년학기 무관) ──
+  const tbMgmtHtml = adminOn ? (()=>{
+    const tbMap = cfg ? _ensureTextbookRegistry() : {};
+    const tbNames = Object.keys(tbMap).sort((a,b)=>a.localeCompare(b,'ko'));
+    const tbRows = tbNames.map(name=>`<div style="display:flex;align-items:center;padding:6px 12px;border-bottom:1px solid var(--border);gap:8px">
+        <span style="flex:1;font-size:12px;font-weight:600">${esc(name)}</span>
+        <span class="chip" style="flex-shrink:0" onclick="rmTextbook('${esc(name)}')">${'×'}</span>
+      </div>`).join('')||'<div style="padding:8px 12px;font-size:11px;color:var(--gray)">등록된 교재 없음</div>';
+    return `<div class="sa admin-sec" id="sa-tbmgmt">
+      <div class="sa-hdr${openSaIds.has('sa-tbmgmt')?' open':''}" onclick="_saToggle('sa-tbmgmt')">
+        <span class="sa-ico">📖</span>
+        <span class="sa-lbl">교재 목록 관리</span>
+        <span style="font-size:10px;background:#FEF3C7;color:#92400E;border-radius:8px;padding:1px 6px;font-weight:700;margin-right:4px">관리자</span>
+        <span class="sa-chv">›</span>
+      </div>
+      <div class="sa-body${openSaIds.has('sa-tbmgmt')?' open':''}">
+        ${tbRows}
+        <div style="padding:8px 12px;display:flex;gap:6px;border-top:1px solid var(--border)">
+          <input class="inp sm" id="tb-name-inp" placeholder="교재명" style="flex:1" onkeydown="if(event.key==='Enter')addTextbook()">
+          <button class="btn bsm" onclick="addTextbook()">+ 등록</button>
+        </div>
+      </div>
+    </div>`;
+  })() : '';
 
   // ── 강사 관리 (관리자 전용) ──
   const instrMgmt=adminOn?`
@@ -537,8 +844,8 @@ function renderSettings(mc){
         <span class="sa-chv">›</span>
       </div>
       <div class="sa-body${openSaIds.has('sa-fb')?' open':''}">
-        <div class="sr"><div class="sl">DB URL</div><input class="inp" id="sUrl" value="${esc(fbUrl)}" placeholder="https://your-project.firebaseio.com" type="url"></div>
-        <div class="sr"><div class="sl">경로 (Secret Path)</div><input class="inp" id="sPth" value="${esc(fbPath)}" placeholder="drw_a7f3k9x2"></div>
+        <div class="sr"><div class="sl">DB URL</div><input class="inp" id="sUrl" value="${esc(fbUrl)}" placeholder="https://your-project.firebaseio.com" type="url" onkeydown="if(event.key==='Enter')saveFb()"></div>
+        <div class="sr"><div class="sl">경로 (Secret Path)</div><input class="inp" id="sPth" value="${esc(fbPath)}" placeholder="drw_a7f3k9x2" onkeydown="if(event.key==='Enter')saveFb()"></div>
         <div style="padding:10px 14px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn bp bsm" onclick="saveFb()">💾 저장</button><button class="btn bsm" onclick="loadCfg()">📥 학생 명단 불러오기</button></div>
         <div style="padding:0 14px 10px;font-size:10px;color:var(--sub)">💡 다른 기기에서 입력한 데이터는 위 버튼으로 수동 갱신하세요.</div>
       </div>
@@ -561,7 +868,7 @@ function renderSettings(mc){
           : ''}
         <div class="sr"><div class="sl">${instr.name ? '다른 계정으로 전환' : '강사 이름으로 조회'}</div>
           <div style="display:flex;gap:8px">
-            <input class="inp" id="acctName" value="" placeholder="이름을 입력하세요" style="flex:1">
+            <input class="inp" id="acctName" value="" placeholder="이름을 입력하세요" style="flex:1" onkeydown="if(event.key==='Enter')lookupInstr()">
             <button class="btn bp bsm" onclick="lookupInstr()" style="flex-shrink:0">조회</button>
           </div>
         </div>
@@ -579,7 +886,7 @@ function renderSettings(mc){
       <div class="sa-body${openSaIds.has('sa-preset')?' open':''}">
         ${presetChips||'<div style="padding:10px 12px;font-size:12px;color:var(--gray)">등록된 문구가 없습니다.</div>'}
         <div style="padding:8px 10px;border-top:1px solid var(--border);display:flex;gap:6px">
-          <input class="inp sm" id="pInput" placeholder="새 문구 입력" style="flex:1">
+          <input class="inp sm" id="pInput" placeholder="새 문구 입력" style="flex:1" onkeydown="if(event.key==='Enter')addPreset()">
           <button class="btn bsm" onclick="addPreset()">+ 추가</button>
         </div>
       </div>
@@ -615,6 +922,8 @@ function renderSettings(mc){
       <div class="sa-body${openSaIds.has('sa-reset')?' open':''}">${resetHtml}</div>
     </div>
 
+    ${tbMgmtHtml}
+
     ${instrMgmt}
 
     <button class="adm-btn${adminOn?' on':''}" onclick="toggleAdmin()" id="admBtn">
@@ -641,6 +950,7 @@ function renderClsMgmt(){
 
 function renderClsMgmtTop(){
   if(!cfg)return `<div class="card"><div class="sh">🏫 학급 &amp; 학생 관리</div><div style="padding:10px 12px;font-size:12px;color:var(--gray)">학생 명단을 먼저 불러오세요.</div></div>`;
+  _ensureConfigShape();
 
   // 내 담당 학급 (assignments 기반)
   const myClsSet=new Set((instructor?.assignments||[]).map(a=>`${a.sheet}|${a.cls}`));
@@ -655,7 +965,7 @@ function renderClsMgmtTop(){
   }
 
   // 전체 시트 드릴다운 버튼
-  const sheets=Object.keys(cfg.sheets||{});
+  const sheets=['M','T',...Object.keys(cfg.sheets||{}).filter(sh=>!['M','T'].includes(sh))];
   const drillBtns=sheets.map(sh=>{
     const cnt=Object.keys(cfg.sheets[sh]?.classes||{}).length;
     return `<div class="drill-btn" onclick="clsDrillSh='${esc(sh)}';openSaIds.add('sa-cls');renderMain()">
@@ -676,6 +986,7 @@ function renderClsMgmtTop(){
 
 function renderClsMgmtSheet(sh){
   if(!cfg)return '';
+  _ensureConfigShape();
   const shD=cfg.sheets?.[sh]||{classes:{}};
   const shClasses=Object.entries(shD.classes||{});
   let rows='';
@@ -701,7 +1012,7 @@ function buildClsAccordion(sh,cls,clsD,myRole){
   const subBadge=isSub?`<span style="font-size:9px;background:#FEF3C7;color:#92400E;border-radius:8px;padding:1px 6px;font-weight:700;flex-shrink:0">부담임</span>`:'';
   // data-sh / data-cls 어트리뷰트로 식별 — 한글 등 특수문자 클래스명의 clsKey 충돌 방지
   const stuChips=sts.map(s=>`<span class="chip" onclick="rmStu('${esc(sh)}','${esc(cls)}','${esc(s.name)}')">${esc(s.name)} <span>×</span></span>`).join('');
-  const tbChips=tbs.map(t=>`<span class="chip" onclick="rmTb('${esc(sh)}','${esc(cls)}','${esc(t)}')">${esc(t)} <span>×</span></span>`).join('');
+  const tbChips=tbs.map(t=>{const gs=getTbGrade(sh,cls,t)||'';const gsLabel=gs?(GRADE_SEM_LIST.find(g=>g.val===gs)?.label||gs):'';return`<span class="chip" onclick="rmTb('${esc(sh)}','${esc(cls)}','${esc(t)}')">${gsLabel?`<span style="color:var(--indigo);font-size:9px;font-weight:700;margin-right:3px">${esc(gsLabel)}</span>`:`<span style="color:var(--red);font-size:9px;margin-right:3px">미설정</span>`}${esc(t)} <span style="display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;margin-left:4px;border-radius:50%;background:#FEE2E2;color:#B91C1C;font-size:10px;font-weight:700;line-height:1">×</span></span>`;}).join('');
   return `<div style="border-bottom:1px solid var(--border)">
     <div class="acc-hdr" onclick="toggleAcc(this)">
       <span class="acc-arr" style="font-size:10px;color:var(--gray);width:14px;flex-shrink:0">▶</span>
@@ -822,12 +1133,14 @@ async function lookupInstr(){
     }
   }catch(e){toast('조회 실패: '+e);}
 }
+const _HARDCODED_PRESETS=[
+  '과제 완벽 수행 ✅','과제 수행 양호 👍','풀이 완료, 채점 미실시',
+  '거의 완료 (소량 미비)','과반 수행 (절반 이상)','일부만 수행 (다수 미완)',
+  '교재 미지참','과제 이행 의지 없어 보임','교재 검사 불가','교재 검사 거부','결석',
+];
 function _defaultPresets(){
-  return cfg?.presets?.['과제수행도']||[
-    '과제 완벽 수행 ✅','과제 수행 양호 👍','풀이 완료, 채점 미실시',
-    '거의 완료 (소량 미비)','과반 수행 (절반 이상)','일부만 수행 (다수 미완)',
-    '교재 미지참','과제 이행 의지 없어 보임','교재 검사 불가','교재 검사 거부','결석',
-  ];
+  const saved=cfg?.presets?.['과제수행도'];
+  return (saved&&saved.length>0)?saved:_HARDCODED_PRESETS;
 }
 async function _registerInstr(name){
   const defPresets=_defaultPresets();
@@ -855,8 +1168,8 @@ async function toggleAdmin(){
 function onCC(){
   const s=document.getElementById('aCls');if(!s||!cfg)return;
   const[sh,cls]=s.value.split('|');
-  const tbs=cfg?.sheets?.[sh]?.classes?.[cls]?.textbooks||[];
-  const t=document.getElementById('aTb');if(t)t.innerHTML=tbs.map(x=>`<option>${esc(x)}</option>`).join('');
+  const tbs=[...(cfg?.sheets?.[sh]?.classes?.[cls]?.textbooks||[])].sort((a,b)=>a.localeCompare(b,'ko'));
+  const t=document.getElementById('aTb');if(t)t.innerHTML='<option value="">-- 교재 선택 --</option>'+tbs.map(x=>`<option>${esc(x)}</option>`).join('');
 }
 function addA(){
   if(!instructor){toast('먼저 계정을 설정해 주세요.');return;}
@@ -888,27 +1201,113 @@ function ensPath(sh,cls){
   // 이미 존재하는 클래스라도 배열 필드가 누락된 경우(구버전 데이터) 초기화
   if(!cfg.sheets[sh].classes[cls].students)cfg.sheets[sh].classes[cls].students=[];
   if(!cfg.sheets[sh].classes[cls].textbooks)cfg.sheets[sh].classes[cls].textbooks=[];
+  if(!cfg.sheets[sh].classes[cls].tb_grade)cfg.sheets[sh].classes[cls].tb_grade={};
 }
+
+function _ensureConfigShape(){
+  if(!cfg)cfg={sheets:{},presets:{'과제수행도':[]},textbooks:{}};
+  if(!cfg.sheets)cfg.sheets={};
+  for(const sh of ['M','T']){
+    if(!cfg.sheets[sh])cfg.sheets[sh]={classes:{}};
+    if(!cfg.sheets[sh].classes)cfg.sheets[sh].classes={};
+  }
+  if(!cfg.textbooks)cfg.textbooks={};
+  return cfg;
+}
+
 async function pushCfg(){
+  _ensureConfigShape();
   saveLocal();
   if(!fbUrl||!fbPath)return;
-  try{await fbPut('config/sheets',cfg.sheets);setSync(true);toast('저장됨 ✅');}
+  try{
+    const payload={sheets:cfg.sheets||{}};
+    if(cfg.textbooks)payload.textbooks=cfg.textbooks;
+    await fbPatch('config',payload);
+    setSync(true);toast('저장됨 ✅');
+  }
   catch(e){setSync(false);toast('저장 실패: '+e);}
 }
 
+function _ensureTextbookRegistry(){
+  _ensureConfigShape();
+  for(const shD of Object.values(cfg.sheets||{})){
+    for(const clsD of Object.values(shD.classes||{})){
+      for(const tb of clsD.textbooks||[]){
+        if(tb)cfg.textbooks[tb]=true;
+      }
+    }
+  }
+  return cfg.textbooks;
+}
+
+function _assertAdminForTextbookDelete(){
+  if(adminOn)return true;
+  toast('교재 삭제는 관리자만 가능합니다.');
+  return false;
+}
+
+async function addTextbook(){
+  const name=document.getElementById('tb-name-inp')?.value.trim();
+  if(!name){toast('교재명을 입력해 주세요.');return;}
+  const registry=_ensureTextbookRegistry();
+  if(registry[name]){toast('이미 등록된 교재명입니다.');return;}
+  registry[name]=true;
+  await pushCfg();
+  openSaIds.add('sa-tbmgmt');renderMain();toast(`"${name}" 등록됨 ✅`);
+}
+async function rmTextbook(name){
+  if(!_assertAdminForTextbookDelete())return;
+  if(!confirm(`"${name}" 삭제합니까?\n모든 학급의 교재 목록에서도 제거됩니다.`))return;
+  if(!cfg?.textbooks)return;
+  delete cfg.textbooks[name];
+  for(const shD of Object.values(cfg.sheets||{})){
+    for(const clsD of Object.values(shD.classes||{})){
+      if(clsD.textbooks)clsD.textbooks=clsD.textbooks.filter(t=>t!==name);
+      if(clsD.tb_grade)delete clsD.tb_grade[name];
+    }
+  }
+  _syncAssignments();
+  await pushCfg();
+  openSaIds.add('sa-tbmgmt');renderMain();
+}
+const addGradeSemTb=addTextbook;
+const rmGradeSemTb=rmTextbook;
 function addCls(sh){
   const c=prompt(`${sh}반 학급명 (예: 3MGM)`);
   if(!c?.trim())return;
-  if(!cfg)cfg={sheets:{M:{classes:{}},T:{classes:{}}},presets:{'과제수행도':[]}};
+  _ensureConfigShape();
   ensPath(sh,c.trim());
   clsDrillSh=sh;  // 추가 후 해당 시트로 유지
   openSaIds.add('sa-cls'); // 학급 관리 섹션 열린 상태 유지
   pushCfg();
   renderMain();
 }
+function _syncAssignments(){
+  if(!instructor?.assignments?.length)return;
+  const before=instructor.assignments.length;
+  instructor.assignments=instructor.assignments.filter(a=>{
+    const clsD=cfg.sheets?.[a.sheet]?.classes?.[a.cls];
+    if(!clsD)return false;
+    return !a.tb||(clsD.textbooks||[]).includes(a.tb);
+  });
+  if(instructor.assignments.length===before)return;
+  if(curAI>=instructor.assignments.length)curAI=0;
+  saveLocal();
+  if(fbUrl&&fbPath&&instructor.id)
+    fbPatch(`config/instructors/${encodeURIComponent(instructor.id)}`,{assignments:instructor.assignments}).catch(()=>{});
+}
 function rmCls(sh,cls){
   if(!confirm(`${cls} 학급을 삭제합니까?`))return;
   delete cfg.sheets[sh].classes[cls];
+  if(instructor?.assignments){
+    const before=instructor.assignments.length;
+    instructor.assignments=instructor.assignments.filter(a=>!(a.sheet===sh&&a.cls===cls));
+    if(instructor.assignments.length!==before){
+      if(curAI>=instructor.assignments.length)curAI=0;
+      saveLocal();
+      if(fbUrl&&fbPath&&instructor.id)fbPatch(`config/instructors/${encodeURIComponent(instructor.id)}`,{assignments:instructor.assignments}).catch(()=>{});
+    }
+  }
   pushCfg();renderMain();
 }
 function rmStu(sh,cls,name){
@@ -917,40 +1316,88 @@ function rmStu(sh,cls,name){
   refreshStuChips(sh,cls);  // chips만 갱신
   pushCfg();
 }
-// ── 교재 인라인 추가 (아코디언 열림 유지) ────────────────────────
+// ── 교재 인라인 추가 — 학년학기 + 교재 선택/직접입력 ──────────────────────
 function addTbInline(sh,cls,btnEl){
   const chips=btnEl.parentElement;
-  if(chips.querySelector('.tb-new-inp')){chips.querySelector('.tb-new-inp').focus();return;}
-  const wrapper=document.createElement('span');
-  wrapper.style.cssText='display:inline-flex;align-items:center;border:1px solid var(--indigo);border-radius:12px;padding:2px 6px;background:var(--indigo-l);gap:2px;vertical-align:middle;';
-  const inp=document.createElement('input');
-  inp.className='tb-new-inp';
-  inp.style.cssText='border:none;background:transparent;font-size:11px;width:80px;color:var(--text);font-family:inherit;outline:none;';
-  inp.placeholder='교재명';
+  if(chips.querySelector('.tb-inline-wrap')){return;}
+
+  const wrapper=document.createElement('div');
+  wrapper.className='tb-inline-wrap';
+  wrapper.style.cssText='display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-top:5px;padding:6px 8px;background:var(--indigo-l);border:1px solid var(--indigo);border-radius:8px;';
+
+  // 학년학기 select
+  const gsSel=document.createElement('select');
+  gsSel.style.cssText='font-size:11px;padding:3px 5px;border:1px solid var(--border);border-radius:5px;font-family:inherit;background:#fff;';
+  gsSel.innerHTML='<option value="">학년학기</option>'+
+    GRADE_SEM_LIST.map(g=>`<option value="${esc(g.val)}">${esc(g.label)}</option>`).join('');
+
+  // 교재 select (전체 레지스트리)
+  const tbSel=document.createElement('select');
+  tbSel.style.cssText='font-size:11px;padding:3px 5px;border:1px solid var(--border);border-radius:5px;font-family:inherit;background:#fff;min-width:90px;';
+
+  // 직접입력 텍스트 (교재가 없을 때 또는 "직접입력" 선택 시)
+  const tbInp=document.createElement('input');
+  tbInp.placeholder='교재명 직접 입력';
+  tbInp.style.cssText='font-size:11px;padding:3px 5px;border:1px solid var(--indigo);border-radius:5px;font-family:inherit;display:none;min-width:100px;';
+
+  function refreshTbOpts(){
+    const allTbs=Object.keys(_ensureTextbookRegistry()).sort((a,b)=>a.localeCompare(b,'ko'));
+    const existing=cfg?.sheets?.[sh]?.classes?.[cls]?.textbooks||[];
+    const available=allTbs.filter(n=>!existing.includes(n));
+    tbSel.innerHTML='<option value="">교재 선택</option>'+
+      available.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join('')+
+      '<option value="__new__">✏️ 직접 입력...</option>';
+    tbInp.style.display='none';
+  }
+  refreshTbOpts();
+
+  tbSel.onchange=()=>{
+    if(tbSel.value==='__new__'){
+      tbInp.style.display='';tbInp.focus();
+    } else {
+      tbInp.style.display='none';tbInp.value='';
+    }
+  };
+
   const ok=document.createElement('span');
   ok.textContent='✓';
-  ok.style.cssText='cursor:pointer;color:var(--indigo);font-weight:700;font-size:13px;line-height:1;padding:0 2px;';
+  ok.style.cssText='cursor:pointer;color:var(--indigo);font-weight:700;font-size:14px;padding:0 2px;';
   const cancel=document.createElement('span');
   cancel.textContent='×';
-  cancel.style.cssText='cursor:pointer;color:var(--gray);font-size:13px;line-height:1;';
+  cancel.style.cssText='cursor:pointer;color:var(--gray);font-size:14px;padding:0 2px;';
   cancel.onclick=()=>wrapper.remove();
+  tbInp.onkeydown=e=>{if(e.key==='Enter')ok.click();};
+
   async function doAdd(){
-    const t=inp.value.trim();
-    if(!t){wrapper.remove();return;}
+    const gs=gsSel.value;
+    if(!gs){toast('학년학기를 선택해 주세요.');return;}
+    let t='';
+    if(tbSel.value==='__new__'){
+      t=tbInp.value.trim();
+      if(!t){toast('교재명을 입력해 주세요.');return;}
+      // 글로벌 레지스트리에도 등록
+      _ensureTextbookRegistry()[t]=true;
+    } else {
+      t=tbSel.value;
+      if(!t){toast('교재를 선택해 주세요.');return;}
+    }
+    const existingTbs=cfg?.sheets?.[sh]?.classes?.[cls]?.textbooks||[];
+    if(existingTbs.includes(t)){toast('이미 추가된 교재입니다.');return;}
     ensPath(sh,cls);
     cfg.sheets[sh].classes[cls].textbooks.push(t);
+    cfg.sheets[sh].classes[cls].tb_grade[t]=gs;
     wrapper.remove();
     try{refreshTbChips(sh,cls);}catch(e){renderMain();}
     try{await pushCfg();}catch(e){toast('교재 저장 실패: '+e);}
   }
   ok.onclick=doAdd;
-  inp.addEventListener('keydown',e=>{
-    if(e.key==='Enter'){e.preventDefault();doAdd();}
-    if(e.key==='Escape')wrapper.remove();
-  });
-  wrapper.appendChild(inp);wrapper.appendChild(ok);wrapper.appendChild(cancel);
-  chips.insertBefore(wrapper,btnEl);
-  inp.focus();
+  gsSel.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();ok.click();}};
+  tbSel.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();ok.click();}};
+  tbInp.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();ok.click();}};
+
+  wrapper.appendChild(gsSel);wrapper.appendChild(tbSel);wrapper.appendChild(tbInp);wrapper.appendChild(ok);wrapper.appendChild(cancel);
+  chips.parentElement.appendChild(wrapper);
+  gsSel.focus();
 }
 function refreshTbChips(sh,cls){
   // data-sh/data-cls 어트리뷰트로 탐색 — clsKey(한글→_) 충돌 방지
@@ -959,11 +1406,24 @@ function refreshTbChips(sh,cls){
   const el=document.querySelector(`[data-chip-type="tb"][data-sh="${sSh}"][data-cls="${sCls}"]`);
   if(!el)return;
   const tbs=cfg.sheets?.[sh]?.classes?.[cls]?.textbooks||[];
-  const tbChips=tbs.map(t=>`<span class="chip" onclick="rmTb('${esc(sh)}','${esc(cls)}','${esc(t)}')">${esc(t)} <span>×</span></span>`).join('');
+  const tbChips=tbs.map(t=>{const gs=getTbGrade(sh,cls,t)||'';const gsLabel=gs?(GRADE_SEM_LIST.find(g=>g.val===gs)?.label||gs):'';return`<span class="chip" onclick="rmTb('${esc(sh)}','${esc(cls)}','${esc(t)}')">${gsLabel?`<span style="color:var(--indigo);font-size:9px;font-weight:700;margin-right:3px">${esc(gsLabel)}</span>`:`<span style="color:var(--red);font-size:9px;margin-right:3px">미설정</span>`}${esc(t)} <span style="display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;margin-left:4px;border-radius:50%;background:#FEE2E2;color:#B91C1C;font-size:10px;font-weight:700;line-height:1">×</span></span>`;}).join('');
   el.innerHTML=tbChips+`<span class="chip" style="background:var(--indigo-l);border-color:var(--indigo);color:var(--indigo);cursor:pointer" onclick="addTbInline('${esc(sh)}','${esc(cls)}',this)">+ 교재 추가</span>`;
 }
 function addTb(sh,cls){const t=prompt(`${cls} 교재명:`);if(!t?.trim())return;ensPath(sh,cls);cfg.sheets[sh].classes[cls].textbooks.push(t.trim());pushCfg();renderMain();}
-function rmTb(sh,cls,tb){if(!confirm(`"${tb}" 삭제합니까?`))return;cfg.sheets[sh].classes[cls].textbooks=cfg.sheets[sh].classes[cls].textbooks.filter(t=>t!==tb);refreshTbChips(sh,cls);pushCfg();}
+async function rmTb(sh,cls,tb){
+  if(!confirm(`"${tb}" 삭제합니까?`))return;
+  ensPath(sh,cls);
+  cfg.sheets[sh].classes[cls].textbooks=(cfg.sheets[sh].classes[cls].textbooks||[]).filter(t=>t!==tb);
+  if(cfg?.sheets?.[sh]?.classes?.[cls]?.tb_grade){
+    delete cfg.sheets[sh].classes[cls].tb_grade[tb];
+  }
+  try{refreshTbChips(sh,cls);}catch(e){}
+  try{
+    await pushCfg();
+  }catch(e){
+    toast('교재 삭제 저장 실패: '+e);
+  }
+}
 
 async function loadCfg(){
   if(!fbUrl||!fbPath){toast('Firebase URL과 경로를 먼저 저장하세요.');return;}
@@ -971,7 +1431,10 @@ async function loadCfg(){
   mc.innerHTML=`<div class="loading"><div class="spin"></div>불러오는 중...</div>`;
   try{
     const data=await fbGet('config');
-    cfg=data||{sheets:{M:{classes:{}},T:{classes:{}}},presets:{'과제수행도':[]}};saveLocal();setSync(true);
+    cfg=data||{sheets:{M:{classes:{}},T:{classes:{}}},presets:{'과제수행도':[]},textbooks:{}};
+    _ensureConfigShape();
+    _ensureTextbookRegistry();
+    saveLocal();setSync(true);
     try{let s=await fbGet('session').catch(()=>null);if(!s?.class_data)s=await fbGet('lastSent').catch(()=>null);if(s?.class_data)for(const[k,v]of Object.entries(s.class_data))if(!progressData[k])progressData[k]=v;saveLocal();}catch(e){}
     try{const d=await fbGet('input');if(d)Object.assign(inputData,d);saveLocal();}catch(e){}
     try{const d=await fbGet('obs');if(d)Object.assign(tagData,d);saveLocal();}catch(e){}
@@ -1153,7 +1616,7 @@ async function loadInstrsSection(){
   if(!adminOn){card.innerHTML='<div style="padding:10px 12px;font-size:12px;color:var(--gray)">관리자 모드가 필요합니다.</div>';return;}
   if(!fbUrl||!fbPath){card.innerHTML='<div style="padding:10px 12px;font-size:12px;color:var(--gray)">Firebase 연결 후 사용 가능합니다.</div>';return;}
   let instrs=[];
-  try{const d=await fbGet('config/instructors');if(d)instrs=Object.entries(d).map(([id,v])=>({id,...v}));}catch(e){}
+  try{const d=await fbGet('config/instructors');if(d)instrs=Object.entries(d).map(([id,v])=>({id,...v})).sort((a,b)=>(a.name||'').localeCompare(b.name||'','ko'));}catch(e){}
   const list=instrs.map(ins=>{
     const isCur=instructor?.id===ins.id;
     return `<div style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid var(--border)">
@@ -1167,7 +1630,7 @@ async function loadInstrsSection(){
   }).join('');
   const newForm=`<div style="padding:10px 12px;border-top:1px solid var(--border)">
     <div style="font-size:11px;font-weight:700;color:var(--sub);margin-bottom:8px">신규 강사 등록</div>
-    <div style="display:flex;gap:6px"><input class="inp sm" id="niNameCard" placeholder="이름" style="flex:1"><button class="btn bp bsm" onclick="createI('card')">등록</button></div>
+    <div style="display:flex;gap:6px"><input class="inp sm" id="niNameCard" placeholder="이름" style="flex:1" onkeydown="if(event.key==='Enter')createI('card')"><button class="btn bp bsm" onclick="createI('card')">등록</button></div>
   </div>`;
   card.innerHTML=`${list||'<div style="padding:10px 12px;font-size:12px;color:var(--gray)">등록된 강사가 없습니다.</div>'}${newForm}`;
 }
@@ -1217,7 +1680,9 @@ function toggleAcc(hdr){
 //  초기화
 // ══════════════════════════════════════════════════════════
 function init(){
-  loadLocal();renderSb();
+  loadLocal();
+  loadCurriculum();
+  renderSb();
   if(!instructor){
     renderMhdr('DailyReportWizard');
     document.getElementById('mc').innerHTML=`<div class="empty">👋 안녕하세요!<br>먼저 강사 정보를 등록해 주세요.<br><br><button class="btn bp" onclick="goNav('setting')">⚙️ 설정으로 이동</button></div>`;
@@ -1231,6 +1696,7 @@ function init(){
       if(sessD?.class_data)for(const[k,v]of Object.entries(sessD.class_data))if(!progressData[k])progressData[k]=v;
       if(obsD)Object.assign(tagData,obsD);
       if(inpD||sessD||obsD)saveLocal();
+      _syncAssignments();
       renderMain();renderSb();
     }).catch(()=>{setSync(false);renderMain();});
   }

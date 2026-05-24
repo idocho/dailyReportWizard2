@@ -17,24 +17,25 @@ ai_engine.DEBUG_AI_PROMPT = "--debug-ai" in sys.argv
 
 if __name__ == '__main__':
     runtime_dir = set_runtime_cwd()
-    root = tk.Tk()
-
-    # 아이콘 설정
+    root = None
     try:
-        from storage import resource_path
-        icon_path = resource_path('drw_icon.ico')
-        root.iconbitmap(icon_path)
+        root = tk.Tk()
+
+        # 아이콘 설정
         try:
-            from PIL import Image, ImageTk  # type: ignore
-            _img   = Image.open(icon_path)
-            _photo = ImageTk.PhotoImage(_img.resize((256, 256), Image.LANCZOS))
-            root.wm_iconphoto(True, _photo)
+            from storage import resource_path
+            icon_path = resource_path('drw_icon.ico')
+            root.iconbitmap(icon_path)
+            try:
+                from PIL import Image, ImageTk  # type: ignore
+                _img   = Image.open(icon_path)
+                _photo = ImageTk.PhotoImage(_img.resize((256, 256), Image.LANCZOS))
+                root.wm_iconphoto(True, _photo)
+            except Exception:
+                pass
         except Exception:
             pass
-    except Exception:
-        pass
 
-    try:
         App(root)
         root.mainloop()
     except Exception as exc:
@@ -54,3 +55,9 @@ if __name__ == '__main__':
         except Exception:
             pass
         raise
+    finally:
+        if root is not None:
+            try:
+                root.destroy()
+            except Exception:
+                pass
