@@ -81,10 +81,16 @@ TAGS = {
         {"key": "attitude", "label": "😤 태도불량"},
         {"key": "late",     "label": "⏰ 지각"},
     ],
-     "extra": [
+    "extra": [
         {"key": "self_study",  "label": "📚 자율학습"},
         {"key": "weekly_test", "label": "📝 주간Test"},
         {"key": "retest",      "label": "🔄 재시험"},
+    ],
+    "highlight": [
+        {"key": "perfect",  "label": "🏆 만점·완벽"},
+        {"key": "improved", "label": "📈 큰 향상"},
+        {"key": "mastered", "label": "✅ 개념완전습득"},
+        {"key": "effort",   "label": "💎 끝까지도전"},
     ],
 }  # TAGS 닫는 중괄호
 
@@ -111,7 +117,6 @@ DEFAULT_CONFIG = {
             "일부만 수행 (다수 미완)",
             "교재 미지참",
             "과제 이행 의지 없어 보임",
-            "추가 자율학습 실시",
             "교재 검사 불가",
             "교재 검사 거부",
             "결석",

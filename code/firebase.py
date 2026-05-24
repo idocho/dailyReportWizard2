@@ -51,14 +51,14 @@ def firebase_patch(cfg, node, data):
         return json.loads(r.read())
 
 
-# ── obs 전용 ─────────────────────────────────────────────────────────
+# ── 태그 전용 (Firebase 경로: obs/) ──────────────────────────────────
 def today_key():
     """오늘 날짜 키 (YYYY-MM-DD)."""
     return datetime.date.today().isoformat()
 
 
-def fetch_obs(cfg):
-    """obs/ 노드 전체 로드 → dict.
+def fetch_tags(cfg):
+    """수업 관찰 태그 전체 로드 → dict. (Firebase: obs/ 노드)
     구조: { "sheet|cls|name": { "YYYY-MM-DD": { condition, understand, ... } } }
     """
     try:
@@ -68,8 +68,8 @@ def fetch_obs(cfg):
         return {}
 
 
-def fetch_obs_today(cfg, sheet, cls, name):
-    """특정 학생의 오늘 obs 데이터만 로드."""
+def fetch_tags_today(cfg, sheet, cls, name):
+    """특정 학생의 오늘 수업 관찰 태그만 로드. (Firebase: obs/ 노드)"""
     okey = urllib.parse.quote(f"{sheet}|{cls}|{name}", safe='')
     try:
         data = firebase_get(cfg, f"obs/{okey}/{today_key()}")

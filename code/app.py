@@ -6,7 +6,7 @@ Crafted by IDO(idocho@kakao.com) · Powered by Claude AI
   constants  — 전역 상수·태그 정의
   storage    — 설정·캐시 파일 I/O
   firebase   — Firebase REST CRUD, obs 로드
-  ai_engine  — AI 특이사항 생성 (obs 태그 주입 포함)
+  ai_engine  — AI 특이사항 생성 (수업 관찰 태그 주입 포함)
   message    — 메시지 조립 유틸
 """
 import tkinter as tk
@@ -52,7 +52,7 @@ from constants import (
 )
 from storage  import (load_config, save_config, has_students,
                       save_daily_cache, load_daily_cache, set_runtime_cwd, RUNTIME_DIR)
-from firebase import firebase_get, firebase_put, firebase_patch, fetch_obs, today_key
+from firebase import firebase_get, firebase_put, firebase_patch, fetch_tags, today_key
 from ai_engine import AiEngine
 from message   import today_str, get_room, nickname_suffix, build_message
 
@@ -72,7 +72,7 @@ class App:
         self.student_data = {}   # Firebase input/ 로드 시 채워짐
         self.note_data    = {}   # Firebase input/ 로드 시 채워짐
         self.force_data   = {}   # (sheet,cls,name) → bool 강제완료 플래그
-        self.obs_data     = {}   # Firebase obs/ 로드 시 채워짐 (v2.0 신규)
+        self.tag_data     = {}   # Firebase obs/ 노드에서 로드하는 수업 관찰 태그
         self.status_w  = {}   # (sheet,cls,name) → (canvas, oval_id)
         self.s_btn_map = {}   # (sheet,cls,name) → tk.Button
         # (sheet,cls) -> bool (True if folded/collapsed)
@@ -868,9 +868,9 @@ class App:
                 date_str   = last_raw.get("date", "")
 
             # ── 3. 수업 관찰 태그 (obs/ 노드, v2.0 신규) ──
-            obs_raw = fetch_obs(self.cfg)
-            if obs_raw:
-                self.obs_data.update(obs_raw)
+            tag_raw = fetch_tags(self.cfg)
+            if tag_raw:
+                self.tag_data.update(tag_raw)
 
             if not input_data and not class_data:
                 messagebox.showinfo("알림", "웹 입력 데이터가 없습니다.\n웹에서 먼저 수업을 입력해 주세요.")
@@ -993,127 +993,6 @@ class App:
                   padx=16, pady=8, cursor='hand2',
                   command=_do).pack(pady=18)
 
-    # ── 반별 진도/과제 창 ────────────────────────────────────────────
-    def _open_progress_window(self):
-        if hasattr(self, '_progress_win') and self._progress_win.winfo_exists():
-            self._progress_win.lift()
-            self._progress_win.focus_force()
-            return
-        win = tk.Toplevel(self.root)
-        self._progress_win = win
-        win.title("반별 진도 / 과제")
-        win.geometry("580x520")
-        win.configure(bg=BG)
-        win.resizable(True, True)
-
-        # 헤더
-        tk.Label(win, text="반별 진도 / 과제 입력",
-                 font=("맑은 고딕", 12, "bold"), bg=BG, fg=TEXT
-                 ).pack(anchor='w', padx=16, pady=(12,4))
-
-        # 버튼 영역 — 스크롤 프레임보다 먼저 pack (bottom 고정)
-        foot = tk.Frame(win, bg=PANEL,
-                        highlightbackground=BORDER, highlightthickness=1)
-        foot.pack(fill='x', side='bottom')
-
-        def _clear_progress():
-            if not messagebox.askyesno("초기화", "진도/과제 데이터를 모두 초기화합니까?"):
-                return
-            self.progress_data.clear()
-            save_daily_cache(self.progress_data, self.student_data, self.note_data, self.force_data)
-            win.destroy()
-            self._open_progress_window()
-
-        def _on_close():
-            win.destroy()
-
-        tk.Button(foot, text="✅ 저장",
-                  font=FT, bg=DARK, fg='white', relief='flat',
-                  cursor='hand2', command=_on_close
-                  ).pack(fill='x', padx=10, pady=(8,3))
-        tk.Button(foot, text="닫기",
-                  font=FT, bg="#F1F5F9", fg=SUBTEXT,
-                  relief='flat', cursor='hand2',
-                  command=win.destroy
-                  ).pack(fill='x', padx=10, pady=(0, 3))
-        tk.Button(foot, text="🗑 진도/과제 초기화",
-                  font=FT, bg="#FEF2F2", fg="#EF4444",
-                  relief='flat', cursor='hand2',
-                  command=_clear_progress
-                  ).pack(fill='x', padx=10, pady=(0, 8))
-
-        # 스크롤 영역
-        _, inner = make_scroll_frame(win, bg=BG)
-        sheet = self.cur_sheet
-
-        # Tab 순서 관리용 위젯 목록
-        all_texts = []
-
-        for cls, cls_data in self.cfg['sheets'][sheet]['classes'].items():
-            tbs = cls_data.get('textbooks', [])
-            lf  = tk.LabelFrame(inner, text=f"  {cls}  ", font=FT,
-                                 fg=DARK, bg=BG, padx=10, pady=8)
-            lf.pack(fill='x', padx=14, pady=8)
-            lf.columnconfigure(2, weight=1)
-
-            row_idx = 0
-            for tb in tbs:
-                tk.Label(lf, text=tb, font=("맑은 고딕", 9, "bold"),
-                         bg=BG, fg=SUBTEXT).grid(
-                    row=row_idx, column=0, columnspan=3,
-                    sticky='w', pady=(6,2))
-                row_idx += 1
-
-                for label, field in [("진도", "progress"), ("과제", "homework")]:
-                    tk.Label(lf, text=label, font=FS, bg=BG, fg=GRAY
-                             ).grid(row=row_idx, column=1, sticky='nw',
-                                    padx=(14,6), pady=2)
-                    t = tk.Text(lf, height=1, font=FE, wrap='word',
-                                relief='flat', bg="#F8FAFC", bd=1,
-                                highlightbackground=BORDER, highlightthickness=1)
-                    t.grid(row=row_idx, column=2, sticky='ew', pady=2)
-
-                    class_key = (sheet, cls, tb)
-                    old = self.progress_data.get(class_key, {}).get(field, '')
-                    if old: t.insert('1.0', old)
-
-                    def _make_saver(key, f2, widget):
-                        def _sv(e=None):
-                            if key not in self.progress_data:
-                                self.progress_data[key] = {}
-                            self.progress_data[key][f2] = widget.get('1.0','end').strip()
-                            self._update_preview()
-                            save_daily_cache(self.progress_data, self.student_data, self.note_data, self.force_data)
-                        return _sv
-                    t.bind('<KeyRelease>', _make_saver(class_key, field, t))
-                    all_texts.append(t)
-                    row_idx += 1
-
-        # Tab / Shift+Tab 으로 텍스트박스 순방향·역방향 이동
-        def _make_tab(idx):
-            def _tab(e):
-                next_idx = (idx + 1) % len(all_texts)
-                all_texts[next_idx].focus_set()
-                all_texts[next_idx].mark_set('insert', 'end')
-                return 'break'
-            return _tab
-
-        def _make_shift_tab(idx):
-            def _stab(e):
-                prev_idx = (idx - 1) % len(all_texts)
-                all_texts[prev_idx].focus_set()
-                all_texts[prev_idx].mark_set('insert', 'end')
-                return 'break'
-            return _stab
-
-        for i, t in enumerate(all_texts):
-            t.bind('<Tab>',       _make_tab(i))
-            t.bind('<Shift-Tab>', _make_shift_tab(i))
-
-        # 첫 번째 텍스트박스에 포커스
-        if all_texts:
-            all_texts[0].focus_set()
-
 # ── 설정 창 ──────────────────────────────────────────────────────
     def _open_settings(self):
         # 이미 열려있으면 앞으로 가져오기
@@ -1179,8 +1058,11 @@ class App:
             tmp = {'firebase_url': url, 'firebase_path': path}
             try:
                 from firebase import firebase_get
-                firebase_get(tmp, "config/presets")
-                messagebox.showinfo("성공", "Firebase 연결 테스트에 성공했습니다!", parent=win)
+                result = firebase_get(tmp, "config")
+                if result is None:
+                    messagebox.showwarning("주의", "연결은 성공했지만 config 노드가 비어있습니다.\nFirebase 경로를 확인하세요.", parent=win)
+                else:
+                    messagebox.showinfo("성공", "Firebase 연결 테스트에 성공했습니다!", parent=win)
             except Exception as e:
                 messagebox.showerror("실패", f"연결 실패:\n{e}", parent=win)
 
@@ -1274,8 +1156,8 @@ class App:
                 s_data = firebase_get(self.cfg, "config/sheets")
                 if isinstance(s_data, dict):
                     self.cfg['sheets'] = s_data
-                asgn = firebase_get(self.cfg, f"config/instructors/{self.cfg['instructor_id']}/classes")
-                self.cfg['instructor_assignments'] = list(asgn.values()) if isinstance(asgn, dict) else []
+                asgn = firebase_get(self.cfg, f"config/instructors/{self.cfg['instructor_id']}/assignments")
+                self.cfg['instructor_assignments'] = list(asgn) if isinstance(asgn, list) else []
                 messagebox.showinfo("성공", "Firebase로부터 학급 명단 동기화 완료!", parent=win)
             except Exception as e:
                 messagebox.showerror("오류", f"명단 가져오기 실패:\n{e}", parent=win)
@@ -1406,7 +1288,8 @@ class App:
         total = len(msgs)
         time.sleep(3)
         for i, m in enumerate(msgs):
-            self.send_status.config(text=f"전송 중... ({i+1}/{total})  {m['name']}")
+            self.root.after(0, lambda t=f"전송 중... ({i+1}/{total})  {m['name']}":
+                            self.send_status.config(text=t))
             try:
                 pyperclip.copy(m['room'])
                 pyautogui.hotkey(_MOD,'f'); time.sleep(0.2)
@@ -1422,9 +1305,11 @@ class App:
                 print(f"오류 [{m['name']}]: {e}")
             time.sleep(0.8)
 
-        self.send_status.config(text=f"✅ 전송 완료 — {total}명")
-        self._reset_after_send()
-        messagebox.showinfo("완료", f"{total}명 전송 완료!")
+        def _on_done():
+            self.send_status.config(text=f"✅ 전송 완료 — {total}명")
+            self._reset_after_send()
+            messagebox.showinfo("완료", f"{total}명 전송 완료!")
+        self.root.after(0, _on_done)
 
     def _reset_after_send(self):
         """전송 완료 후 로컬 전면 초기화 (진도/과제 포함) — DB 쓰기는 lastSent만"""

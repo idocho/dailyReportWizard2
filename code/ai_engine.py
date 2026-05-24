@@ -12,7 +12,7 @@ import urllib.error
 DEBUG_AI_PROMPT: bool = False
 
 from constants import APP_VERSION, AI_COOLDOWN_GROQ, AI_COOLDOWN_PAID, TAGS
-from firebase import fetch_obs_today, today_key
+from firebase import fetch_tags_today, today_key
 from storage import save_daily_cache
 
 def dprint(*args, **kwargs):
@@ -55,40 +55,51 @@ _EXTRA_TEXT = {
     "weekly_test": "주간 테스트를 실시함",
     "retest":      "재시험을 실시함",
 }
+_HIGHLIGHT_TEXT = {
+    "perfect":  "오늘 만점 또는 완벽에 가까운 풀이 성취",
+    "improved": "지난 수업 대비 눈에 띄게 향상된 모습",
+    "mastered": "오늘 다룬 개념을 완전히 습득함",
+    "effort":   "어려운 문제에도 끝까지 포기하지 않는 집념을 보임",
+}
 
 
-def _build_obs_context(obs: dict) -> str:
-    """오늘 obs 태그 dict → 프롬프트용 자연어 블록."""
-    if not obs:
+def _build_tags_context(tags: dict) -> str:
+    """오늘 수업 관찰 태그 dict → 프롬프트용 자연어 블록."""
+    if not tags:
         return ""
 
     lines = []
 
-    cond = obs.get("condition")
+    cond = tags.get("condition")
     if cond and cond in _CONDITION_TEXT:
         lines.append(f"- 수업 컨디션: {_CONDITION_TEXT[cond]}")
 
-    und = obs.get("understand")
+    und = tags.get("understand")
     if und and und in _UNDERSTAND_TEXT:
         lines.append(f"- 이해 속도: {_UNDERSTAND_TEXT[und]}")
 
-    for key in obs.get("understand_sub") or []:
+    for key in tags.get("understand_sub") or []:
         if key in _UNDERSTAND_SUB_TEXT:
             lines.append(f"- {_UNDERSTAND_SUB_TEXT[key]}")
 
-    engage_notes = [_ENGAGE_TEXT[k] for k in (obs.get("engage") or []) if k in _ENGAGE_TEXT]
+    engage_notes = [_ENGAGE_TEXT[k] for k in (tags.get("engage") or []) if k in _ENGAGE_TEXT]
     if engage_notes:
         lines.append(f"- 참여 행동: {', '.join(engage_notes)}")
 
-    caution_notes = [_CAUTION_TEXT[k] for k in (obs.get("caution") or []) if k in _CAUTION_TEXT]
+    caution_notes = [_CAUTION_TEXT[k] for k in (tags.get("caution") or []) if k in _CAUTION_TEXT]
     if caution_notes:
         lines.append(f"- 주의 관찰 (학부모 전달용, 과도한 비난 표현 금지): {', '.join(caution_notes)}")
-        extra_notes = [_EXTRA_TEXT[k] for k in (obs.get("extra") or []) if k in _EXTRA_TEXT]
+    extra_notes = [_EXTRA_TEXT[k] for k in (tags.get("extra") or []) if k in _EXTRA_TEXT]
     if extra_notes:
         lines.append(f"- 특수 이벤트: {', '.join(extra_notes)}")
+
+    hl = tags.get("highlight")
+    if hl and hl in _HIGHLIGHT_TEXT:
+        lines.insert(0, f"- ⭐ 오늘의 하이라이트: {_HIGHLIGHT_TEXT[hl]}")
+
     if DEBUG_AI_PROMPT:
-        print(f"[OBS DEBUG] raw={obs}")
-        print(f"[OBS DEBUG] built=\n{chr(10).join(lines) if lines else '(없음)'}")
+        print(f"[TAGS DEBUG] raw={tags}")
+        print(f"[TAGS DEBUG] built=\n{chr(10).join(lines) if lines else '(없음)'}")
 
     return "\n".join(lines)
 
@@ -97,20 +108,23 @@ def _base_conditions() -> str:
     """모든 AI 생성 호출에 공통으로 들어가는 조건 문자열."""
     return (
         "[작성 지침]\n"
-        "1. 문체: ~했습니다 체로 통일 (했어요 혼용 금지). 학생 이름으로 시작.\n"
+        "1. 문체: ~했습니다 체로 통일 (했어요 혼용 금지). 학생 이름 또는 오늘 수업 내용으로 자연스럽게 시작 "
+        "(매 문장을 이름으로만 시작하지 말 것 — 단조로운 패턴 금지).\n"
         "2. 금지: '어머님·학부모님' 호칭, 시스템 표현('미입력·데이터 없음' 등), "
         "제공된 데이터에 없는 사실 추가(할루시네이션) 절대 금지.\n"
         "3. 이벤트 반영: [수업 관찰 및 이벤트 정보]에 명시된 항목만 반영. "
-        "이 섹션에 명시되지 않은 자율학습·재시험·주간테스트 등을 임의로 추가하지 마세요.\n"
-        "4. 주의 태그: 학부모에게 사실 전달은 가능하나 과도한 비난·단정적 표현은 금지. 사실 기반으로 자연스럽게 녹여 작성.\n"
-        "5. 결석: 데이터가 없으면 안부 인사와 다음 수업 기약 코멘트로 대체.\n"
-        "6. 출력: 순수 텍스트만 (JSON·마크다운·따옴표 금지). 2~3문장, 100자 내외."
+        "이 섹션에 없는 자율학습·재시험·주간테스트 등을 임의로 추가하지 마세요.\n"
+        "4. 주의 태그: '졸음·잡담·태도불량' 등 직접 단어 사용 절대 금지. "
+        "'오늘은 조금 피곤해 보이는 날이었습니다' / '집중이 다소 어려웠던 날이었지만' 수준으로 완곡하게 녹여 작성.\n"
+        "5. 하이라이트: ⭐ 오늘의 하이라이트가 있으면 메시지에서 가장 먼저 또는 가장 인상적으로 표현.\n"
+        "6. 결석: 데이터가 없으면 안부 인사와 다음 수업 기약 코멘트로 대체.\n"
+        "7. 출력: 순수 텍스트만 (JSON·마크다운·따옴표 금지). 2~3문장, 100자 내외."
     )
 
 
 # ── 단건 생성 프롬프트 ───────────────────────────────────────────────
 def build_single_prompt(sheet, cls, name, textbooks, student_data, progress_data,
-                        existing_note, obs):
+                        existing_note, tags):
     """단건 AI 생성용 프롬프트 조립 (이벤트 반영 최적화)."""
     lines = []
     for tb in textbooks:
@@ -124,16 +138,20 @@ def build_single_prompt(sheet, cls, name, textbooks, student_data, progress_data
             )
     context = "\n".join(lines) if lines else "수업 진행 완료"
 
-    obs_block = _build_obs_context(obs)
+    tags_block = _build_tags_context(tags)
 
     prompt = (
         "수학학원 교사가 학부모에게 보낼 데일리 리포트 특이사항을 작성합니다.\n"
         "아래 제공된 데이터만을 근거로 작성하고, 데이터에 없는 내용은 절대 추가하지 마세요.\n\n"
+        "[문체 참고 예시 — 내용은 아래 학생 데이터로 새로 작성]\n"
+        "예1) \"오늘 이차함수 단원에서 막혔던 개념을 반복 설명 후 이해했습니다. 틀린 문항을 스스로 재풀이하며 오답을 정리하는 모습이 인상적이었습니다.\"\n"
+        "예2) \"주간 테스트를 실시했으며, 오늘은 다소 피곤해 보이는 날이었지만 끝까지 집중해서 임했습니다.\"\n"
+        "예3) \"예습 내용을 바탕으로 설명을 빠르게 이해하고 응용 문제까지 도전했습니다. 오늘 다룬 개념을 완전히 자기 것으로 만든 하루였습니다.\"\n\n"
         f"[학생 이름]\n{name}\n\n"
         f"[수업 데이터]\n{context}\n\n"
     )
-    if obs_block:
-        prompt += f"[수업 관찰 및 이벤트 정보]\n{obs_block}\n\n"
+    if tags_block:
+        prompt += f"[수업 관찰 및 이벤트 정보]\n{tags_block}\n\n"
     if existing_note:
         prompt += f"[기존 특이사항 참고]\n{existing_note}\n\n"
 
@@ -158,9 +176,9 @@ def build_batch_prompt(targets):
         }
         if t.get("existing"):
             entry["기존특이사항"] = t["existing"]
-        obs_block = _build_obs_context(t.get("obs") or {})
-        if obs_block:
-            entry["수업관찰및이벤트"] = obs_block
+        tags_block = _build_tags_context(t.get("tags") or {})
+        if tags_block:
+            entry["수업관찰및이벤트"] = tags_block
         students_payload.append(entry)
 
     students_json = json.dumps(students_payload, ensure_ascii=False, indent=2)
@@ -169,6 +187,10 @@ def build_batch_prompt(targets):
         "수학학원 교사가 학부모용 데일리 리포트 특이사항을 일괄 작성합니다.\n"
         "⚠️ 각 학생의 '수업관찰및이벤트' 필드에 명시된 항목만 반영하세요. "
         "필드에 없는 자율학습·재시험·주간테스트 등은 절대 언급하지 마세요.\n\n"
+        "[문체 기준] 2~3문장 100자 내외. 학부모가 읽기 편한 따뜻한 어조. "
+        "학생 이름 또는 수업 내용으로 자연스럽게 시작 (매번 이름으로만 시작하지 말 것). "
+        "'졸음·잡담·태도불량' 직접 단어 사용 금지 — 완곡하게 표현.\n"
+        "⭐ 하이라이트 항목이 있으면 가장 인상적인 표현으로 강조.\n\n"
         f"{_base_conditions()}\n\n"
         "⚠️ 반드시 JSON 배열로만 응답 (다른 텍스트 금지):\n"
         '[{"cls":"반명","name":"이름","note":"특이사항"}, ...]\n\n'
@@ -178,7 +200,7 @@ def build_batch_prompt(targets):
 
 
 # ── 멀티 엔진 API 허브 (직관적 선택형 분기) ───────────────────────────
-def _call_ai_hub(engine_type, api_key, prompt, max_tokens=300, temperature=0.5):
+def _call_ai_hub(engine_type, api_key, prompt, max_tokens=300, temperature=0.5, system=""):
     """설정창에서 선택된 특정 AI 엔진 규격에 맞추어 통신을 처리합니다."""
     engine_type = engine_type.strip().lower()
 
@@ -189,9 +211,13 @@ def _call_ai_hub(engine_type, api_key, prompt, max_tokens=300, temperature=0.5):
             "Authorization": f"Bearer {api_key}",
             "User-Agent":    f"DailyReportWizard/{APP_VERSION.lstrip('v')}",
         }
+        messages = []
+        if system:
+            messages.append({"role": "system", "content": system})
+        messages.append({"role": "user", "content": prompt})
         body = {
-            "model":       "llama-3.1-8b-instant",  # 무료 최고 가성비 속도 최적화
-            "messages":    [{"role": "user", "content": prompt}],
+            "model":       "llama-3.1-8b-instant",
+            "messages":    messages,
             "max_tokens":  max_tokens,
             "temperature": temperature
         }
@@ -204,11 +230,13 @@ def _call_ai_hub(engine_type, api_key, prompt, max_tokens=300, temperature=0.5):
             "Content-Type":      "application/json"
         }
         body = {
-            "model":      "claude-sonnet-4-6",            # 최신 Sonnet
+            "model":      "claude-sonnet-4-6",
             "max_tokens":  max_tokens,
             "temperature": temperature,
             "messages":    [{"role": "user", "content": prompt}]
         }
+        if system:
+            body["system"] = system
 
     elif engine_type == "openai":
         url = "https://api.openai.com/v1/chat/completions"
@@ -216,9 +244,13 @@ def _call_ai_hub(engine_type, api_key, prompt, max_tokens=300, temperature=0.5):
             "Content-Type":  "application/json",
             "Authorization": f"Bearer {api_key}"
         }
+        messages = []
+        if system:
+            messages.append({"role": "system", "content": system})
+        messages.append({"role": "user", "content": prompt})
         body = {
-            "model":       "gpt-4o-mini",  # 비용 효율 범용
-            "messages":    [{"role": "user", "content": prompt}],
+            "model":       "gpt-4o-mini",
+            "messages":    messages,
             "max_tokens":  max_tokens,
             "temperature": temperature
         }
@@ -301,12 +333,19 @@ class AiEngine:
         app = self.app
 
         existing = app.note_data.get((sheet, cls, name), {}).get('value', '').strip()
-        obs = app.obs_data.get(f"{sheet}|{cls}|{name}", {}).get(today_key(), {})
+        okey = f"{sheet}|{cls}|{name}"
+        tags = app.tag_data.get(okey, {}).get(today_key(), {})
+
+        if DEBUG_AI_PROMPT:
+            all_dates = list(app.tag_data.get(okey, {}).keys())
+            print(f"\n[SINGLE] student={name}  cls={cls}  today={today_key()}")
+            print(f"[SINGLE] tag_key={okey!r}  dates_in_cache={all_dates}")
+            print(f"[SINGLE] tags_today={tags if tags else '(없음)'}")
 
         # 프롬프트 생성
         prompt = build_single_prompt(
             sheet, cls, name, textbooks,
-            app.student_data, app.progress_data, existing, obs
+            app.student_data, app.progress_data, existing, tags
         )
 
         note_txt.config(state='normal')
@@ -317,8 +356,9 @@ class AiEngine:
 
         def _call():
             try:
-                # 허브 함수로 분기 처리 토스 (단건은 리스크가 적으므로 max_tokens=400 확보)
-                text = _call_ai_hub(engine_type, api_key, prompt, max_tokens=400)
+                text = _call_ai_hub(engine_type, api_key, prompt,
+                                    max_tokens=400, temperature=0.75,
+                                    system=_base_conditions())
                 note_key = (sheet, cls, name)
                 app.note_data[note_key] = {'value': text}
                 save_daily_cache(app.progress_data, app.student_data, app.note_data, app.force_data)
@@ -370,14 +410,17 @@ class AiEngine:
                     if val:
                         student_book_data[tb] = val
 
-                obs = app.obs_data.get(f"{sheet}|{cls}|{name}", {}).get(today_key(), {})
+                okey_b = f"{sheet}|{cls}|{name}"
+                tags = app.tag_data.get(okey_b, {}).get(today_key(), {})
+                if DEBUG_AI_PROMPT:
+                    print(f"[BATCH] {name}({cls})  tags={tags if tags else '(없음)'}")
                 targets.append({
                     "sheet":    sheet,
                     "cls":      cls,
                     "name":     name,
                     "data":     student_book_data,
                     "existing": app.note_data.get((sheet, cls, name), {}).get('value', '').strip(),
-                    "obs":      obs,
+                    "tags":     tags,
                 })
 
         if not targets:
@@ -394,8 +437,9 @@ class AiEngine:
 
         def _call():
             try:
-                # 일괄 제어 처리를 위해 응답 최대 토큰 스케일링 확보
-                raw = _call_ai_hub(engine_type, api_key, prompt, max_tokens=4096)
+                raw = _call_ai_hub(engine_type, api_key, prompt,
+                                   max_tokens=4096, temperature=0.5,
+                                   system=_base_conditions())
                 clean = raw.replace('```json', '').replace('```', '').strip()
                 parsed = json.loads(clean)
 

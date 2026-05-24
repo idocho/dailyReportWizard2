@@ -18,7 +18,7 @@ def get_room(cfg, name):
 
 def nickname_suffix(full_name):
     """'김지민' → '지민이는' 또는 '지민는' (받침 여부 판단)."""
-    nick = full_name[1:]
+    nick = full_name[1:] or full_name  # 한 글자 이름 방어
     code = ord(nick[-1])
     if 0xAC00 <= code <= 0xD7A3 and (code - 0xAC00) % 28 != 0:
         return f"{nick}이는"

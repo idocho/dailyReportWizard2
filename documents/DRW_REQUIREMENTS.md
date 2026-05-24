@@ -1,7 +1,7 @@
 # DailyReportWizard — 요구사항 명세서
 
 **Crafted by IDO(idocho@kakao.com) · Powered by Claude AI**  
-**문서 버전**: 3.0 · **앱 버전**: v2.0.0 · **최종 수정**: 2026-05-23
+**문서 버전**: 3.2 · **앱 버전**: v2.0.0 · **최종 수정**: 2026-05-24
 
 ---
 
@@ -15,6 +15,8 @@
 | 1.3 | 2026-05-20 | v0.9.3 가져오기 정책 고정 / v0.9.4 웹 초기화 보안 |
 | 2.0 | 2026-05-21 | DRW 2.0 — 입력 데이터 다각화, DailyReportAnalyzer 연계 목적 |
 | 3.0 | 2026-05-23 | DRW_REQUIREMENTS + DRW2_REQUIREMENTS 통합. 모듈 구조 반영. 멀티 AI 엔진 반영. 구버전 잔재 정리 |
+| 3.1 | 2026-05-24 | 버그 수정 반영 (extra_notes NameError / _do_send 스레드 안전성 / _fetch_class_data 경로 / nickname_suffix / 연결 테스트). _open_progress_window dead code 제거 |
+| 3.2 | 2026-05-24 | AI 생성 품질 개선 (few-shot 예시·system prompt 분리·temperature 0.75·caution 완곡화·highlight 태그 신설). obs→tag 변수명 정리. preset "추가 자율학습 실시" 제거 |
 
 ---
 
@@ -34,8 +36,8 @@ v2.0부터는 DailyReportAnalyzer가 월간 학부모 리포트를 생성할 수
 | `main.py` | 진입점, 아이콘, 에러 로그 | 거의 수정 없음 |
 | `constants.py` | 전역 상수, 색상, 폰트, TAGS, DEFAULT_CONFIG | 태그·상수 추가 시 |
 | `storage.py` | 경로, config, cache I/O | 저장 구조 변경 시 |
-| `firebase.py` | Firebase REST CRUD, obs 로드 | 노드 추가 시 |
-| `ai_engine.py` | AI 생성, obs 프롬프트 주입, 멀티 엔진(Groq/Claude/GPT) | 엔진 추가·프롬프트 튜닝 시 |
+| `firebase.py` | Firebase REST CRUD, 태그 로드(`fetch_tags`) | 노드 추가 시 |
+| `ai_engine.py` | AI 생성, 태그 프롬프트 주입, 멀티 엔진(Groq/Claude/GPT) | 엔진 추가·프롬프트 튜닝 시 |
 | `message.py` | 카카오톡 메시지 조립 | 포맷 변경 시 |
 | `app.py` | UI 전체 (App 클래스) | UI 수정 시 |
 | `drw_icon.ico` | PC 앱 아이콘 — 256×256 레이어 필수 | — |
@@ -62,7 +64,8 @@ v2.0부터는 DailyReportAnalyzer가 월간 학부모 리포트를 생성할 수
 ```
 
 ※ **로컬 전용 시나리오 폐기** — Firebase 연결 필수  
-※ **PC 앱 쓰기 제한**: Firebase 쓰기는 `lastSent/` 기록 + 강사 신규 등록만 허용
+※ **PC 앱 쓰기 제한**: Firebase 쓰기는 `lastSent/` 기록 + 강사 신규 등록만 허용  
+※ **진도/과제 입력**: 웹 전용 (v3.0 이후 PC 직접 입력 UI 제거)
 
 ### 1.4 연계 프로젝트
 
@@ -182,7 +185,7 @@ DRW 2.0이 저장하는 수업 관찰 데이터(`obs/`)와 성적 데이터(`sco
 ① config/ 로드  → sheets, presets 갱신
 ② config/instructors/{id} 로드 → 강사별 assignments 우선 적용
 ③ input/ 로드   → student_data, note_data 채움
-④ obs/ 로드     → obs_data 채움 (v2.0 신규)
+④ obs/ 로드     → tag_data 채움 (v2.0 신규)
 ⑤ session/class_data/ 로드 → progress_data (없으면 lastSent/ 폴백)
 ```
 
@@ -204,13 +207,14 @@ DRW 2.0이 저장하는 수업 관찰 데이터(`obs/`)와 성적 데이터(`sco
 - **부담임 반 제외**: `assignments[cls].role == "부담임"` → 전송 제외. 폴백: `config/sheets/.../is_sub: true`
 - `pyautogui` 미설치 시: `AUTOMATION=False`, 전송 버튼 비활성화
 - 전송 완료 후: `student_data`, `note_data`, `force_data` 초기화 / `progress_data` 유지 / Firebase `lastSent/` push
+- **스레드 안전**: `_do_send`는 별도 스레드 실행. UI 업데이트 전체를 `root.after(0, ...)` 로 메인 스레드에 위임
 
 ### 2.9 설정 창
 
 | 섹션 | 내용 |
 |------|------|
 | 기본 매크로 설정 | 카카오톡 전송 딜레이(초), 톡방 접두사 |
-| Firebase 연결 | DB URL, DB 경로, ⚡ 연결 테스트 |
+| Firebase 연결 | DB URL, DB 경로, ⚡ 연결 테스트 (`config` 노드 조회 + null 여부 검증) |
 | 내 강사 계정 | 이름 입력 → 조회/신규등록, 🔄 학급명단 동기화 |
 | AI 엔진 설정 | 엔진 종류 선택(groq/openai/claude) + API Key + 👁 토글 |
 | 학급·학생·교재·프리셋 | 웹 PWA 전담 안내 |
@@ -222,6 +226,10 @@ DRW 2.0이 저장하는 수업 관찰 데이터(`obs/`)와 성적 데이터(`sco
 | `ai_engine_type` | `"groq"` \| `"openai"` \| `"claude"` |
 | `ai_api_key` | 통합 API Key |
 | `groq_api_key` | groq 선택 시 병행 저장 (하위 호환 폴백) |
+
+**학급명단 동기화 (`_fetch_class_data`)**
+
+`config/instructors/{id}/assignments` 노드 조회 (list). 반드시 강사 계정 조회 완료 후 실행.
 
 ### 2.10 데이터 지속성
 
@@ -286,42 +294,52 @@ def _my_classes(self, sheet) -> list[tuple[str, dict]]:
 | 엔진 | 모델 | 용도 |
 |------|------|------|
 | `groq` | `llama-3.1-8b-instant` | 무료, 속도 최적화 |
-| `claude` | `claude-3-5-sonnet-20241022` | 문장력·감성 우선 |
+| `claude` | `claude-sonnet-4-6` | 문장력·감성 우선 |
 | `openai` | `gpt-4o-mini` | 범용 |
 
 **API Key 로드 순서**: `ai_api_key` → (groq 선택 시) `groq_api_key` 폴백
 
 ### 3.2 단건 생성 (`gen_single`)
 
-- 컨텍스트: 학생명, 교재별 수행도·진도·과제, 기존 특이사항, 오늘 obs 태그
-- `max_tokens=400`
-- 완료 후 쿨다운 틱 시작 (`AI_COOLDOWN = 30`초)
+- 컨텍스트: 학생명, 교재별 수행도·진도·과제, 기존 특이사항, 오늘 태그
+- `max_tokens=400`, `temperature=0.75` (자연스러운 문체)
+- system prompt: `_base_conditions()` 전달 (Claude: system 필드, Groq/OpenAI: system role 메시지)
+- 완료 후 쿨다운 틱 시작
 
 ### 3.3 일괄 생성 (`gen_all`)
 
 - 현재 시트의 `STATUS_READY` 학생 전원 단일 API 호출
 - 부담임 반 자동 제외
-- 배치 프롬프트: 학생 데이터 JSON 배열 → JSON 배열 응답 (`max_tokens=4096`)
+- 배치 프롬프트: 학생 데이터 JSON 배열 → JSON 배열 응답 (`max_tokens=4096`, `temperature=0.5`)
+- system prompt: `_base_conditions()` 전달 (JSON 안정성 위해 temperature 0.5 유지)
 - 응답 파싱: `json.loads()` 전 ` ```json ``` ` 펜스 제거
 
-### 3.4 obs 태그 → 프롬프트 변환 (`_build_obs_context`)
+### 3.4 태그 → 프롬프트 변환 (`_build_tags_context`)
 
-| obs 필드 | 변환 방식 |
+| 태그 필드 | 변환 방식 |
 |----------|-----------|
+| `highlight` | `_HIGHLIGHT_TEXT` 매핑 → 블록 최상단에 "⭐ 오늘의 하이라이트"로 삽입 |
 | `condition` | `_CONDITION_TEXT` 매핑 → 자연어 1줄 |
 | `understand` | `_UNDERSTAND_TEXT` 매핑 |
 | `understand_sub[]` | `_UNDERSTAND_SUB_TEXT` 매핑, 복수 가능 |
 | `engage[]` | `_ENGAGE_TEXT` 매핑, 콤마 연결 |
-| `caution[]` | 직접 언급 금지. "집중도 낮은 편이었음 (참고용)" 완곡 표현 |
+| `caution[]` | '졸음·잡담·태도불량' 직접 단어 사용 금지. 완곡 표현으로만 활용 |
 | `extra[]` | `_EXTRA_TEXT` 매핑 — 자율학습/재시험 문장 후반 반드시 포함 |
+
+> **주의**: `caution`과 `extra`는 독립 블록. caution 없이 extra만 있어도 정상 처리됨.
 
 ### 3.5 생성 지침 (`_base_conditions`)
 
-1. 톤: 학부모가 읽기 편한 다정한 문체 (~했어요, ~했습니다)
-2. 금지: '어머님/학부모님' 호칭, 기계적 시스템 로그 표현, 미입력 교재 언급
-3. obs 태그 반영: 기본 태그는 첫 부분에, 이벤트 태그(자율/재시험)는 후반부 필수 포함
-4. 주의 태그: 완곡 표현만 ("조금 피곤해 보였지만 이내 집중하여~")
-5. 출력: 순수 텍스트만 (JSON·마크다운·따옴표 금지)
+1. 문체: ~했습니다 체 통일. 학생 이름 **또는** 수업 내용으로 자연스럽게 시작 (이름 고정 패턴 금지)
+2. 금지: '어머님/학부모님' 호칭, 시스템 표현, 할루시네이션
+3. 태그 반영: 명시된 항목만. 미명시 이벤트 임의 추가 금지
+4. 주의 태그: '졸음·잡담·태도불량' 직접 단어 절대 금지. '오늘은 조금 피곤해 보이는 날이었습니다' 수준 완곡 표현
+5. 하이라이트: ⭐ 항목 있으면 가장 인상적으로 표현
+6. 결석: 데이터 없으면 안부 인사 + 다음 수업 기약 코멘트
+7. 출력: 순수 텍스트 (JSON·마크다운 금지). 2~3문장, 100자 내외
+
+**few-shot 예시** (단건 프롬프트에 포함, 문체·어조 참고용)
+> "오늘 이차함수 단원에서 막혔던 개념을 반복 설명 후 이해했습니다. 틀린 문항을 스스로 재풀이하며 오답을 정리하는 모습이 인상적이었습니다."
 
 ---
 
@@ -387,12 +405,12 @@ def _my_classes(self, sheet) -> list[tuple[str, dict]]:
 
 **참여 관찰** `engage` (멀티 선택):
 ```
-긍정: 📣 발표 / 🙋 질문 / 🤝 도움 / 📖 예습
+긍정: 📣 발표 / 🙋 질문 / 🤝 도움 / 📖 예습 / 💡 오류정정
 ```
 
 **주의 관찰** `caution` (멀티 선택):
 ```
-💤 졸음 / 📵 폰사용 / 🗣 잡담 / 😤 태도불량
+💤 졸음 / 🗣 잡담 / 😤 태도불량 / ⏰ 지각
 ```
 > caution 태그는 Firebase에 저장되나 **학부모 리포트에 직접 노출 금지**. AI가 완곡 표현으로만 활용.
 
@@ -400,6 +418,12 @@ def _my_classes(self, sheet) -> list[tuple[str, dict]]:
 ```
 📚 자율학습 / 📝 주간Test / 🔄 재시험
 ```
+
+**오늘의 하이라이트** `highlight` (단일 선택):
+```
+🏆 만점·완벽 / 📈 큰 향상 / ✅ 개념완전습득 / 💎 끝까지도전
+```
+> 선택 시 AI 프롬프트 블록 최상단에 삽입되어 메시지에서 가장 먼저 강조됨.
 
 #### 메모 (선택)
 
@@ -468,7 +492,7 @@ def _my_classes(self, sheet) -> list[tuple[str, dict]]:
 | `drw_fb_path` | Firebase 경로 |
 | `drw_input` | 수행도·특이사항 로컬 캐시 |
 | `drw_prog` | 진도/과제 로컬 캐시 |
-| `drw_obs` | 수업 관찰 태그 로컬 캐시 |
+| `drw_tags` | 수업 관찰 태그 로컬 캐시 (v3.2: drw_obs → drw_tags 변경) |
 | `drw_instr` | 현재 강사 정보 |
 | `drw_cfg` | config 로컬 캐시 |
 
@@ -497,7 +521,7 @@ def _my_classes(self, sheet) -> list[tuple[str, dict]]:
     instructors/
       {name}/
         name: "IDO"
-        assignments:
+        assignments:           ← list (웹에서 배정)
           - { sheet: "M", cls: "3MGM", tb: "3-1 우공비", role: "담임" }
           - { sheet: "T", cls: "3TGM", tb: "3-1 우공비", role: "부담임" }
         presets: ["과제 완벽 수행 ✅", ...]
@@ -523,6 +547,7 @@ def _my_classes(self, sheet) -> list[tuple[str, dict]]:
         engage:         ["present", "question", "help", "preview", "error_fix"]
         caution:        ["sleepy", "chat", "attitude", "late"]
         extra:          ["self_study", "weekly_test", "retest"]
+        highlight:      "perfect" | "improved" | "mastered" | "effort"  ← v3.2 신규
 
   session/                  ← 웹 쓰기 / PC 읽기
     class_data/
@@ -542,7 +567,8 @@ def _my_classes(self, sheet) -> list[tuple[str, dict]]:
 ```
 
 **obs 키 규칙**: `obs/{sheet}|{cls}|{name}/{YYYY-MM-DD}`  
-**TAGS key는 불변** — Firebase 저장값. label만 수정 가능.
+**TAGS key는 불변** — Firebase 저장값. label만 수정 가능.  
+**assignments 구조**: list (Firebase 저장 기준). `_fetch_class_data`에서 `config/instructors/{id}/assignments` 경로로 조회.
 
 **부담임 판단 우선순위**
 ```
@@ -596,9 +622,6 @@ def _my_classes(self, sheet) -> list[tuple[str, dict]]:
 | `chat` | 🗣 잡담 | **완곡** — 집중력 유지 필요성 암시 |
 | `attitude` | 😤 태도불량 | **완곡** — 수업 참여 자세에 대한 대화 필요성 암시 |
 
-> `phone` 태그 폐기. caution은 직접 언급 금지 원칙에서 **태그별 차등 전달**로 변경.
-> `late`는 사실 관계 전달이 가능하며 훈육 메시지로 긍정적으로 활용한다.
-
 **FR-RESET 요구사항**
 
 | ID | 요구사항 |
@@ -606,13 +629,6 @@ def _my_classes(self, sheet) -> list[tuple[str, dict]]:
 | FR-RESET-01 | Lv1·Lv2는 실행 강사의 `assignments` 범위 내 키만 삭제 |
 | FR-RESET-02 | Firebase 쓰기는 개별 키 null PATCH 방식만 (노드 전체 PUT 금지) |
 | FR-RESET-03 | `assignments` 비어있는 강사 Lv1·Lv2 실행 시 Firebase 쓰기 차단, 로컬만 초기화. toast 안내 |
-
-**`_myResetKeys()` 헬퍼**
-```javascript
-// assignments 기반 삭제 대상 키 생성
-// inputKeys: "sheet|cls|name|tb" + "sheet|cls|name|__note__"
-// progressKeys: "sheet|cls|tb"
-```
 
 ---
 
@@ -643,13 +659,11 @@ def _my_classes(self, sheet) -> list[tuple[str, dict]]:
 
 | 항목 | 값 | 위치 |
 |------|-----|------|
-| AI 쿨다운 |  | `AI_COOLDOWN` 상수 |
-
-  - Groq: 30초 (무료 RPM 제한 대응)
-  - Claude/OpenAI: 3초 (중복 클릭 방지 최소치)
-| Groq 모델 | `llama-3.1-8b-instant` | ai_engine.py 하드코딩 |
-| Claude 모델 | `claude-3-5-sonnet-20241022` | ai_engine.py 하드코딩 |
-| OpenAI 모델 | `gpt-4o-mini` | ai_engine.py 하드코딩 |
+| AI 쿨다운 (Groq) | 30초 | `AI_COOLDOWN_GROQ` |
+| AI 쿨다운 (유료) | 3초 | `AI_COOLDOWN_PAID` |
+| Groq 모델 | `llama-3.1-8b-instant` | ai_engine.py |
+| Claude 모델 | `claude-sonnet-4-6` | ai_engine.py |
+| OpenAI 모델 | `gpt-4o-mini` | ai_engine.py |
 
 ---
 
@@ -659,6 +673,9 @@ def _my_classes(self, sheet) -> list[tuple[str, dict]]:
 - `_pull_mobile_data`: Firebase config 로드 후 UI 갱신(`_switch_sheet`)은 messagebox 이후 동기 호출. `after()` 예약 금지 — 이벤트 루프 재진입으로 인한 TclError 유발
 - `_populate_student_list`: `sl_inner` 자식 파괴 전 `status_w` 해당 sheet 항목 일괄 삭제 (stale Canvas ref 방지)
 - `_update_dot`: TclError 방어 처리 필수
+- `_do_send`: 별도 스레드 실행. 루프 내 상태 업데이트는 `root.after(0, lambda ...)`, 완료 후 처리는 `root.after(0, _on_done)` 으로 메인 스레드에 위임 (tkinter 스레드 안전 원칙)
+- `_build_tags_context`: `caution`과 `extra`는 독립 블록. caution 없이 extra만 존재해도 정상 처리 (변수 스코프 분리). `highlight` 있으면 lines 최상단에 삽입
+- `nickname_suffix`: 한 글자 이름 방어 — `full_name[1:] or full_name`
 
 **웹 PWA**
 - 아코디언 상태는 `openSaIds: Set`로 DOM 재생성 후에도 복원
@@ -673,6 +690,7 @@ def _my_classes(self, sheet) -> list[tuple[str, dict]]:
 | 최종 메시지 직접 수정 | 미리보기 패널 편집 가능화. AI생성 후 편집 시 재생성 경고 필요 |
 | PC 강사 배정 UI | 현재 웹에서만 가능 |
 | Firebase Security Rules | 현재 기본 설정. 최종 단계에서 강화 예정 |
+| API Key 보안 저장 | config.json 평문 저장 중. macOS Keychain / 암호화 미적용 |
 
 ## 11. 스코프 제외
 
@@ -683,3 +701,4 @@ def _my_classes(self, sheet) -> list[tuple[str, dict]]:
 | 웹 카카오톡 전송 | PC 앱 전용 확정 |
 | 모바일 앱 설치형 | APK 전환 계획 없음 |
 | PDF 출력 | Analyzer 단계에서 검토 |
+| PC 직접 진도/과제 입력 UI | v3.0에서 웹 전용으로 전환, PC UI 제거 완료 |

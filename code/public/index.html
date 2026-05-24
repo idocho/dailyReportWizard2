@@ -72,9 +72,9 @@ body{font-family:'Malgun Gothic','맑은 고딕',sans-serif;background:var(--bg)
 .px.sel{color:#fff;border-color:transparent}
 .pf{padding:14px 16px;background:#F8FAFC;border-bottom:1px solid var(--border)}
 .fl{font-size:11px;font-weight:700;color:var(--sub);margin-bottom:4px}
-.sth{display:grid;grid-template-columns:88px 1fr 120px 130px 160px 110px 150px;background:#F1F5F9;border-bottom:1px solid var(--border);padding:5px 14px;gap:6px}
+.sth{display:grid;grid-template-columns:88px 1fr 120px 180px 160px 110px 160px;background:#F1F5F9;border-bottom:1px solid var(--border);padding:5px 14px;gap:6px}
 .sth span{font-size:10px;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.04em}
-.str{display:grid;grid-template-columns:88px 1fr 120px 130px 160px 110px 150px;border-bottom:1px solid var(--border);padding:6px 14px;gap:6px;align-items:center;transition:background .1s;min-height:46px}
+.str{display:grid;grid-template-columns:88px 1fr 120px 180px 160px 110px 160px;border-bottom:1px solid var(--border);padding:6px 14px;gap:6px;align-items:center;transition:background .1s;min-height:46px}
 .str:last-child{border-bottom:none}
 .str:hover{background:#FAFBFF}
 .stn{display:flex;align-items:center;gap:7px;font-size:13px;font-weight:700}
@@ -127,6 +127,8 @@ body{font-family:'Malgun Gothic','맑은 고딕',sans-serif;background:var(--bg)
 /* 멀티 태그 (engage/caution/understand_sub) */
 .tg.sel-m{background:var(--indigo)}
 .tg[data-g="caution"].sel-m{background:#B45309}
+/* highlight 태그 */
+.tg[data-g="highlight"].sel-c{background:#B45309;border-color:transparent;color:#fff}
 /* 태그 행 레이아웃 */
 .tg-cell{display:flex;flex-wrap:wrap;gap:3px;align-content:center}
 .tg-sep{width:1px;background:var(--border);align-self:stretch;margin:4px 0;flex-shrink:0}
@@ -216,13 +218,20 @@ const TAGS = {
     {key:'weekly_test', label:'📝 주간Test'},
     {key:'retest',      label:'🔄 재시험'},
   ],
+  highlight: [
+    {key:'perfect',  label:'🏆 만점·완벽'},
+    {key:'improved', label:'📈 큰 향상'},
+    {key:'mastered', label:'✅ 개념완전습득'},
+    {key:'effort',   label:'💎 끝까지도전'},
+  ],
 };
 
-let cfg=null,inputData={},progressData={},obsData={},instructor=null;
+let cfg=null,inputData={},progressData={},tagData={},instructor=null;
 let curNav='input',curAI=0,fbUrl='',fbPath='',curSheet='';
 let clsDrillSh=null; // 학급 관리 드릴다운 상태 (null=최상위, 'M'/'T'=시트)
 let adminOn=false;   // 관리자 모드 세션 상태 (새로고침 시 해제)
 let sbFolded={};     // 사이드바 시트 섹션 접힘 상태 {시트명: true/false}
+let _resetSel=new Set(); // 초기화 다중 선택 상태
 let openSaIds=new Set(['sa-fb']); // 설정 아코디언 열림 상태 — renderMain() 재렌더 후 복원용
 // SHA-256("idocho")
 const ADMIN_HASH='f3fd1456b2db60728b102561496c156e4c4adf0e537d4c45fa0add381fdd9a1e';
@@ -233,7 +242,7 @@ function loadLocal(){
   fbUrl=LS('drw_fb_url')||'';fbPath=LS('drw_fb_path')||'';
   try{inputData=JSON.parse(LS('drw_input')||'{}');}catch(e){inputData={};}
   try{progressData=JSON.parse(LS('drw_prog')||'{}');}catch(e){progressData={};}
-  try{obsData=JSON.parse(LS('drw_obs')||'{}');}catch(e){obsData={};}
+  try{tagData=JSON.parse(LS('drw_tags')||LS('drw_obs')||'{}');}catch(e){tagData={};}
   try{instructor=JSON.parse(LS('drw_instr')||'null');}catch(e){instructor=null;}
   try{cfg=JSON.parse(LS('drw_cfg')||'null');}catch(e){cfg=null;}
 }
@@ -241,7 +250,7 @@ function saveLocal(){
   SS('drw_fb_url',fbUrl);SS('drw_fb_path',fbPath);
   SS('drw_input',JSON.stringify(inputData));
   SS('drw_prog',JSON.stringify(progressData));
-  SS('drw_obs',JSON.stringify(obsData));
+  SS('drw_tags',JSON.stringify(tagData));
   if(instructor)SS('drw_instr',JSON.stringify(instructor));
   if(cfg)SS('drw_cfg',JSON.stringify(cfg));
 }
@@ -283,12 +292,12 @@ async function pushProgress(pkey,val){
 // ── 오늘 날짜 키 (YYYY-MM-DD) ────────────────────────────────────
 function todayKey(){const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
 
-// ── obs 저장 키: "sheet|cls|name" → obsData[okey][YYYY-MM-DD] ────
-function getObs(sheet,cls,name){
+// ── tags 저장 키: "sheet|cls|name" → tagData[okey][YYYY-MM-DD] ────
+function getTags(sheet,cls,name){
   const okey=`${sheet}|${cls}|${name}`;
-  if(!obsData[okey])obsData[okey]={};
-  if(!obsData[okey][todayKey()])obsData[okey][todayKey()]={};
-  return obsData[okey][todayKey()];
+  if(!tagData[okey])tagData[okey]={};
+  if(!tagData[okey][todayKey()])tagData[okey][todayKey()]={};
+  return tagData[okey][todayKey()];
 }
 async function pushObs(sheet,cls,name){
   saveLocal();
@@ -296,7 +305,7 @@ async function pushObs(sheet,cls,name){
   if(!_canWrite(sheet,cls,null))return;
   const okey=`${sheet}|${cls}|${name}`;
   const dateKey=todayKey();
-  const val=obsData[okey]?.[dateKey]||{};
+  const val=tagData[okey]?.[dateKey]||{};
   // Firebase 경로: obs/{sheet}|{cls}|{name}/{YYYY-MM-DD}
   try{await fbPatch(`obs/${encodeURIComponent(okey)}`,{[dateKey]:val});setSync(true);}catch(e){setSync(false);}
 }
@@ -304,30 +313,39 @@ async function pushObs(sheet,cls,name){
 // ── 태그 토글 핸들러 ─────────────────────────────────────────────
 function onTagCondition(el,sheet,cls,name){
   const k=el.dataset.k;
-  const obs=getObs(sheet,cls,name);
-  obs.condition = obs.condition===k ? null : k;
+  const tags=getTags(sheet,cls,name);
+  tags.condition = tags.condition===k ? null : k;
   // UI 갱신
   el.closest('.tg-cell').querySelectorAll('.tg').forEach(b=>{
-    b.classList.toggle('sel-c', b.dataset.k===obs.condition);
+    b.classList.toggle('sel-c', b.dataset.k===tags.condition);
   });
   pushObs(sheet,cls,name);
 }
 function onTagUnderstand(el,sheet,cls,name){
   const k=el.dataset.k;
-  const obs=getObs(sheet,cls,name);
-  obs.understand = obs.understand===k ? null : k;
+  const tags=getTags(sheet,cls,name);
+  tags.understand = tags.understand===k ? null : k;
   el.closest('.tg-cell').querySelectorAll('.tg[data-g="understand"]').forEach(b=>{
-    b.classList.toggle('sel-c', b.dataset.k===obs.understand);
+    b.classList.toggle('sel-c', b.dataset.k===tags.understand);
+  });
+  pushObs(sheet,cls,name);
+}
+function onTagHighlight(el,sheet,cls,name){
+  const k=el.dataset.k;
+  const tags=getTags(sheet,cls,name);
+  tags.highlight = tags.highlight===k ? null : k;
+  el.closest('.tg-cell').querySelectorAll('.tg[data-g="highlight"]').forEach(b=>{
+    b.classList.toggle('sel-c', b.dataset.k===tags.highlight);
   });
   pushObs(sheet,cls,name);
 }
 function onTagMulti(el,sheet,cls,name,field){
   const k=el.dataset.k;
-  const obs=getObs(sheet,cls,name);
-  if(!obs[field])obs[field]=[];
-  const idx=obs[field].indexOf(k);
-  if(idx>=0)obs[field].splice(idx,1); else obs[field].push(k);
-  el.classList.toggle('sel-m', obs[field].includes(k));
+  const tags=getTags(sheet,cls,name);
+  if(!tags[field])tags[field]=[];
+  const idx=tags[field].indexOf(k);
+  if(idx>=0)tags[field].splice(idx,1); else tags[field].push(k);
+  el.classList.toggle('sel-m', tags[field].includes(k));
   pushObs(sheet,cls,name);
 }
 
@@ -492,45 +510,49 @@ function renderInput(mc){
     const note=inputData[nkey]?.note||'';
     const selI=presets.findIndex(p=>p===val);
     const dc=dotClass(a.sheet,a.cls,s.name,a.tb);
-    const obs=obsData[`${a.sheet}|${a.cls}|${s.name}`]?.[dk]||{};
+    const tags=tagData[`${a.sheet}|${a.cls}|${s.name}`]?.[dk]||{};
 
     // 과제수행도 버튼
     const dBtns=presets.map((p,pi)=>{const sel=pi===selI;return `<button class="px${sel?' sel':''}" ${sel?`style="background:${BC[pi%BC.length]}"`:''} data-key="${esc(ikey)}" data-pi="${pi}" onclick="onPB(this)">${esc(p)}</button>`;}).join('');
 
     // condition 버튼
     const condBtns=TAGS.condition.map(t=>{
-      const sel=obs.condition===t.key;
+      const sel=tags.condition===t.key;
       return `<button class="tg${sel?' sel-c':''}" data-k="${esc(t.key)}" onclick="onTagCondition(this,'${esc(a.sheet)}','${esc(a.cls)}','${esc(s.name)}')">${esc(t.label)}</button>`;
     }).join('');
 
     // understand 버튼 (1택) + understand_sub (멀티)
     const undBtns=TAGS.understand.map(t=>{
-      const sel=obs.understand===t.key;
+      const sel=tags.understand===t.key;
       return `<button class="tg${sel?' sel-c':''}" data-k="${esc(t.key)}" data-g="understand" onclick="onTagUnderstand(this,'${esc(a.sheet)}','${esc(a.cls)}','${esc(s.name)}')">${esc(t.label)}</button>`;
     }).join('');
     const undSubBtns=TAGS.understand_sub.map(t=>{
-      const sel=(obs.understand_sub||[]).includes(t.key);
+      const sel=(tags.understand_sub||[]).includes(t.key);
       return `<button class="tg${sel?' sel-m':''}" data-k="${esc(t.key)}" onclick="onTagMulti(this,'${esc(a.sheet)}','${esc(a.cls)}','${esc(s.name)}','understand_sub')">${esc(t.label)}</button>`;
     }).join('');
 
     // engage + caution 멀티
     const engBtns=TAGS.engage.map(t=>{
-      const sel=(obs.engage||[]).includes(t.key);
+      const sel=(tags.engage||[]).includes(t.key);
       return `<button class="tg${sel?' sel-m':''}" data-k="${esc(t.key)}" onclick="onTagMulti(this,'${esc(a.sheet)}','${esc(a.cls)}','${esc(s.name)}','engage')">${esc(t.label)}</button>`;
     }).join('');
     const cauBtns=TAGS.caution.map(t=>{
-      const sel=(obs.caution||[]).includes(t.key);
+      const sel=(tags.caution||[]).includes(t.key);
       return `<button class="tg${sel?' sel-m':''}" data-k="${esc(t.key)}" data-g="caution" onclick="onTagMulti(this,'${esc(a.sheet)}','${esc(a.cls)}','${esc(s.name)}','caution')">${esc(t.label)}</button>`;
     }).join('');
     const extraBtns = TAGS.extra.map(t => {
-        const sel = (obs.extra || []).includes(t.key);
+        const sel = (tags.extra || []).includes(t.key);
         return `<button class="tg${sel?' sel-m':''}" data-k="${esc(t.key)}" onclick="onTagMulti(this,'${esc(a.sheet)}','${esc(a.cls)}','${esc(s.name)}','extra')">${esc(t.label)}</button>`;
+    }).join('');
+    const hlBtns=TAGS.highlight.map(t=>{
+      const sel=tags.highlight===t.key;
+      return `<button class="tg${sel?' sel-c':''}" data-k="${esc(t.key)}" data-g="highlight" onclick="onTagHighlight(this,'${esc(a.sheet)}','${esc(a.cls)}','${esc(s.name)}')">${esc(t.label)}</button>`;
     }).join('');
     dtRows+=`<div class="str">
       <div class="stn"><span class="dot ${dc}" data-ikey="${esc(ikey)}"></span>${esc(s.name)}</div>
       <div class="pxw">${dBtns}</div>
       <div class="tg-cell">${condBtns}</div>
-      <div class="tg-cell">${undBtns}<div class="tg-sep"></div>${undSubBtns}</div>
+      <div class="tg-cell">${undBtns}<div class="tg-sep"></div>${undSubBtns}<div class="tg-sep"></div>${hlBtns}</div>
       <div class="tg-cell">${engBtns}</div>
       <div class="tg-cell">${extraBtns}</div>
       <div class="tg-cell">${cauBtns}<input class="inp sm" value="${esc(note)}" placeholder="메모" data-key="${esc(nkey)}" oninput="onNI(this)" style="margin-top:2px;width:100%"></div>
@@ -648,7 +670,7 @@ function renderSettings(mc){
     addAsgn=`<div style="padding:10px 12px;border-top:1px solid var(--border)"><div style="font-size:11px;font-weight:700;color:var(--sub);margin-bottom:8px">수업 추가</div><div style="display:grid;grid-template-columns:1fr 1fr 72px;gap:6px;margin-bottom:8px"><div><div class="sl">반</div><select class="inp sm" id="aCls" onchange="onCC()">${clsOpts}</select></div><div><div class="sl">교재</div><select class="inp sm" id="aTb">${tbOpts}</select></div><div><div class="sl">역할</div><select class="inp sm" id="aRole"><option>담임</option><option>부담임</option></select></div></div><button class="btn bsm" onclick="addA()">+ 추가</button></div>`;
   }else{addAsgn=`<div style="padding:10px 12px;font-size:11px;color:var(--gray)">학생 명단을 먼저 불러오세요.</div>`;}
 
-  // ── 프리셋 ──
+  // ── 자주 쓰는 문구 ──
   const myPresets=instr.presets||[];
   const presetChips=myPresets.map((p,i)=>`
     <div id="preset-row-${i}" style="display:flex;align-items:center;justify-content:space-between;padding:6px 10px;border-bottom:1px solid var(--border)">
@@ -659,30 +681,8 @@ function renderSettings(mc){
       </div>
     </div>`).join('');
 
-  // ── 초기화 레벨 버튼 ──
-  const resetHtml=`
-    <div style="display:flex;align-items:flex-start;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border)">
-      <div style="width:22px;height:22px;border-radius:50%;background:#DCFCE7;color:#166534;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">1</div>
-      <div style="flex:1"><div style="font-size:12px;font-weight:700">입력 초기화</div><div style="font-size:11px;color:var(--sub);margin-top:2px">수행도·특이사항 삭제, 진도/과제 유지</div><code style="font-size:10px;color:var(--sub)">input/</code></div>
-      <button class="btn bsm" onclick="clrLv1()">초기화</button>
-    </div>
-    <div style="display:flex;align-items:flex-start;gap:10px;padding:10px 14px${adminOn?';border-bottom:1px solid var(--border)':''}">
-      <div style="width:22px;height:22px;border-radius:50%;background:#FEF3C7;color:#92400E;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">2</div>
-      <div style="flex:1"><div style="font-size:12px;font-weight:700">전체 초기화</div><div style="font-size:11px;color:var(--sub);margin-top:2px">수행도·특이사항·진도/과제 전체 삭제</div><code style="font-size:10px;color:var(--sub)">input/ session/</code></div>
-      <button class="btn bsm" style="color:var(--red)" onclick="clrLv2()">초기화</button>
-    </div>
-    ${adminOn?`
-    <div style="display:flex;align-items:flex-start;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border)">
-      <div style="width:22px;height:22px;border-radius:50%;background:#FEE2E2;color:#991B1B;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">3</div>
-      <div style="flex:1"><div style="font-size:12px;font-weight:700;color:var(--red)">DB 초기화 <span style="font-size:10px;background:#FEF3C7;color:#92400E;border-radius:8px;padding:1px 6px;font-weight:700">관리자</span></div><div style="font-size:11px;color:var(--sub);margin-top:2px">입력·진도·강사배정 삭제. 학생명단·설정 유지</div><code style="font-size:10px;color:var(--sub)">input/ session/ instructor_assignments/</code></div>
-      <button class="btn bsm" style="color:var(--red)" onclick="clrLv3()">초기화</button>
-    </div>
-    <div style="display:flex;align-items:flex-start;gap:10px;padding:10px 14px">
-      <div style="width:22px;height:22px;border-radius:50%;background:#7F1D1D;color:#FEE2E2;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">4</div>
-      <div style="flex:1"><div style="font-size:12px;font-weight:700;color:#7F1D1D">완전 초기화 <span style="font-size:10px;background:#FEF3C7;color:#92400E;border-radius:8px;padding:1px 6px;font-weight:700">관리자</span></div><div style="font-size:11px;color:var(--sub);margin-top:2px">학생명단·강사·프리셋 포함 전체 삭제. 복구 불가</div><code style="font-size:10px;color:var(--sub)">config/ input/ session/ 전체</code></div>
-      <button class="btn bsm" style="color:var(--red);border-color:var(--red)" onclick="clrLv4()">삭제</button>
-    </div>`
-    :`<div style="padding:8px 14px;background:#F8FAFC;border-top:1px solid var(--border);font-size:11px;color:var(--sub)">🔒 고위험 초기화 항목은 관리자 모드에서 표시됩니다</div>`}`;
+  // ── 초기화 UI (다중 선택형) ──
+  const resetHtml=_renderResetHtml();
 
   // ── 강사 관리 (관리자 전용) ──
   const instrMgmt=adminOn?`
@@ -741,14 +741,14 @@ function renderSettings(mc){
     <div class="sa" id="sa-preset">
       <div class="sa-hdr${openSaIds.has('sa-preset')?' open':''}" onclick="_saToggle('sa-preset')">
         <span class="sa-ico">🎯</span>
-        <span class="sa-lbl">내 프리셋</span>
+        <span class="sa-lbl">자주 쓰는 문구</span>
         <span class="sa-sub">${myPresets.length}개</span>
         <span class="sa-chv">›</span>
       </div>
       <div class="sa-body${openSaIds.has('sa-preset')?' open':''}">
-        ${presetChips||'<div style="padding:10px 12px;font-size:12px;color:var(--gray)">프리셋이 없습니다.</div>'}
+        ${presetChips||'<div style="padding:10px 12px;font-size:12px;color:var(--gray)">등록된 문구가 없습니다.</div>'}
         <div style="padding:8px 10px;border-top:1px solid var(--border);display:flex;gap:6px">
-          <input class="inp sm" id="pInput" placeholder="새 프리셋 문구" style="flex:1">
+          <input class="inp sm" id="pInput" placeholder="새 문구 입력" style="flex:1">
           <button class="btn bsm" onclick="addPreset()">+ 추가</button>
         </div>
       </div>
@@ -962,7 +962,7 @@ function savePreset(i){
   instructor.presets[i]=val;
   saveLocal();
   if(fbUrl&&fbPath&&instructor.id)fbPatch(`config/instructors/${encodeURIComponent(instructor.id)}`,{presets:instructor.presets}).catch(()=>{});
-  toast('프리셋 수정됨 ✅');
+  toast('문구 수정됨 ✅');
   renderMain();
 }
 
@@ -991,11 +991,18 @@ async function lookupInstr(){
     }
   }catch(e){toast('조회 실패: '+e);}
 }
+function _defaultPresets(){
+  return cfg?.presets?.['과제수행도']||[
+    '과제 완벽 수행 ✅','과제 수행 양호 👍','풀이 완료, 채점 미실시',
+    '거의 완료 (소량 미비)','과반 수행 (절반 이상)','일부만 수행 (다수 미완)',
+    '교재 미지참','과제 이행 의지 없어 보임','교재 검사 불가','교재 검사 거부','결석',
+  ];
+}
 async function _registerInstr(name){
-  const defPresets=cfg?.presets?.['과제수행도']||['과제 이상 무 👍','과제 수행 양호 👍','일부 미비, 전반적 양호','과제 일부 누락','과제 미제출','과제 이행 불량','교재 검사 불가','교재 검사 거부','과제 미비로 추가 자율학습 실시'];
+  const defPresets=_defaultPresets();
   instructor={id:name,name,assignments:[],presets:defPresets};saveLocal();
   if(fbUrl&&fbPath)await fbPatch(`config/instructors/${encodeURIComponent(name)}`,{name,assignments:[],presets:defPresets}).catch(()=>{});
-  renderSb();renderMain();toast(`${name} 등록됨 ✅ — 담당 수업·프리셋을 설정해 주세요`);
+  renderSb();renderMain();toast(`${name} 등록됨 ✅ — 담당 수업·자주 쓰는 문구를 설정해 주세요`);
 }
 
 // 관리자 인증 (SHA-256 비교)
@@ -1136,7 +1143,7 @@ async function loadCfg(){
     cfg=data||{sheets:{M:{classes:{}},T:{classes:{}}},presets:{'과제수행도':[]}};saveLocal();setSync(true);
     try{let s=await fbGet('session').catch(()=>null);if(!s?.class_data)s=await fbGet('lastSent').catch(()=>null);if(s?.class_data)for(const[k,v]of Object.entries(s.class_data))if(!progressData[k])progressData[k]=v;saveLocal();}catch(e){}
     try{const d=await fbGet('input');if(d)Object.assign(inputData,d);saveLocal();}catch(e){}
-    try{const d=await fbGet('obs');if(d)Object.assign(obsData,d);saveLocal();}catch(e){}
+    try{const d=await fbGet('obs');if(d)Object.assign(tagData,d);saveLocal();}catch(e){}
     if(instructor?.id){const id=await fbGet(`config/instructors/${encodeURIComponent(instructor.id)}`).catch(()=>null);if(id){Object.assign(instructor,id);saveLocal();}}
     toast('학생 명단 불러옴 ✅');
     if(!instructor)toast('강사 선택이 필요합니다 — 좌측 상단 강사 뱃지를 클릭하세요',4000);
@@ -1164,90 +1171,135 @@ function _myResetKeys(){
   return{inputKeys,progressKeys};
 }
 
-// ── Lv1: 수행도·특이사항 초기화 (assignments 범위 한정) ─────────────
-async function clrLv1(){
-  if(!confirm('과제수행도·특이사항·오늘 관찰 태그를 초기화합니까?\n진도/과제는 유지됩니다.'))return;
-  const asgns=instructor?.assignments||[];
-  const{inputKeys}=_myResetKeys();
-  // obs 키 수집 (오늘 날짜)
-  const dk=todayKey();
-  const obsKeys=[];
-  for(const a of asgns){
-    const sts=cfg?.sheets?.[a.sheet]?.classes?.[a.cls]?.students||[];
-    for(const s of sts){
-      const okey=`${a.sheet}|${a.cls}|${s.name}`;
-      if(obsData[okey]?.[dk]){delete obsData[okey][dk];obsKeys.push(okey);}
-    }
+// ── 초기화 UI 렌더 ──────────────────────────────────────────────────
+const _RESET_ITEMS=[
+  {id:'input',    icon:'📋', label:'수행도 & 특이사항',   desc:'오늘 입력한 수행도·노트',       admin:false},
+  {id:'tags',     icon:'🏷',  label:'관찰 태그 (오늘)',    desc:'오늘 날짜 태그 전체',           admin:false},
+  {id:'progress', icon:'📚', label:'진도 & 과제',          desc:'내 수업 진도·과제 데이터',      admin:false},
+  {id:'presets',  icon:'⚙️', label:'자주 쓰는 문구 초기화', desc:'기본 문구 목록으로 복원',      admin:false},
+  {id:'all-input',    icon:'🗂',  label:'전체 입력 삭제',   desc:'모든 강사 수행도·노트',         admin:true},
+  {id:'all-progress', icon:'📊', label:'전체 진도 삭제',   desc:'모든 강사 진도·과제',           admin:true},
+  {id:'assignments',  icon:'👤', label:'강사 배정 초기화', desc:'모든 강사 수업 배정 삭제',      admin:true},
+  {id:'config',       icon:'💥', label:'명단 & 설정 삭제', desc:'학생명단·강사·문구 전체',       admin:true},
+];
+function _renderResetHtml(){
+  const hasAdmin=adminOn;
+  const normalItems=_RESET_ITEMS.filter(it=>!it.admin);
+  const adminItems=_RESET_ITEMS.filter(it=>it.admin);
+  const _card=(it)=>{
+    const sel=_resetSel.has(it.id);
+    const adm=it.admin;
+    const borderC=sel?(adm?'#EF4444':'#4338CA'):(adm?'#FCA5A5':'#E2E8F0');
+    const bgC=sel?(adm?'#FEE2E2':'#EEF2FF'):(adm?'#FFF5F5':'#fff');
+    const labelC=sel?(adm?'#EF4444':'#4338CA'):'#1E293B';
+    const checkBg=sel?(adm?'#EF4444':'#4338CA'):'#fff';
+    const checkBorder=sel?(adm?'#EF4444':'#4338CA'):'#CBD5E1';
+    return `<div onclick="_resetToggle('${it.id}')" style="border:1.5px solid ${borderC};border-radius:12px;padding:11px 10px 9px;cursor:pointer;background:${bgC};position:relative;transition:border-color .15s,background .15s">
+      <div style="position:absolute;top:7px;right:7px;width:15px;height:15px;border-radius:50%;border:1.5px solid ${checkBorder};background:${checkBg};display:flex;align-items:center;justify-content:center;font-size:9px;color:${sel?'#fff':'transparent'}">✓</div>
+      <div style="font-size:17px;line-height:1;margin-bottom:4px">${it.icon}</div>
+      <div style="font-size:12px;font-weight:700;color:${labelC};line-height:1.25;margin-bottom:3px">${it.label}</div>
+      <div style="font-size:10px;color:#94A3B8;line-height:1.3">${it.desc}</div>
+    </div>`;
+  };
+  const normalGrid=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:12px 12px 4px">${normalItems.map(_card).join('')}</div>`;
+  const adminGrid=hasAdmin?`
+    <div style="padding:8px 12px 2px;font-size:11px;font-weight:700;color:#EF4444;letter-spacing:.3px">👑 관리자 전용</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:0 12px 4px">${adminItems.map(_card).join('')}</div>`:'';
+  const hasAdminSel=[..._resetSel].some(id=>_RESET_ITEMS.find(it=>it.id===id)?.admin);
+  const empty=_resetSel.size===0;
+  const btnBg=empty?'#E2E8F0':hasAdminSel?'#EF4444':'#4338CA';
+  const btnC=empty?'#94A3B8':'#fff';
+  const btnLabel=hasAdminSel?'⚠ 초기화 실행 (관리자)':'초기화 실행';
+  return `${normalGrid}${adminGrid}
+    <div style="padding:10px 12px 14px">
+      <button class="btn bp" style="width:100%;background:${btnBg};color:${btnC};border-color:transparent;font-size:13px;font-weight:700;padding:10px;border-radius:10px" ${empty?'disabled':''} onclick="clrSelected()">${btnLabel}</button>
+      ${_resetSel.size?`<div style="font-size:11px;color:#94A3B8;margin-top:6px;text-align:center">${_resetSel.size}개 항목 선택됨</div>`:''}
+    </div>`;
+}
+function _resetToggle(id){
+  if(_resetSel.has(id))_resetSel.delete(id);else _resetSel.add(id);
+  // 설정 탭이 열려 있으면 해당 섹션만 부분 갱신
+  const body=document.querySelector('#sa-reset .sa-body');
+  if(body)body.innerHTML=_renderResetHtml();
+}
+async function _doResetPresets(){
+  const def=_defaultPresets();
+  if(instructor){instructor.presets=[...def];}
+  if(fbUrl&&fbPath&&instructor?.id){
+    await fbPatch(`config/instructors/${instructor.id}`,{presets:def}).catch(()=>{});
   }
-  for(const k of inputKeys)delete inputData[k];
   saveLocal();
-  if(fbUrl&&fbPath){
-    if(!asgns.length){toast('Lv1 초기화 완료 (로컬만 — 배정 없음)');renderMain();return;}
-    try{
-      const patch={};
-      for(const k of inputKeys)patch[k]=null;
-      if(Object.keys(patch).length)await fbPatch('input',patch);
-      // obs 오늘 날짜 null 패치
-      for(const okey of obsKeys)await fbPatch(`obs/${encodeURIComponent(okey)}`,{[dk]:null}).catch(()=>{});
-      toast('Lv1 초기화 완료');
-    }catch(e){toast('Firebase 초기화 오류: '+e);}
-  }else{toast('Lv1 초기화 완료 (로컬)');}
-  renderMain();
 }
 
-// ── Lv2: 수행도·특이사항·진도/과제 전체 초기화 (assignments 범위 한정) ─
-async function clrLv2(){
-  if(!confirm('수행도·특이사항·진도/과제를 모두 초기화합니까?'))return;
-  const asgns=instructor?.assignments||[];
-  const{inputKeys,progressKeys}=_myResetKeys();
-  // 로컬: 본인 키만 삭제
-  for(const k of inputKeys)delete inputData[k];
-  for(const k of progressKeys)delete progressData[k];
-  saveLocal();
-  // Firebase: assignments가 있을 때만, 해당 키 null 패치 (전체 PUT 금지)
-  if(fbUrl&&fbPath){
-    if(!asgns.length){toast('Lv2 초기화 완료 (로컬만 — 배정 없음)');renderMain();return;}
-    try{
-      const inPatch={},sesPatch={};
-      for(const k of inputKeys)inPatch[k]=null;
-      for(const k of progressKeys)sesPatch[k]=null;
-      const ops=[];
-      if(Object.keys(inPatch).length)ops.push(fbPatch('input',inPatch));
-      if(Object.keys(sesPatch).length)ops.push(fbPatch('session/class_data',sesPatch));
-      await Promise.all(ops);
-      toast('Lv2 전체 초기화 완료');
-    }catch(e){toast('Firebase 초기화 오류: '+e);}
-  }else{toast('Lv2 초기화 완료 (로컬)');}
-  renderMain();
-}
-async function clrLv3(){
-  if(!adminOn){toast('관리자 모드가 필요합니다.');return;}
-  if(!confirm('⚠ DB 초기화 (Lv3)\n\ninput/, session/, 강사 배정 정보를 삭제합니다.\n학생 명단·강사·프리셋·설정은 유지됩니다.\n\n진행합니까?'))return;
-  if(!fbUrl||!fbPath){toast('Firebase 연결 정보가 없습니다.');return;}
+// ── 초기화 실행 (다중 선택) ──────────────────────────────────────────
+async function clrSelected(){
+  if(_resetSel.size===0)return;
+  const sel=[..._resetSel];
+  const hasAdminItem=sel.some(id=>_RESET_ITEMS.find(it=>it.id===id)?.admin);
+  const labels=sel.map(id=>_RESET_ITEMS.find(it=>it.id===id)?.label||id).join(', ');
+
+  if(hasAdminItem){
+    if(!adminOn){toast('관리자 모드가 필요합니다.');return;}
+    if(!confirm(`⚠ 관리자 초기화\n\n선택 항목: ${labels}\n\n진행합니까?`))return;
+    if(!confirm('마지막 확인: 이 작업은 되돌릴 수 없습니다. 진행합니까?'))return;
+  }else{
+    if(!confirm(`다음 항목을 초기화합니까?\n\n${labels}`))return;
+  }
+
+  if(!fbUrl||!fbPath){
+    // 로컬 처리 (Firebase 없음)
+    if(sel.includes('input')){const{inputKeys}=_myResetKeys();for(const k of inputKeys)delete inputData[k];}
+    if(sel.includes('tags')){const dk=todayKey();const asgns=instructor?.assignments||[];for(const a of asgns){const sts=cfg?.sheets?.[a.sheet]?.classes?.[a.cls]?.students||[];for(const s of sts){const ok=`${a.sheet}|${a.cls}|${s.name}`;if(tagData[ok]?.[dk])delete tagData[ok][dk];}}}
+    if(sel.includes('progress')){const{progressKeys}=_myResetKeys();for(const k of progressKeys)delete progressData[k];}
+    if(sel.includes('presets'))await _doResetPresets();
+    saveLocal();toast('초기화 완료 (로컬)');_resetSel.clear();renderMain();return;
+  }
+
   try{
-    await Promise.all([fbPut('input',null),fbPut('session',null)]);
-    // 각 강사의 assignments 초기화
-    if(cfg?.sheets){const instrs=await fbGet('config/instructors').catch(()=>null);if(instrs)for(const id of Object.keys(instrs))await fbPatch(`config/instructors/${id}`,{assignments:[]}).catch(()=>{});}
-    inputData={};progressData={};saveLocal();
-    toast('Lv3 DB 초기화 완료');renderMain();
+    const ops=[];
+    // ── 일반 항목 ──
+    if(sel.includes('input')){
+      const{inputKeys}=_myResetKeys();
+      for(const k of inputKeys)delete inputData[k];
+      const p={};for(const k of inputKeys)p[k]=null;
+      if(Object.keys(p).length)ops.push(fbPatch('input',p));
+    }
+    if(sel.includes('tags')){
+      const dk=todayKey();const asgns=instructor?.assignments||[];
+      for(const a of asgns){
+        const sts=cfg?.sheets?.[a.sheet]?.classes?.[a.cls]?.students||[];
+        for(const s of sts){
+          const ok=`${a.sheet}|${a.cls}|${s.name}`;
+          if(tagData[ok]?.[dk]){delete tagData[ok][dk];ops.push(fbPatch(`obs/${encodeURIComponent(ok)}`,{[dk]:null}));}
+        }
+      }
+    }
+    if(sel.includes('progress')){
+      const{inputKeys,progressKeys}=_myResetKeys();
+      for(const k of progressKeys)delete progressData[k];
+      const p={};for(const k of progressKeys)p[k]=null;
+      if(Object.keys(p).length)ops.push(fbPatch('session/class_data',p));
+    }
+    if(sel.includes('presets'))ops.push(_doResetPresets());
+    // ── 관리자 항목 ──
+    if(sel.includes('all-input')){inputData={};ops.push(fbPut('input',null));}
+    if(sel.includes('all-progress')){progressData={};ops.push(fbPut('session',null));}
+    if(sel.includes('assignments')){
+      const instrs=await fbGet('config/instructors').catch(()=>null);
+      if(instrs)for(const id of Object.keys(instrs))ops.push(fbPatch(`config/instructors/${id}`,{assignments:[]}).catch(()=>{}));
+    }
+    if(sel.includes('config')){
+      ops.push(fbPut('config',null));ops.push(fbPut('input',null));ops.push(fbPut('session',null));
+      inputData={};progressData={};cfg=null;instructor=null;adminOn=false;
+      SS('drw_input','{}');SS('drw_prog','{}');SS('drw_cfg','');SS('drw_instr','');
+    }
+    await Promise.all(ops);
+    saveLocal();
+    _resetSel.clear();
+    toast('초기화 완료');
+    if(sel.includes('config')){toast('페이지를 새로고침하세요',4000);}else{renderMain();}
   }catch(e){toast('초기화 실패: '+e);}
 }
-async function clrLv4(){
-  if(!adminOn){toast('관리자 모드가 필요합니다.');return;}
-  if(!confirm('🗑 완전 초기화 (Lv4)\n\nconfig/, input/, session/ 전체가 삭제됩니다.\n학생 명단·강사 정보·프리셋 모두 사라집니다.\n복구 불가능합니다.\n\n정말 진행합니까?'))return;
-  if(!confirm('마지막 확인: 이 작업은 되돌릴 수 없습니다.\n"완전 초기화"를 진행합니까?'))return;
-  if(!fbUrl||!fbPath){toast('Firebase 연결 정보가 없습니다.');return;}
-  try{
-    await Promise.all([fbPut('config',null),fbPut('input',null),fbPut('session',null)]);
-    inputData={};progressData={};cfg=null;instructor=null;adminOn=false;
-    SS('drw_input','{}');SS('drw_prog','{}');SS('drw_cfg','');SS('drw_instr','');
-    toast('Lv4 완전 초기화 완료 — 페이지를 새로고침하세요',4000);
-  }catch(e){toast('초기화 실패: '+e);}
-}
-// 구버전 호환용 별칭
-function clrInput(){clrLv1();}
-function clrAll(){clrLv2();}
-async function clrDB(){clrLv4();}
 
 // ══════════════════════════════════════════════════════════
 //  강사 모달 / 관리
@@ -1346,7 +1398,7 @@ function init(){
       if(cfgD){cfg=cfgD;saveLocal();setSync(true);}
       if(inpD)Object.assign(inputData,inpD);
       if(sessD?.class_data)for(const[k,v]of Object.entries(sessD.class_data))if(!progressData[k])progressData[k]=v;
-      if(obsD)Object.assign(obsData,obsD);
+      if(obsD)Object.assign(tagData,obsD);
       if(inpD||sessD||obsD)saveLocal();
       renderMain();renderSb();
     }).catch(()=>{setSync(false);renderMain();});
