@@ -49,19 +49,31 @@ FS = (_FONT, 8)
 FE = ("맑은 고딕", 9) if _SYS == "Windows" else ("TkDefaultFont", 9)
 _MOD = "command" if _SYS == "Darwin" else "ctrl"
 
+# ── obs/ assign_grade key → 한국어 라벨 ──────────────────────────────
+ASSIGN_GRADE_LABELS = {
+    "done":   "과제 완료",
+    "most":   "대부분 수행",
+    "half":   "절반 수행",
+    "little": "일부 수행",
+    "none":   "미수행",
+}
+
 # ── 관찰 태그 정의 (key=Firebase 저장값, label=표시) ──────────────────
 # key는 불변. label만 추후 수정 가능.
 TAGS = {
     "condition": [
-        {"key": "great",  "label": "💡 번뜩임"},
-        {"key": "good",   "label": "👍 잘함"},
-        {"key": "normal", "label": "😐 보통"},
-        {"key": "bad",    "label": "😴 힘듦"},
+        {"key": "great",  "label": "↑ 최상"},
+        {"key": "good",   "label": "↗ 좋음"},
+        {"key": "normal", "label": "→ 보통"},
+        {"key": "low",    "label": "↘ 낮음"},
+        {"key": "bad",    "label": "↓ 힘듦"},
     ],
     "understand": [
-        {"key": "fast",     "label": "🟢 빠름"},
-        {"key": "normal_u", "label": "🟡 보통"},
-        {"key": "slow",     "label": "🔴 느림"},
+        {"key": "top",      "label": "완벽"},
+        {"key": "good",     "label": "잘함"},
+        {"key": "normal_u", "label": "이해함"},
+        {"key": "confused", "label": "헷갈림"},
+        {"key": "hard",     "label": "어려워함"},
     ],
     "understand_sub": [
         {"key": "self_solve", "label": "💪 혼자해결"},
@@ -100,9 +112,12 @@ DEFAULT_CONFIG = {
     "room_prefix":    "오직 ",
     "firebase_url":   "",
     "firebase_path":  "",
-    "ai_engine_type": "groq",
-    "ai_api_key":     "",
-    "instructor_id":  "",
+    "ai_engine_type":  "groq",
+    "ai_api_key":      "",
+    "groq_api_key":    "",
+    "openai_api_key":  "",
+    "claude_api_key":  "",
+    "instructor_id":   "",
     "sheets": {
         "M": {"classes": {}},
         "T": {"classes": {}}

@@ -49,6 +49,7 @@ from constants import (
     GREEN, YELLOW, GRAY, BORDER, TEXT, SUBTEXT, BLUE,
     STATUS_EMPTY, STATUS_PARTIAL, STATUS_READY, DOT_COLOR,
     FT, FB, FS, FE, _MOD,
+    ASSIGN_GRADE_LABELS,
 )
 from storage  import (load_config, save_config, has_students,
                       save_daily_cache, load_daily_cache, set_runtime_cwd, RUNTIME_DIR)
@@ -874,6 +875,12 @@ class App:
             return
 
         try:
+            # ── 로컬 데이터 전부 초기화 ──
+            self.student_data.clear()
+            self.note_data.clear()
+            self.progress_data.clear()
+            self.force_data.clear()
+
             # ── 0. config/ (sheets + presets + 강사 데이터) ──
             config_data = firebase_get(self.cfg, "config") or {}
             self._sync_shared_sheets_from_firebase()
@@ -927,6 +934,37 @@ class App:
             # ── input/ 처리 ──
             # 과제수행도·메모: 항상 웹 데이터로 교체
             self._import_mobile_data(input_data)
+
+            # ── obs/ assign_grade + assign_tags → student_data 매핑 (v2.0) ──
+            # 웹 앱이 assign_grade/assign_tags를 obs/{sh}|{cls}|{name}|{tb}/{date} 에 저장
+            _today = today_key()
+            for _okey, _date_map in self.tag_data.items():
+                if not isinstance(_date_map, dict):
+                    continue
+                _oparts = _okey.split('|', 3)   # sheet|cls|name|tb
+                if len(_oparts) != 4:
+                    continue
+                _sh, _cls, _name, _tb = _oparts
+                _day = _date_map.get(_today, {})
+                if not isinstance(_day, dict):
+                    continue
+
+                # assign_grade → 라벨
+                _gk = _day.get('assign_grade', '')
+                _grade_lbl = ASSIGN_GRADE_LABELS.get(_gk, '') if _gk else ''
+
+                # assign_tags (복수선택 프리셋 — Firebase 배열/객체 모두 대응)
+                _raw_tags = _day.get('assign_tags') or []
+                if isinstance(_raw_tags, dict):
+                    _raw_tags = [v for _, v in sorted(_raw_tags.items())]
+                _tag_lbls = [str(t) for t in _raw_tags if t]
+
+                # 결합: "대부분 수행 / 교재 미지참 / 오답 풀이 안함"
+                _combined = ' / '.join(p for p in [_grade_lbl] + _tag_lbls if p)
+                if not _combined:
+                    continue
+
+                self.student_data[(_sh, _cls, _name, _tb)] = {'value': _combined}
 
             # ── session/class_data → progress_data (항상 덮어쓰기) ──
             applied_prog = 0
@@ -1238,13 +1276,20 @@ class App:
         # API Key 입력 폼
         tk.Label(ai_grid, text="API Key", font=FS, bg=BG, fg=SUBTEXT).grid(row=1, column=0, sticky='w', pady=3, padx=(0,8))
         
-        default_key = self.cfg.get('ai_api_key', '')
-        if not default_key:
-            default_key = self.cfg.get('groq_api_key', '')
-            
+        def _key_for_engine(eng):
+            k = self.cfg.get(f'{eng}_api_key', '').strip()
+            if not k:
+                k = self.cfg.get('ai_api_key', '').strip()
+            return k
+
+        default_key = _key_for_engine(engine_var.get())
         ai_key_var = tk.StringVar(value=default_key)
         ai_entry = tk.Entry(ai_grid, textvariable=ai_key_var, font=FS, show='*', relief='flat', bg="#F8FAFC", highlightbackground=BORDER, highlightthickness=1)
         ai_entry.grid(row=1, column=1, sticky='ew', ipady=3)
+
+        def _on_engine_change(event=None):
+            ai_key_var.set(_key_for_engine(engine_var.get()))
+        cmb_engine.bind('<<ComboboxSelected>>', _on_engine_change)
 
         def _toggle_ai_vis():
             ai_entry.config(show='' if ai_entry.cget('show') == '*' else '*')
@@ -1270,9 +1315,7 @@ class App:
                 
                 self.cfg['ai_engine_type'] = chosen_engine
                 self.cfg['ai_api_key'] = chosen_key
-                
-                if chosen_engine == 'groq':
-                    self.cfg['groq_api_key'] = chosen_key
+                self.cfg[f'{chosen_engine}_api_key'] = chosen_key
 
                 save_config(self.cfg)
                 

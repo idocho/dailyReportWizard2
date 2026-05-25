@@ -1,7 +1,7 @@
 # DailyReportWizard — 요구사항 명세서
 
 **Crafted by IDO(idocho@kakao.com) · Powered by Claude AI**  
-**문서 버전**: 4.9 · **앱 버전**: v2.0.0 · **최종 수정**: 2026-05-24
+**문서 버전**: 5.8 · **앱 버전**: v2.0.0 · **최종 수정**: 2026-05-25
 
 ---
 
@@ -34,6 +34,15 @@
 | 4.7 | 2026-05-24 | 학급 삭제 시 담당 수업 cascade 삭제. `rmCls()`에서 `instructor.assignments` 중 해당 `sheet|cls` 항목 자동 제거 및 Firebase 동기화 |
 | 4.8 | 2026-05-24 | 교재·강사 목록 가나다순 정렬. 교재 삭제 시 assignments cascade 정리. `_my_classes()` 버그픽스 — instructor_id 설정 + assignments=[] 시 전체 반 노출 오류. `_sync_shared_sheets_from_firebase()` 전면 개선 — 시작 시 `config/` 전체 읽어 sheets + instructor assignments 동시 동기화. `_fetch_class_data` save_config·_switch_sheet 누락 수정. `_pull_mobile_data` session 폴백 버그픽스 — `session` 노드 자체 없을 때만 `lastSent` 폴백. 노드 존재 + `class_data` 비어있으면(의도적 초기화) 폴백 없이 빈 데이터 처리 |
 | 4.9 | 2026-05-24 | 진도 저장값 소단원만 저장. `pgBuild()` — 소단원 선택 시 `소단원`만, 단원 전체 선택 시 `대단원`만 저장 (기존 `"대단원 › 소단원"` 복합 저장 폐기) |
+| 5.0 | 2026-05-25 | 웹 성적 입력 탭 구현. `scores/` Firebase 노드 쓰기. 시험 유형 6종(주간Test·기출모의고사·실전모의고사·성취도평가·반배치고사·직접입력), 회차·날짜·만점·메모·반 전체 일괄 입력, 백분율·반평균·최고·최저 실시간 산출. `goNav('scores')`, `scoreData`, `SCORE_TYPES`, `_renderScoreList/Edit`, `_saveScore`, `_deleteScore` 신설 |
+| 5.1 | 2026-05-25 | 가져오기 알고리즘 간소화. `_pull_mobile_data()` 시작 시 `student_data`, `note_data`, `progress_data`, `force_data` 전부 clear 후 Firebase 데이터만 채움. 로컬 잔류 데이터 병합 로직 제거 |
+| 5.2 | 2026-05-25 | 관찰 태그 대폭 개편. ① 과제 고정 등급 3→5단계(`done/most/half/little/none`). ② 컨디션 4→5단계(PES 화살표 스타일, `low` 추가). ③ 이해도 3→5단계(`top/good/normal_u/confused/hard`). ④ 하이라이트 단일→복수선택 전환(배열 저장). ⑤ 버튼 UX: 택1=pill(tg-radio), 복수=dashed square(tg-check). ⑥ 기본 프리셋 11→7개로 정리(`오답 풀이 안함` 추가). ⑦ PC 앱 A안: `obs/assign_grade` → `student_data` 매핑(`ASSIGN_GRADE_LABELS`). ⑧ `ai_engine.py` condition/understand/highlight 키 현행화 |
+| 5.3 | 2026-05-25 | PC 앱 과제 데이터 통합 고도화. ① `ASSIGN_GRADE_LABELS` 전문 라벨 확정(`과제 완료/대부분 수행/절반 수행/일부 수행/미수행`). ② `app.py` obs 매핑에 `assign_tags` 복수 추가 — `assign_grade` 라벨 + 다중 선택 태그를 `" / "` 구분자로 결합(`"대부분 수행 / 교재 미지참 / 오답 풀이 안함"` 형태). ③ Firebase `assign_tags` 배열·딕셔너리 이중 구조 모두 대응(배열이면 직접 사용, dict이면 키 정렬 후 값 추출) |
+| 5.5 | 2026-05-25 | 초기화 기능 수정. ① `tags` 초기화 obs 키 수정(`sheet\|cls\|name` → `sheet\|cls\|name\|tb`) — 구버전 키로 인해 tagData 조회 실패, 아무것도 삭제 안 되던 버그. ② 초기화 항목 재정의: "수행도 & 특이사항"을 "수행도 & 관찰 태그"(obs 전체)와 "특이사항 메모"(inputData notes만)로 분리 — v2.0에서 수행도가 obs/에 저장되므로 기존 `input` 초기화로 수행도 삭제 불가였던 혼동 해소. ③ `input` 초기화는 `__note__` 키만 삭제하도록 축소. ④ 관리자 `all-input` 초기화에 `obs/` 노드 삭제 추가(`tagData={}`, `fbPut('obs',null)`) |
+| 5.8 | 2026-05-25 | AI 엔진별 API Key 독립 저장. `groq_api_key` / `openai_api_key` / `claude_api_key` 분리. 설정창 엔진 전환 시 해당 엔진 저장 키 자동 로드. `_get_engine_settings` 엔진별 키 우선 조회 → `ai_api_key` 폴백 |
+| 5.7 | 2026-05-25 | AI 생성 지침 8번 추가 — 과제 반복 금지. 진도·과제 정보는 메시지 별도 항목으로 전달되므로 특이사항에서 재낭독 금지 |
+| 5.6 | 2026-05-25 | ai_engine.py 개선. ① `_merge_student_tags()` 신설 — v5.4 교재별 obs 키(`sheet\|cls\|name\|tb`) 대응, 복수 교재 태그 병합(단일 필드 first-wins, 배열 필드 union). ② `gen_single`/`gen_all` obs 키 3분할→4분할 수정 (태그 미전달 버그 수정). ③ `_base_conditions()` 중복 제거 — 프롬프트 텍스트에서 제거, system 파라미터로만 전달. ④ `build_batch_prompt` 진도/과제 포함 — `gen_all` targets에 `progress` 필드 추가, 단건 프롬프트와 동일 수준 컨텍스트 제공. ⑤ Groq 모델 문서 정정 `llama-3.1-8b-instant` → `qwen/qwen3-32b` |
+| 5.4 | 2026-05-25 | obs 데이터 교재별 분리. ① `tagData` 키 구조 변경: `sheet\|cls\|name` → `sheet\|cls\|name\|tb` — 같은 학생의 교재별 독립된 obs 저장. ② Firebase 경로 동일 변경(`obs/{sheet}\|{cls}\|{name}\|{tb}/{date}`). ③ `getTags(sheet,cls,name,tb)`, `pushObs(sheet,cls,name,tb)`, `onTagCondition/Understand/Multi/onAssignGrade/onAssignTag` 전부 `tb` 파라미터 추가. ④ Python `app.py` obs 키 파싱 3분할→4분할(`_sh,_cls,_name,_tb`), `textbooks` 루프 제거(키에서 직접 추출). ⑤ `onTagCondition` UI 갱신 스코프를 `[data-g="condition"]` 로 한정. ⑥ CSS: `.tg-radio.sel-c`에 기본 background(`var(--indigo)`) 추가(understand 선택 시각 보장). ⑦ highlight `sel-m` 색 `#B45309`→`#CA8A04`(caution 앰버와 차별화, 골드) |
 
 ---
 
@@ -199,22 +208,25 @@ DRW 2.0이 저장하는 수업 관찰 데이터(`obs/`)와 성적 데이터(`sco
 
 순서:
 ```
-① config/ 로드  → sheets, presets 갱신
-② config/instructors/{id} 로드 → 강사별 assignments 우선 적용
-③ input/ 로드   → student_data, note_data 채움
-④ obs/ 로드     → tag_data 채움 (v2.0 신규)
-⑤ session/class_data/ 로드 → progress_data (없으면 lastSent/ 폴백)
+① 로컬 초기화  → student_data, note_data, progress_data, force_data 전부 clear
+② config/ 로드  → sheets, presets 갱신
+③ config/instructors/{id} 로드 → 강사별 assignments 우선 적용
+④ input/ 로드   → student_data, note_data 채움
+⑤ obs/ 로드     → tag_data 채움 (v2.0 신규)
+⑥ session/class_data/ 로드 → progress_data (없으면 lastSent/ 폴백)
 ```
 
-**가져오기 고정 정책** (v0.9.3~, 다이얼로그 폐지)
+**가져오기 고정 정책** (v5.1~)
+
+- 가져오기 시작 시 로컬 데이터 전체 초기화 → Firebase 데이터만 채움
+- 로컬 잔류 데이터 병합 없음
 
 | 데이터 | 정책 |
 |--------|------|
-| 과제수행도 | 항상 웹 데이터로 교체 |
-| 진도/과제 | 항상 웹 데이터로 교체 |
-| 메모/특이사항 | 항상 웹 데이터로 교체 |
-
-> 웹 입력 화면에서 직접 수정한 메모가 PC 앱에 즉시 반영되는 것을 우선한다. PC에서 AI 생성/직접 편집한 특이사항은 다음 가져오기 시 웹 메모 값으로 교체될 수 있다.
+| 과제수행도 | 로컬 초기화 후 웹 데이터로 채움 |
+| 진도/과제 | 로컬 초기화 후 웹 데이터로 채움 |
+| 메모/특이사항 | 로컬 초기화 후 웹 데이터로 채움 |
+| 강제완료 | 로컬 초기화 (웹에 없으므로 빈 상태) |
 
 한글 강사명: `urllib.parse.quote(node, safe='/')` 자동 처리
 
@@ -241,8 +253,10 @@ DRW 2.0이 저장하는 수업 관찰 데이터(`obs/`)와 성적 데이터(`sco
 | 키 | 내용 |
 |----|------|
 | `ai_engine_type` | `"groq"` \| `"openai"` \| `"claude"` |
-| `ai_api_key` | 통합 API Key |
-| `groq_api_key` | groq 선택 시 병행 저장 (하위 호환 폴백) |
+| `ai_api_key` | 마지막 저장 Key (폴백용) |
+| `groq_api_key` | Groq 전용 Key |
+| `openai_api_key` | OpenAI 전용 Key |
+| `claude_api_key` | Claude 전용 Key |
 
 **학급명단 동기화 (`_fetch_class_data`)**
 
@@ -252,10 +266,10 @@ DRW 2.0이 저장하는 수업 관찰 데이터(`obs/`)와 성적 데이터(`sco
 
 | 데이터 | 저장 위치 | 초기화 시점 |
 |--------|-----------|-------------|
-| 진도/과제 (`progress_data`) | `daily_cache.json` | 수동 초기화 또는 확인 후 |
-| 과제수행도 (`student_data`) | 메모리 | 전송 완료 후 자동 |
-| 특이사항 (`note_data`) | 메모리 | 전송 완료 후 자동 |
-| 강제완료 (`force_data`) | `daily_cache.json` | 전송 완료 후 자동 |
+| 진도/과제 (`progress_data`) | `daily_cache.json` | 가져오기 시 초기화 후 재채움 / 수동 초기화 |
+| 과제수행도 (`student_data`) | 메모리 | 가져오기 시 초기화 후 재채움 / 전송 완료 후 |
+| 특이사항 (`note_data`) | 메모리 | 가져오기 시 초기화 후 재채움 / 전송 완료 후 |
+| 강제완료 (`force_data`) | `daily_cache.json` | 가져오기 시 초기화 / 전송 완료 후 자동 |
 | 학생 명단·설정 | `config.json` | 변경 즉시 |
 | 강사 배정 | `config.json` | 가져오기 시 덮어쓰기 |
 
@@ -312,7 +326,7 @@ def _my_classes(self, sheet) -> list:
 
 | 엔진 | 모델 | 용도 |
 |------|------|------|
-| `groq` | `llama-3.1-8b-instant` | 무료, 속도 최적화 |
+| `groq` | `qwen/qwen3-32b` | 무료, 속도 최적화 |
 | `claude` | `claude-sonnet-4-6` | 문장력·감성 우선 |
 | `openai` | `gpt-4o-mini` | 범용 |
 
@@ -358,7 +372,8 @@ def _my_classes(self, sheet) -> list:
 5. 기타 이벤트: 자율학습·주간Test·재시험은 다른 수업 묘사와 섞지 않고 별도 문장으로 명확히 전달
 6. 하이라이트: ⭐ 항목 있으면 가장 인상적으로 표현
 7. 결석: 데이터 없으면 안부 인사 + 다음 수업 기약 코멘트
-8. 출력: 순수 텍스트 (JSON·마크다운 금지). 2~3문장, 100자 내외
+8. 과제 반복 금지: 진도·과제(페이지·번호)는 메시지 별도 항목으로 전달되므로 특이사항에서 그대로 읽어주는 문장 금지
+9. 출력: 순수 텍스트 (JSON·마크다운 금지). 2~3문장, 100자 내외
 
 **few-shot 예시** (단건 프롬프트에 포함, 문체·어조 참고용)
 > "오늘 이차함수 단원에서 막혔던 개념을 반복 설명 후 이해했습니다. 틀린 문항을 스스로 재풀이하며 오답을 정리하는 모습이 인상적이었습니다."
@@ -491,18 +506,37 @@ def _my_classes(self, sheet) -> list:
 
 ### 4.6 성적 입력 탭
 
-**시험 유형 (기본 5종)**
+**네비게이션**: 사이드바 `📊 성적 입력` → `goNav('scores')`
 
-| 유형 | 회차 |
-|---|---|
-| 주간 Test | O (1회차, 2회차...) |
-| 성취도 평가 | X (단원명으로 구분) |
-| 반배치고사 | X (시기로 구분) |
-| 실전 모의고사 | O |
-| 기출 모의고사 | O |
+**시험 유형 6종** (`SCORE_TYPES`)
+
+| 유형 | 설명 |
+|------|------|
+| 주간Test | 매주 정기 테스트 |
+| 기출모의고사 | 기출문제 기반 모의고사 |
+| 실전모의고사 | 실전 모의고사 |
+| 성취도평가 | 단원별 성취도 평가 |
+| 반배치고사 | 반 편성/재배치 시험 |
+| 직접입력 | 사용자 정의 시험명 |
+
+**입력 필드**
+
+| 필드 | 타입 | 기본값 | 설명 |
+|------|------|--------|------|
+| 시험 유형 | select | 주간Test | `SCORE_TYPES` 선택 또는 직접입력 |
+| 회차 | text | 1 | 자유 텍스트 (1, 2, "5월" 등) |
+| 날짜 | date | 오늘 | YYYY-MM-DD |
+| 만점 | number | 100 | 점수 백분율 기준 |
+| 메모 | text | - | 시험 범위·특이사항 |
+| 학생별 점수 | number | - | 반 전체 일괄 입력 |
+
+**자동 산출 (실시간)**
+- 학생별 백분율 = 점수 / 만점 × 100
+- 반 평균·최고점·최저점·입력 인원 수
 
 **입력 플로우**:  
-시험 유형 선택 → 회차/식별자 선택 → 만점 설정 → 학급 전체 점수 입력 → 분포/석차 자동 산출 → 저장
+`+ 새 시험 추가` → 시험 정보 설정 → 학생별 점수 입력 → 저장 → 목록 뷰  
+기존 시험: `수정` 버튼 → 동일 폼 (testKey 유지하여 덮어쓰기) / `삭제` 버튼
 
 ### 4.7 신호등 판정 (`dotClass`)
 
@@ -651,12 +685,15 @@ cfg.sheets.M.classes.중1A.tb_grade  = { "최상위수학": "중1-1", "우공비
     class_data/
       {sheet}|{cls}|{tb}: { progress: "3단원 2차시", homework: "p.45~48" }
 
-  scores/                   ← 웹 쓰기 / Analyzer 읽기 (v2.0 신규)
-    {sheet}|{cls}/
-      {exam_type}|{round}|{YYYY-MM-DD}:
-        meta: { type, round, date, perfect }
-        {학생명}: 85
-        {학생명}: 72
+  scores/                   ← 웹 쓰기 / Analyzer 읽기 (v2.0 신규, v5.0 구현)
+    {sheet}|{cls}/           URL 인코딩 (클래스키 = "M|3MGM")
+      {YYYY-MM-DD}|{type}|{round}:   testKey (신규 생성 시, 수정 시 유지)
+        type:      "주간Test" | "기출모의고사" | "실전모의고사" | "성취도평가" | "반배치고사" | 사용자정의
+        round:     "1" | "2" | 자유 텍스트
+        date:      "YYYY-MM-DD"
+        max_score: 100
+        memo:      ""
+        students:  { "김상덕": 85, "이민준": 92, ... }
 
   lastSent/                 ← PC 쓰기
     date: "5/19 (화)"
@@ -759,7 +796,7 @@ cfg.sheets.M.classes.중1A.tb_grade  = { "최상위수학": "중1-1", "우공비
 |------|-----|------|
 | AI 쿨다운 (Groq) | 30초 | `AI_COOLDOWN_GROQ` |
 | AI 쿨다운 (유료) | 3초 | `AI_COOLDOWN_PAID` |
-| Groq 모델 | `llama-3.1-8b-instant` | ai_engine.py |
+| Groq 모델 | `qwen/qwen3-32b` | ai_engine.py |
 | Claude 모델 | `claude-sonnet-4-6` | ai_engine.py |
 | OpenAI 모델 | `gpt-4o-mini` | ai_engine.py |
 

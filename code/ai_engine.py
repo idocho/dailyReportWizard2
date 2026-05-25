@@ -25,12 +25,15 @@ _CONDITION_TEXT = {
     "great":  "오늘 특히 집중력이 높고 활발한 날이었음",
     "good":   "평소처럼 성실하게 수업에 임함",
     "normal": "무난하게 수업에 참여함",
-    "bad":    "컨디션이 다소 저조하거나 집중력이 흐트러진 날이었음",
+    "low":    "다소 활력이 부족하고 집중력이 흐트러진 편이었음",
+    "bad":    "컨디션이 저조하고 집중력이 크게 흐트러진 날이었음",
 }
 _UNDERSTAND_TEXT = {
-    "fast":     "설명 1회에 바로 이해하고 응용까지 진행함",
-    "normal_u": "반복 설명 후 이해함",
-    "slow":     "반복 설명에도 어려움이 있어 추가 지도가 필요한 상태",
+    "top":      "설명 즉시 이해하고 바로 응용까지 진행함",
+    "good":     "대체로 빠르게 이해하며 큰 막힘 없이 진행함",
+    "normal_u": "설명 후 이해함, 평균적인 흡수 속도",
+    "confused": "헷갈리는 부분이 있어 반복 설명 필요",
+    "hard":     "반복 설명에도 어려움이 있어 추가 지도 필요",
 }
 _UNDERSTAND_SUB_TEXT = {
     "self_solve": "막힌 문제를 스스로 돌파하는 모습이 있었음",
@@ -61,6 +64,28 @@ _HIGHLIGHT_TEXT = {
     "mastered": "오늘 다룬 개념을 완전히 습득함",
     "effort":   "어려운 문제에도 끝까지 포기하지 않는 집념을 보임",
 }
+
+
+def _merge_student_tags(tag_data: dict, sheet: str, cls: str, name: str, textbooks: list) -> dict:
+    """교재별 분리된 tag_data에서 학생의 오늘 태그를 교재 전체 병합."""
+    today = today_key()
+    merged = {}
+    for tb in textbooks:
+        okey = f"{sheet}|{cls}|{name}|{tb}"
+        tb_tags = tag_data.get(okey, {}).get(today, {})
+        if not tb_tags:
+            continue
+        for field in ('condition', 'understand', 'highlight'):
+            if field not in merged and field in tb_tags:
+                merged[field] = tb_tags[field]
+        for field in ('understand_sub', 'engage', 'caution', 'extra'):
+            if field in tb_tags:
+                vals = tb_tags[field]
+                if isinstance(vals, str):
+                    vals = [vals] if vals else []
+                existing = merged.get(field, [])
+                merged[field] = list(dict.fromkeys(existing + vals))
+    return merged
 
 
 def _build_tags_context(tags: dict) -> str:
@@ -96,9 +121,12 @@ def _build_tags_context(tags: dict) -> str:
             f"{', '.join(extra_notes)}"
         )
 
-    hl = tags.get("highlight")
-    if hl and hl in _HIGHLIGHT_TEXT:
-        lines.insert(0, f"- ⭐ 오늘의 하이라이트: {_HIGHLIGHT_TEXT[hl]}")
+    hl_raw = tags.get("highlight") or []
+    if isinstance(hl_raw, str):  # 구버전 단일값 호환
+        hl_raw = [hl_raw] if hl_raw else []
+    hl_texts = [_HIGHLIGHT_TEXT[k] for k in hl_raw if k in _HIGHLIGHT_TEXT]
+    if hl_texts:
+        lines.insert(0, f"- ⭐ 오늘의 하이라이트: {', '.join(hl_texts)}")
 
     if DEBUG_AI_PROMPT:
         print(f"[TAGS DEBUG] raw={tags}")
@@ -126,8 +154,10 @@ def _base_conditions() -> str:
         "6. 주의 태그: '졸음·잡담·태도불량' 등 직접 단어 사용 절대 금지. "
         "'오늘은 조금 피곤해 보이는 날이었습니다' / '집중이 다소 어려웠던 날이었지만' 수준으로 완곡하게 녹여 작성.\n"
         "7. 하이라이트: ⭐ 오늘의 하이라이트가 있으면 메시지에서 가장 먼저 또는 가장 인상적으로 표현.\n"
-        "8. 결석: 데이터가 없으면 안부 인사와 다음 수업 기약 코멘트로 대체.\n"
-        "9. 출력: 순수 텍스트만 (JSON·마크다운·따옴표 금지). 2~3문장, 100자 내외."
+        "8. 과제 반복 금지: 진도·과제 정보(페이지·번호 등)는 메시지에 별도 항목으로 이미 전달됩니다. "
+        "특이사항에서 '다음 과제는 p.XX입니다' 식으로 그대로 읽어주는 문장 절대 금지.\n"
+        "9. 결석: 데이터가 없으면 안부 인사와 다음 수업 기약 코멘트로 대체.\n"
+        "10. 출력: 순수 텍스트만 (JSON·마크다운·따옴표 금지). 2~3문장, 100자 내외."
     )
 
 
@@ -172,7 +202,6 @@ def build_single_prompt(sheet, cls, name, textbooks, student_data, progress_data
             "최종 특이사항에 빠뜨리지 말고 자연스럽게 포함하세요.\n\n"
         )
 
-    prompt += f"{_base_conditions()}"
     return prompt
 
 
@@ -184,7 +213,13 @@ def build_batch_prompt(targets):
         valid_data = []
         for tb, val in t["data"].items():
             if val and "미입력" not in str(val):
-                valid_data.append(f"{tb}(수행도:{val})")
+                prog = t.get("progress", {}).get(tb, {})
+                parts = [f"수행도:{val}"]
+                if prog.get('progress'):
+                    parts.append(f"진도:{prog['progress']}")
+                if prog.get('homework'):
+                    parts.append(f"과제:{prog['homework']}")
+                valid_data.append(f"{tb}({', '.join(parts)})")
         
         entry = {
             "name":  t["name"],
@@ -212,7 +247,6 @@ def build_batch_prompt(targets):
         "각 학생의 '직접작성메모_반드시반영' 필드는 교사가 직접 입력한 핵심 전달 사항이므로 "
         "최종 note에 반드시 자연스럽게 포함하세요.\n"
         "⭐ 하이라이트 항목이 있으면 가장 인상적인 표현으로 강조.\n\n"
-        f"{_base_conditions()}\n\n"
         "⚠️ 반드시 JSON 배열로만 응답 (다른 텍스트 금지):\n"
         '[{"cls":"반명","name":"이름","note":"특이사항"}, ...]\n\n'
         f"[학생데이터]\n{students_json}"
@@ -328,11 +362,9 @@ class AiEngine:
         engine_type = self.app.cfg.get('ai_engine_type', 'groq').strip().lower()
         
         # UI에서 설정한 단일 통합 키 혹은 개별 키 저장값 연동
-        api_key = self.app.cfg.get('ai_api_key', '').strip()
-        
-        # 하위 호환성 케어: 만약 기존 구형 단일 groq 키 필드가 있다면 백업 적용
-        if not api_key and engine_type == 'groq':
-            api_key = self.app.cfg.get('groq_api_key', '').strip()
+        api_key = self.app.cfg.get(f'{engine_type}_api_key', '').strip()
+        if not api_key:
+            api_key = self.app.cfg.get('ai_api_key', '').strip()
 
         if not api_key:
             from tkinter import messagebox
@@ -363,13 +395,10 @@ class AiEngine:
         except Exception:
             existing_note = app.note_data.get(note_key, {}).get('value', '')
         existing = existing_note.strip()
-        okey = f"{sheet}|{cls}|{name}"
-        tags = app.tag_data.get(okey, {}).get(today_key(), {})
+        tags = _merge_student_tags(app.tag_data, sheet, cls, name, textbooks)
 
         if DEBUG_AI_PROMPT:
-            all_dates = list(app.tag_data.get(okey, {}).keys())
             print(f"\n[SINGLE] student={name}  cls={cls}  today={today_key()}")
-            print(f"[SINGLE] tag_key={okey!r}  dates_in_cache={all_dates}")
             print(f"[SINGLE] tags_today={tags if tags else '(없음)'}")
             print(f"[SINGLE] existing_note={existing if existing else '(없음)'}")
 
@@ -444,15 +473,22 @@ class AiEngine:
                         key = f"{gs} {tb}".strip() if gs else tb
                         student_book_data[key] = val
 
-                okey_b = f"{sheet}|{cls}|{name}"
-                tags = app.tag_data.get(okey_b, {}).get(today_key(), {})
+                tags = _merge_student_tags(app.tag_data, sheet, cls, name, tbs)
                 if DEBUG_AI_PROMPT:
                     print(f"[BATCH] {name}({cls})  tags={tags if tags else '(없음)'}")
+                progress_book_data = {}
+                for _tb in tbs:
+                    _gs = tb_grade.get(_tb, '')
+                    _key = f"{_gs} {_tb}".strip() if _gs else _tb
+                    _pd = app.progress_data.get((sheet, cls, _tb), {})
+                    if _pd.get('progress') or _pd.get('homework'):
+                        progress_book_data[_key] = _pd
                 targets.append({
                     "sheet":    sheet,
                     "cls":      cls,
                     "name":     name,
                     "data":     student_book_data,
+                    "progress": progress_book_data,
                     "existing": app.note_data.get((sheet, cls, name), {}).get('value', '').strip(),
                     "tags":     tags,
                 })

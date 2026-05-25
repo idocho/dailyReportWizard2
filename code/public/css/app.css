@@ -128,24 +128,40 @@ body{font-family:'Malgun Gothic','맑은 고딕',sans-serif;background:var(--bg)
 #scr-mask{display:none;position:fixed;inset:0;background:#1A1D2E;z-index:9999;align-items:center;justify-content:center;flex-direction:column;gap:16px;text-align:center;padding:24px}
 @media(max-width:1023px){#scr-mask{display:flex}}
 /* ── 관찰 태그 버튼 ── */
-.tg{padding:3px 7px;border-radius:4px;border:1px solid var(--border);background:#F1F5F9;color:var(--sub);font-size:10px;font-family:inherit;font-weight:600;cursor:pointer;white-space:nowrap;transition:all .1s;line-height:1.4}
-.tg:active{transform:scale(.95)}
-.tg.sel-c{border-color:transparent;color:#fff}
-.tg.sel-m{border-color:transparent;color:#fff}
-/* condition 컬러 */
-.tg[data-k="great"].sel-c{background:#7C3AED}
-.tg[data-k="good"].sel-c{background:#2563EB}
-.tg[data-k="normal"].sel-c{background:#64748B}
-.tg[data-k="bad"].sel-c{background:#DC2626}
-/* understand 컬러 */
-.tg[data-k="fast"].sel-c{background:#16A34A}
-.tg[data-k="normal_u"].sel-c{background:#D97706}
-.tg[data-k="slow"].sel-c{background:#DC2626}
-/* 멀티 태그 (engage/caution/understand_sub) */
-.tg.sel-m{background:var(--indigo)}
-.tg[data-g="caution"].sel-m{background:#B45309}
-/* highlight 태그 */
-.tg[data-g="highlight"].sel-c{background:#B45309;border-color:transparent;color:#fff}
+/* ── 택1 고정 지표 — pill ─────────────────────────────────── */
+.tg-radio{padding:4px 11px;border-radius:20px;border:2px solid var(--border);background:#F0F4F8;color:var(--sub);font-size:10px;font-family:inherit;font-weight:700;cursor:pointer;white-space:nowrap;transition:all .12s;line-height:1.4;display:inline-flex;align-items:center;gap:3px}
+.tg-radio:active{transform:scale(.96)}
+.tg-radio.sel-c{border-color:transparent;color:#fff;background:var(--indigo)}
+/* condition — PES 화살표 (data-g="condition" 스코핑) */
+.tg-radio[data-g="condition"][data-k="great"]{color:#E53E3E;border-color:#FED7D7}
+.tg-radio[data-g="condition"][data-k="great"].sel-c{background:#E53E3E;border-color:transparent;color:#fff}
+.tg-radio[data-g="condition"][data-k="good"]{color:#ED8936;border-color:#FEEBC8}
+.tg-radio[data-g="condition"][data-k="good"].sel-c{background:#ED8936;border-color:transparent;color:#fff}
+.tg-radio[data-g="condition"][data-k="normal"]{color:#38B2AC;border-color:#B2F5EA}
+.tg-radio[data-g="condition"][data-k="normal"].sel-c{background:#38B2AC;border-color:transparent;color:#fff}
+.tg-radio[data-g="condition"][data-k="low"]{color:#D69E2E;border-color:#FAF089}
+.tg-radio[data-g="condition"][data-k="low"].sel-c{background:#D69E2E;border-color:transparent;color:#fff}
+.tg-radio[data-g="condition"][data-k="bad"]{color:#718096;border-color:#E2E8F0}
+.tg-radio[data-g="condition"][data-k="bad"].sel-c{background:#718096;border-color:transparent;color:#fff}
+/* understand 5단계 */
+.tg-radio[data-g="understand"][data-k="top"].sel-c{background:#15803D}
+.tg-radio[data-g="understand"][data-k="good"].sel-c{background:#16A34A}
+.tg-radio[data-g="understand"][data-k="normal_u"].sel-c{background:#D97706}
+.tg-radio[data-g="understand"][data-k="confused"].sel-c{background:#EA580C}
+.tg-radio[data-g="understand"][data-k="hard"].sel-c{background:#DC2626}
+/* assign_grade (5단계) */
+.tg-radio.ag-done.sel-c{background:#16A34A}
+.tg-radio.ag-most.sel-c{background:#CA8A04}
+.tg-radio.ag-half.sel-c{background:#D97706}
+.tg-radio.ag-little.sel-c{background:#EA580C}
+.tg-radio.ag-none.sel-c{background:#DC2626}
+
+/* ── 복수선택 항목 — dashed square ──────────────────────────── */
+.tg-check{padding:3px 8px;border-radius:5px;border:1.5px dashed #B0BEC5;background:#F8FAFC;color:#94A3B8;font-size:10px;font-family:inherit;font-weight:600;cursor:pointer;white-space:nowrap;transition:all .12s;line-height:1.4}
+.tg-check:active{transform:scale(.96)}
+.tg-check.sel-m{background:var(--indigo);color:#fff;border-color:transparent;border-style:solid}
+.tg-check[data-g="caution"].sel-m{background:#B45309;border-style:solid}
+.tg-check[data-g="highlight"].sel-m{background:#CA8A04;border-style:solid;color:#fff}
 /* 태그 행 레이아웃 */
 .tg-cell{display:flex;flex-wrap:wrap;gap:3px;align-content:center}
 .tg-sep{width:1px;background:var(--border);align-self:stretch;margin:4px 0;flex-shrink:0}
@@ -180,4 +196,23 @@ body{font-family:'Malgun Gothic','맑은 고딕',sans-serif;background:var(--bg)
 .adm-btn{display:flex;align-items:center;gap:8px;padding:10px 14px;border-radius:var(--r);border:1px solid var(--border);background:var(--panel);color:var(--sub);font-size:12px;font-weight:700;font-family:inherit;cursor:pointer;width:100%;transition:all .15s}
 .adm-btn:hover{background:var(--bg)}
 .adm-btn.on{border-color:#F59E0B;background:#FFFBEB;color:#92400E}
+
+/* ── 성적 입력 ────────────────────────────────────── */
+.score-form-grid{display:grid;grid-template-columns:1fr 80px 150px 80px;gap:8px;margin-bottom:10px}
+.field-lbl{font-size:11px;color:var(--sub);font-weight:700;margin-bottom:4px;letter-spacing:.03em}
+.score-table{background:var(--panel);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;margin-bottom:0}
+.score-table-header{display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--bg);border-bottom:1px solid var(--border)}
+.score-row{display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid var(--border)}
+.score-row:last-child{border-bottom:none}
+.score-sname{width:80px;font-size:13px;font-weight:600;flex-shrink:0}
+.score-slash{width:45px;font-size:12px;color:var(--sub);text-align:center;flex-shrink:0}
+.score-pct{width:45px;font-size:12px;color:var(--indigo);font-weight:700;text-align:right;flex-shrink:0}
+.score-stats{padding:10px 12px;background:var(--bg);font-size:12px;color:var(--sub);border-top:1px solid var(--border)}
+.score-card{background:var(--panel);border:1px solid var(--border);border-radius:var(--r);padding:12px 14px;margin-bottom:8px}
+.score-card-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.score-card-bottom{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.score-type-badge{font-size:12px;font-weight:700;background:var(--indigo-l);color:var(--indigo);border-radius:6px;padding:2px 8px}
+.score-round{font-size:11px;color:var(--sub);margin-left:2px}
+.score-date{font-size:11px;color:var(--sub);margin-left:2px}
+.score-grade-agg{margin-top:6px;padding:6px 8px;background:var(--indigo-l);border-radius:6px;font-size:11px;color:var(--sub)}
 </style>
