@@ -124,9 +124,10 @@ body{font-family:'Malgun Gothic','맑은 고딕',sans-serif;background:var(--bg)
 .toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#333;color:#fff;padding:8px 16px;border-radius:20px;font-size:12px;opacity:0;transition:opacity .25s;pointer-events:none;z-index:300;white-space:nowrap;max-width:90vw;text-align:center}
 .toast.show{opacity:1}
 @media(min-width:1024px){.toast{bottom:16px}}
-/* ── 소형 화면 마스킹 ── */
+/* ── 소형 화면 마스킹 (9인치급 최소: 840px, 1024×9/11≈838 → 840) ── */
+/* [임시 비활성] 전면 개방 — 차단 미디어쿼리 주석. 나중에 아래 @media 복구 시 9인치급(839px) 기준 재적용 */
 #scr-mask{display:none;position:fixed;inset:0;background:#1A1D2E;z-index:9999;align-items:center;justify-content:center;flex-direction:column;gap:16px;text-align:center;padding:24px}
-@media(max-width:1023px){#scr-mask{display:flex}}
+/* @media(max-width:839px){#scr-mask{display:flex}} */
 /* ── 관찰 태그 버튼 ── */
 /* ── 택1 고정 지표 — pill ─────────────────────────────────── */
 .tg-radio{padding:4px 11px;border-radius:20px;border:2px solid var(--border);background:#F0F4F8;color:var(--sub);font-size:10px;font-family:inherit;font-weight:700;cursor:pointer;white-space:nowrap;transition:all .12s;line-height:1.4;display:inline-flex;align-items:center;gap:3px}
