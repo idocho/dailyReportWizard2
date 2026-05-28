@@ -4,20 +4,58 @@
 
 // ── Firebase 연동 ─────────────────────────────────────────────────────
 async function _loadScoreDataIfNeeded(){
-  if(!fbUrl||!fbPath)return;
+  if(!dbUrl||!dbPath)return;
+  const a=instructor?.assignments?.[curAI];
+  if(!a)return;
   try{
-    const d=await fbGet('scores');
-    if(d&&typeof d==='object')scoreData=d;
-    if(curNav==='scores')renderMain();
+    const {classId, subject} = a;
+    // weekly: scores/weekly/{classId}/{subject}
+    const weeklyD=await fbGet(`scores/weekly/${classId}/${subject}`).catch(()=>null);
+    if(!scoreData.weekly)scoreData.weekly={};
+    if(!scoreData.weekly[classId])scoreData.weekly[classId]={};
+    if(weeklyD&&typeof weeklyD==='object')scoreData.weekly[classId][subject]=weeklyD;
+
+    // achievement (담임만): curriculum 기반
+    const curriculum=getCurriculumForSubject(classId,subject);
+    if(curriculum){
+      const curriculumKey=curriculumToKey(curriculum);
+      const achD=await fbGet(`scores/achievement/${curriculumKey}`).catch(()=>null);
+      if(!scoreData.achievement)scoreData.achievement={};
+      if(achD&&typeof achD==='object')scoreData.achievement[curriculumKey]=achD;
+    }
+    if(activeTab==='scores')renderMain();
   }catch(e){}
 }
-async function _pushScore(clsKey,testKey,val){
-  if(!fbUrl||!fbPath)return;
-  try{await fbPatch(`scores/${encodeURIComponent(clsKey)}`,{[testKey]:val});}catch(e){}
+
+// 저장 경로 결정
+function getScorePath(classId, subject, testKey, type){
+  if(ACHIEVEMENT_TYPES.includes(type)){
+    const curriculum=getCurriculumForSubject(classId,subject);
+    const curriculumKey=curriculumToKey(curriculum);
+    return `scores/achievement/${curriculumKey}/${testKey}`;
+  }
+  return `scores/weekly/${classId}/${subject}/${testKey}`;
 }
-async function _deleteScore(clsKey,testKey){
-  if(!fbUrl||!fbPath)return;
-  try{await fbPatch(`scores/${encodeURIComponent(clsKey)}`,{[testKey]:null});}catch(e){}
+
+async function _pushScore(classId, subject, testKey, val, type){
+  if(!dbUrl||!dbPath)return;
+  const path=getScorePath(classId,subject,testKey,type||val.type||'');
+  try{await fbPatch(path.slice(0,path.lastIndexOf('/')),{[testKey]:val});}catch(e){}
+}
+async function _deleteScore(classId, subject, testKey, type){
+  if(!dbUrl||!dbPath)return;
+  const path=getScorePath(classId,subject,testKey,type||'');
+  try{await fbPatch(path.slice(0,path.lastIndexOf('/')),{[testKey]:null});}catch(e){}
+}
+
+// ── 반별 시험 권한: 해당 subject의 instructor만 ────────────────────
+function _canInputWeekly(classId, subject){
+  const course=config?.classes?.[classId]?.courses?.[subject];
+  return course?.instructor===instructor?.id;
+}
+// 학년단위 시험: 담임 여부 (assignments에 해당 classId+subject가 있고 role이 '담임')
+function _canInputAchievement(classId){
+  return (instructor?.assignments||[]).some(a=>a.classId===classId&&(a.role||'담임')==='담임');
 }
 
 // ── 통계 계산 ─────────────────────────────────────────────────────────
@@ -36,7 +74,6 @@ function _scoreStatLine(students,maxScore,label){
 }
 
 // ── 백분율 기준 통계 (학년 집계용) ────────────────────────────────────
-// pctStu: {uid: pct(0~100)} — 각 반의 만점으로 정규화된 값
 function _pctStatLine(pctStu){
   const vs=Object.values(pctStu||{}).filter(v=>!isNaN(v)).map(Number);
   if(!vs.length)return'<span style="color:var(--sub)">데이터 없음</span>';
@@ -45,29 +82,15 @@ function _pctStatLine(pctStu){
   return`평균: <strong>${avg.toFixed(1)}점</strong> · 최고: <strong>${maxV.toFixed(0)}점</strong> · 최저: <strong>${minV.toFixed(0)}점</strong> · ${vs.length}명`;
 }
 
-// ── 학년 단위 집계 ───────────────────────────────────────────────────
-function _gradeAggregate(testKey,gradeSem){
-  if(!cfg||!gradeSem)return null;
-  const rawStu={};
-  let clsCount=0;
-  for(const[ck,tests] of Object.entries(scoreData||{})){
-    const tv=tests?.[testKey];
-    if(!tv||tv.scope!=='grade')continue;
-    const parts=ck.split('|');
-    if(parts.length<2)continue;
-    const[sh,cls]=parts;
-    const tbGrade=cfg?.sheets?.[sh]?.classes?.[cls]?.tb_grade||{};
-    if(!Object.values(tbGrade).includes(gradeSem))continue;
-    const studs=tv.students||{};
-    const hasSc=Object.values(studs).some(v=>v!==''&&v!==null&&!isNaN(v));
-    if(!hasSc)continue;
-    clsCount++;
-    for(const[name,score] of Object.entries(studs)){
-      if(score===''||score===null||isNaN(score))continue;
-      rawStu[ck+'::'+name]=Number(score);
-    }
-  }
-  return clsCount>0?{rawStudents:rawStu,clsCount}:null;
+// ── 학년 단위 집계 (achievement) ─────────────────────────────────────
+function _achievementAggregate(curriculumKey, testKey){
+  const tests=scoreData?.achievement?.[curriculumKey]||{};
+  const tv=tests[testKey];
+  if(!tv)return null;
+  const studs=tv.students||{};
+  const vs=Object.values(studs).filter(v=>v!==''&&v!==null&&!isNaN(v));
+  if(!vs.length)return null;
+  return{rawStudents:studs,count:vs.length};
 }
 
 // ── 메인 렌더 ─────────────────────────────────────────────────────────
@@ -77,69 +100,77 @@ function renderScores(mc){
     mc.innerHTML=makeTb('성적 입력')+`<div style="padding:20px;color:var(--sub)">좌측 사이드바에서 담당 수업을 선택하세요.</div>`;
     return;
   }
-  const clsKey=`${a.sheet}|${a.cls}`;
-  if(scoreView==='edit')_renderScoreEdit(mc,a,clsKey);
-  else _renderScoreList(mc,a,clsKey);
+  const {classId, subject} = a;
+  if(scoreView==='edit')_renderScoreEdit(mc,a,classId,subject);
+  else _renderScoreList(mc,a,classId,subject);
 }
 
 // ── 목록 뷰 ──────────────────────────────────────────────────────────
-function _renderScoreList(mc,a,clsKey){
-  const tests=scoreData[clsKey]||{};
-  const list=Object.entries(tests).sort(([ka],[kb])=>kb.localeCompare(ka));
-  const gs=getTbGrade(a.sheet,a.cls,a.tb)||'';
+function _renderScoreList(mc,a,classId,subject){
+  const weeklyTests=scoreData?.weekly?.[classId]?.[subject]||{};
+  const curriculum=getCurriculumForSubject(classId,subject)||'';
+  const curriculumKey=curriculumToKey(curriculum);
+  const achievementTests=curriculumKey?(scoreData?.achievement?.[curriculumKey]||{}):{};
+  const gs=curriculum?(GRADE_SEM_LIST.find(g=>g.val===curriculum)?.label||curriculum):'';
+
+  // 합산: weekly + achievement (각각 타입 표기)
+  const weeklyEntries=Object.entries(weeklyTests).map(([tk,tv])=>([tk,tv,'weekly']));
+  const achievementEntries=Object.entries(achievementTests).map(([tk,tv])=>([tk,tv,'achievement']));
+  const list=[...weeklyEntries,...achievementEntries].sort(([ka],[kb])=>kb.localeCompare(ka));
 
   let rows='';
   if(list.length===0){
     rows=`<div style="padding:20px;text-align:center;color:var(--sub);font-size:12px">시험 기록이 없습니다.</div>`;
   }else{
-    rows=list.map(([tk,tv])=>{
-      const isGrade=tv.scope==='grade';
-      const avg=_scoreAvg(tv.students);
-      const cnt=Object.values(tv.students||{}).filter(v=>v!==''&&v!==null&&!isNaN(v)).length;
-      const totalStu=cfg?.sheets?.[a.sheet]?.classes?.[a.cls]?.students?.length||0;
-      const maxScore=tv.max_score||100;
+    rows=list.map(([tk,tv,kind])=>{
+      const isAchievement=kind==='achievement';
+      const meta=tv.meta||tv; // 신규: meta 서브키 지원
+      const students=tv.students||{};
+      const avg=_scoreAvg(students);
+      const cnt=Object.values(students).filter(v=>v!==''&&v!==null&&!isNaN(v)).length;
+      const classStudentCount=(config?._classStudents||{})[classId]?.length||0;
+      const maxScore=meta.max_score||100;
 
       // 학년 단위: 전체 집계
       let gradeLine='';
-      if(isGrade&&gs){
-        const agg=_gradeAggregate(tk,gs);
+      if(isAchievement&&curriculumKey){
+        const agg=_achievementAggregate(curriculumKey,tk);
         if(agg){
-          const clsLabel=agg.clsCount===1?'1개 반 입력됨':`${agg.clsCount}개 반 합산`;
           gradeLine=`<div style="margin-top:6px;padding:6px 8px;background:var(--indigo-l);border-radius:6px;font-size:11px">
-            🎓 학년 전체 (${clsLabel}) · ${_pctStatLine(agg.rawStudents)}
+            🎓 학년 집계 · ${_pctStatLine(agg.rawStudents)}
           </div>`;
         }
       }
 
-      const scopeBadge=isGrade
+      const scopeBadge=isAchievement
         ?`<span style="font-size:10px;background:#DCFCE7;color:#15803D;border-radius:4px;padding:1px 6px;font-weight:700;margin-left:4px">학년</span>`
         :`<span style="font-size:10px;background:#F1F5F9;color:#64748B;border-radius:4px;padding:1px 6px;font-weight:700;margin-left:4px">반</span>`;
 
       return`<div class="score-card">
   <div class="score-card-top">
     <div style="display:flex;align-items:center;flex-wrap:wrap;gap:4px">
-      <span class="score-type-badge">${esc(tv.type||'')}</span>
-      ${tv.round?`<span class="score-round">${esc(tv.round)}회</span>`:''}
+      <span class="score-type-badge">${esc(meta.type||'')}</span>
+      ${meta.round?`<span class="score-round">${esc(meta.round)}회</span>`:''}
       ${scopeBadge}
-      <span class="score-date">${esc(tv.date||'')}</span>
+      <span class="score-date">${esc(meta.date||'')}</span>
     </div>
     <div style="display:flex;gap:6px;flex-shrink:0">
-      <button class="btn bsm" onclick="_openScoreEdit('${esc(clsKey)}','${esc(tk)}')">수정</button>
-      <button class="btn bsm" style="color:var(--red)" onclick="_confirmDeleteScore('${esc(clsKey)}','${esc(tk)}')">삭제</button>
+      <button class="btn bsm" onclick="_openScoreEdit('${esc(classId)}','${esc(subject)}','${esc(tk)}','${isAchievement?'1':'0'}')">수정</button>
+      <button class="btn bsm" style="color:var(--red)" onclick="_confirmDeleteScore('${esc(classId)}','${esc(subject)}','${esc(tk)}','${esc(meta.type||'')}')">삭제</button>
     </div>
   </div>
   <div class="score-card-bottom">
     <span style="font-size:11px;color:var(--sub)">만점 ${maxScore}점</span>
     ${avg!==null?`<span style="font-size:11px;color:var(--sub)">· 반 평균 <strong>${avg.toFixed(1)}점</strong></span>`:''}
-    <span style="font-size:11px;color:var(--sub)">· ${cnt}/${totalStu}명 입력</span>
-    ${tv.memo?`<span style="font-size:11px;color:var(--sub);margin-left:4px">📝 ${esc(tv.memo)}</span>`:''}
+    <span style="font-size:11px;color:var(--sub)">· ${cnt}/${classStudentCount}명 입력</span>
+    ${meta.memo?`<span style="font-size:11px;color:var(--sub);margin-left:4px">📝 ${esc(meta.memo)}</span>`:''}
   </div>
   ${gradeLine}
 </div>`;
     }).join('');
   }
 
-  mc.innerHTML=makeTb('성적 입력',`${a.cls} · ${a.tb}${gs?' · '+gs:''}`)+`
+  mc.innerHTML=makeTb('성적 입력',`${classId} · ${subject}${gs?' · '+gs:''}`)+`
 <div style="padding:12px 14px">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
     <span style="font-size:12px;color:var(--sub)">${list.length}개 시험 기록</span>
@@ -151,57 +182,57 @@ function _renderScoreList(mc,a,clsKey){
 
 // ── 입력/수정 뷰 ──────────────────────────────────────────────────────
 function _openScoreNew(){scoreEditing=null;scoreView='edit';renderMain();}
-function _openScoreEdit(clsKey,testKey){scoreEditing={clsKey,testKey};scoreView='edit';renderMain();}
+function _openScoreEdit(classId,subject,testKey,isAchievementStr){
+  const isAchievement=isAchievementStr==='1';
+  scoreEditing={classId,subject,testKey,isAchievement};
+  scoreView='edit';renderMain();
+}
 function _cancelScoreEdit(){scoreEditing=null;scoreView='list';renderMain();}
 
-function _renderScoreEdit(mc,a,clsKey){
-  const existing=scoreEditing?(scoreData[clsKey]?.[scoreEditing.testKey]||{}):{};
-  const students=cfg?.sheets?.[a.sheet]?.classes?.[a.cls]?.students||[];
-  const isNew=!scoreEditing;
-  const gs=getTbGrade(a.sheet,a.cls,a.tb)||'';
+function _renderScoreEdit(mc,a,classId,subject){
+  const curriculum=getCurriculumForSubject(classId,subject)||'';
+  const curriculumKey=curriculumToKey(curriculum);
+  const gs=curriculum?(GRADE_SEM_LIST.find(g=>g.val===curriculum)?.label||curriculum):'';
   const today=todayKey();
+
+  let existing={};
+  if(scoreEditing){
+    if(scoreEditing.isAchievement){
+      const testObj=scoreData?.achievement?.[curriculumKey]?.[scoreEditing.testKey]||{};
+      existing={...(testObj.meta||testObj),students:testObj.students||{}};
+    } else {
+      const testObj=scoreData?.weekly?.[classId]?.[subject]?.[scoreEditing.testKey]||{};
+      existing={...(testObj.meta||testObj),students:testObj.students||{}};
+    }
+  }
+
+  const students=(config?._classStudents||{})[classId]||[];
+  const isNew=!scoreEditing;
 
   const type=existing.type||'주간Test';
   const isCustom=!SCORE_TYPES.slice(0,-1).includes(type);
-  const round=existing.round??'';          // 기본값 빈 문자열 → 선택사항
+  const round=existing.round??'';
   const date=existing.date||today;
   const maxScore=existing.max_score||100;
   const memo=existing.memo||'';
-  const scope=existing.scope||'class';     // 'class' | 'grade'
   const existStudents=existing.students||{};
 
   const typeOpts=SCORE_TYPES.map(t=>`<option${(isCustom&&t==='직접입력'||!isCustom&&t===type)?' selected':''}>${esc(t)}</option>`).join('');
 
-  // scope 버튼 스타일
-  const clsActive=scope!=='grade';
-  const grdActive=scope==='grade';
-  const clsBtnSt=clsActive?'background:var(--indigo);color:#fff;border-color:var(--indigo)':'';
-  const grdBtnSt=grdActive?'background:var(--indigo);color:#fff;border-color:var(--indigo)':'';
-
   const studentRows=students.map(s=>{
-    const sv=existStudents[s.name]!==undefined?existStudents[s.name]:'';
+    // 신규: students 키는 nameKey
+    const sv=existStudents[s.nameKey]!==undefined?existStudents[s.nameKey]:'';
     return`<div class="score-row">
-  <div class="score-sname">${esc(s.name)}</div>
+  <div class="score-sname">${esc(s.name||s.nameKey)}</div>
   <input class="inp score-inp" type="number" min="0" max="${maxScore}" value="${esc(String(sv))}"
-    data-name="${esc(s.name)}" oninput="_onScoreInput(this)" placeholder="-"
+    data-namekey="${esc(s.nameKey)}" oninput="_onScoreInput(this)" placeholder="-"
     style="width:80px;text-align:center;font-size:15px;touch-action:manipulation">
   <div class="score-slash">/${maxScore}</div>
 </div>`;
   }).join('');
 
-  mc.innerHTML=makeTb(isNew?'새 시험 추가':'시험 수정',`${a.cls} · ${a.tb}${gs?' · '+gs:''}`)+`
+  mc.innerHTML=makeTb(isNew?'새 시험 추가':'시험 수정',`${classId} · ${subject}${gs?' · '+gs:''}`)+`
 <div style="padding:12px 14px">
-
-  <!-- 시험 범위 (scope) -->
-  <div style="margin-bottom:10px">
-    <div class="field-lbl">시험 범위</div>
-    <div style="display:flex;gap:6px">
-      <button class="btn bsm" id="sc-scope-class" style="flex:1;${clsBtnSt}" onclick="_onScopeChange('class')">🏫 반 단위</button>
-      <button class="btn bsm" id="sc-scope-grade" style="flex:1;${grdBtnSt}" onclick="_onScopeChange('grade')">🎓 학년 단위</button>
-    </div>
-    <input type="hidden" id="sc-scope-val" value="${scope}">
-    ${gs?`<div style="font-size:10px;color:var(--sub);margin-top:4px">학년학기: ${esc(gs)}</div>`:''}
-  </div>
 
   <!-- 시험 유형 / 회차(선택) / 날짜 / 만점 -->
   <div class="score-form-grid">
@@ -233,6 +264,8 @@ function _renderScoreEdit(mc,a,clsKey){
     <input class="inp" id="sc-memo" value="${esc(memo)}" placeholder="시험 범위, 특이사항 등">
   </div>
 
+  ${gs?`<div style="font-size:10px;color:var(--sub);margin-bottom:8px">커리큘럼: ${esc(gs)}</div>`:''}
+
   <!-- 학생 점수 테이블 -->
   <div class="score-table">
     <div class="score-table-header">
@@ -246,22 +279,12 @@ function _renderScoreEdit(mc,a,clsKey){
 
   <div style="display:flex;gap:8px;margin-top:10px">
     <button class="btn bsm" onclick="_cancelScoreEdit()" style="flex:1">취소</button>
-    <button class="btn bp bsm" onclick="_saveScore('${esc(clsKey)}')" style="flex:2">저장</button>
+    <button class="btn bp bsm" onclick="_saveScore('${esc(classId)}','${esc(subject)}')" style="flex:2">저장</button>
   </div>
 </div>`;
 }
 
 // ── 이벤트 핸들러 ─────────────────────────────────────────────────────
-function _onScopeChange(val){
-  const hid=document.getElementById('sc-scope-val');
-  if(hid)hid.value=val;
-  const cb=document.getElementById('sc-scope-class');
-  const gb=document.getElementById('sc-scope-grade');
-  const act='background:var(--indigo);color:#fff;border-color:var(--indigo)';
-  const idle='';
-  if(cb)cb.style.cssText=`flex:1;${val==='class'?act:idle}`;
-  if(gb)gb.style.cssText=`flex:1;${val==='grade'?act:idle}`;
-}
 function _onScoreTypeChange(){
   const sel=document.getElementById('sc-type');
   const inp=document.getElementById('sc-type-custom');
@@ -273,31 +296,29 @@ function _onMaxScoreChange(el){
   document.querySelectorAll('.score-inp').forEach(i=>_onScoreInput(i));
 }
 function _onScoreInput(inp){
-  const name=inp.dataset.name;
-  const score=inp.value;
   const max=Number(document.getElementById('sc-max')?.value)||100;
   const statsEl=document.getElementById('scoreStats');
   if(statsEl){
     const studs={};
-    document.querySelectorAll('.score-inp').forEach(i=>{if(i.dataset.name&&i.value!=='')studs[i.dataset.name]=Number(i.value);});
+    document.querySelectorAll('.score-inp').forEach(i=>{if(i.dataset.namekey&&i.value!=='')studs[i.dataset.namekey]=Number(i.value);});
     statsEl.innerHTML=_scoreStatLine(studs,max);
   }
 }
 
 // ── 저장/삭제 ─────────────────────────────────────────────────────────
-async function _saveScore(clsKey){
+async function _saveScore(classId, subject){
   const typeEl=document.getElementById('sc-type');
   const customEl=document.getElementById('sc-type-custom');
   const typeVal=typeEl?.value==='직접입력'?(customEl?.value.trim()||'직접입력'):typeEl?.value||'주간Test';
-  const round=(document.getElementById('sc-round')?.value.trim())||''; // 빈 문자열 = 회차 없음
+  const round=(document.getElementById('sc-round')?.value.trim())||'';
   const date=document.getElementById('sc-date')?.value||todayKey();
   const maxScore=Number(document.getElementById('sc-max')?.value)||100;
   const memo=document.getElementById('sc-memo')?.value.trim()||'';
-  const scope=document.getElementById('sc-scope-val')?.value||'class';
 
+  // students 키: nameKey
   const students={};
   document.querySelectorAll('.score-inp').forEach(i=>{
-    if(i.dataset.name&&i.value!=='')students[i.dataset.name]=Number(i.value);
+    if(i.dataset.namekey&&i.value!=='')students[i.dataset.namekey]=Number(i.value);
   });
 
   // testKey: 회차 있으면 날짜|유형|회차, 없으면 날짜|유형
@@ -305,27 +326,48 @@ async function _saveScore(clsKey){
     ?scoreEditing.testKey
     :(round?`${date}|${typeVal}|${round}`:`${date}|${typeVal}`);
 
-  const testObj={type:typeVal,date,max_score:maxScore,scope,memo,students};
-  if(round)testObj.round=round;
+  const isAchievement=ACHIEVEMENT_TYPES.includes(typeVal);
 
-  // 학년 단위 시험이면 grade_sem 저장 (집계에 사용)
-  const a=instructor?.assignments?.[curAI];
-  if(scope==='grade'&&a){
-    const gs=getTbGrade(a.sheet,a.cls,a.tb)||'';
-    if(gs)testObj.grade_sem=gs;
+  // 신규 구조: meta + students 분리
+  const metaObj={type:typeVal,date,max_score:maxScore,memo};
+  if(round)metaObj.round=round;
+  const testObj={meta:metaObj,students};
+
+  // 권한 체크
+  if(isAchievement&&!_canInputAchievement(classId)){toast('학년단위 시험은 담임만 입력할 수 있습니다.');return;}
+  if(!isAchievement&&!_canInputWeekly(classId,subject)){toast('이 수업의 담당 강사만 입력할 수 있습니다.');return;}
+
+  const curriculum=getCurriculumForSubject(classId,subject)||'';
+  const curriculumKey=curriculumToKey(curriculum);
+
+  if(isAchievement){
+    if(!scoreData.achievement)scoreData.achievement={};
+    if(!scoreData.achievement[curriculumKey])scoreData.achievement[curriculumKey]={};
+    scoreData.achievement[curriculumKey][testKey]=testObj;
+    if(dbUrl&&dbPath)await fbPatch(`scores/achievement/${curriculumKey}`,{[testKey]:testObj}).catch(()=>{});
+  } else {
+    if(!scoreData.weekly)scoreData.weekly={};
+    if(!scoreData.weekly[classId])scoreData.weekly[classId]={};
+    if(!scoreData.weekly[classId][subject])scoreData.weekly[classId][subject]={};
+    scoreData.weekly[classId][subject][testKey]=testObj;
+    if(dbUrl&&dbPath)await fbPatch(`scores/weekly/${classId}/${subject}`,{[testKey]:testObj}).catch(()=>{});
   }
-
-  if(!scoreData[clsKey])scoreData[clsKey]={};
-  scoreData[clsKey][testKey]=testObj;
-  await _pushScore(clsKey,testKey,testObj);
 
   scoreEditing=null;scoreView='list';
   toast('저장됨 ✅');renderMain();
 }
-async function _confirmDeleteScore(clsKey,testKey){
+async function _confirmDeleteScore(classId,subject,testKey,type){
   if(!confirm('이 시험 기록을 삭제하시겠습니까?'))return;
-  if(scoreData[clsKey])delete scoreData[clsKey][testKey];
-  await _deleteScore(clsKey,testKey);
+  const isAchievement=ACHIEVEMENT_TYPES.includes(type);
+  const curriculum=getCurriculumForSubject(classId,subject)||'';
+  const curriculumKey=curriculumToKey(curriculum);
+  if(isAchievement){
+    if(scoreData.achievement?.[curriculumKey])delete scoreData.achievement[curriculumKey][testKey];
+    if(dbUrl&&dbPath)await fbPatch(`scores/achievement/${curriculumKey}`,{[testKey]:null}).catch(()=>{});
+  } else {
+    if(scoreData.weekly?.[classId]?.[subject])delete scoreData.weekly[classId][subject][testKey];
+    if(dbUrl&&dbPath)await fbPatch(`scores/weekly/${classId}/${subject}`,{[testKey]:null}).catch(()=>{});
+  }
   toast('삭제됨');renderMain();
 }
 
@@ -342,10 +384,33 @@ function init(){
     document.getElementById('mc').innerHTML=`<div class="empty">👋 안녕하세요!<br>먼저 강사 정보를 등록해 주세요.<br><br><button class="btn bp" onclick="goNav('setting')">⚙️ 설정으로 이동</button></div>`;
     return;
   }
-  if(fbUrl&&fbPath){
-    Promise.all([fbGet('config').catch(()=>null),fbGet('input').catch(()=>null),fbGet('session').catch(()=>null),fbGet('obs').catch(()=>null),fbGet('scores').catch(()=>null)])
-    .then(([cfgD,inpD,sessD,obsD,scD])=>{
-      if(cfgD){cfg=cfgD;saveLocal();setSync(true);}
+  if(dbUrl&&dbPath){
+    // 신규: config(classes+instructors), students/ 전체, input, session, obs, scores 로드
+    Promise.all([
+      fbGet('config').catch(()=>null),
+      fbGet('students').catch(()=>null),
+      fbGet('input').catch(()=>null),
+      fbGet('session').catch(()=>null),
+      fbGet('obs').catch(()=>null),
+      fbGet('scores').catch(()=>null),
+    ])
+    .then(([cfgD,stuD,inpD,sessD,obsD,scD])=>{
+      if(cfgD){
+        config=cfgD;
+        // students를 classId별로 캐싱
+        if(stuD&&typeof stuD==='object'){
+          const classStudents={};
+          for(const[nameKey,v] of Object.entries(stuD)){
+            const cid=v?.class;
+            if(cid){
+              if(!classStudents[cid])classStudents[cid]=[];
+              classStudents[cid].push({nameKey,...v});
+            }
+          }
+          config._classStudents=classStudents;
+        }
+        saveLocal();setSync(true);
+      }
       if(inpD)Object.assign(inputData,inpD);
       if(sessD?.class_data)for(const[k,v]of Object.entries(sessD.class_data))if(!progressData[k])progressData[k]=v;
       if(obsD)Object.assign(tagData,obsD);

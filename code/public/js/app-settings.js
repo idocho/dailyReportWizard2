@@ -8,19 +8,19 @@ function _saToggle(id){
   if(!hdr||!body)return;
   const open=body.classList.toggle('open');
   hdr.classList.toggle('open',open);
-  if(open)openSaIds.add(id);else openSaIds.delete(id); // 재렌더 후 복원용
+  if(open)openSaIds.add(id);else openSaIds.delete(id);
 }
 function _saOpen(id){
   const hdr=document.querySelector(`#${id}>.sa-hdr`);
   const body=document.querySelector(`#${id}>.sa-body`);
   if(!hdr||!body)return;
   hdr.classList.add('open');body.classList.add('open');
-  openSaIds.add(id); // 재렌더 후 복원용
+  openSaIds.add(id);
 }
 
 function renderSettings(mc){
   renderMhdr('설정');
-  if(cfg)_ensureConfigShape();
+  if(config)_ensureConfigShape();
   const instr=instructor||{};
 
   // ── 내 계정 상태 요약 ──
@@ -30,14 +30,22 @@ function renderSettings(mc){
   const asgns=instr.assignments||[];
   const asgRows=!asgns.length
     ?`<div style="padding:10px 12px;font-size:12px;color:var(--gray)">담당 수업이 없습니다.</div>`
-    :`<div class="ar" style="grid-template-columns:1fr 1fr 52px 30px;background:#F8FAFC;font-size:10px;font-weight:700;color:var(--sub)"><span>반</span><span>교재</span><span>역할</span><span></span></div>`
-      +asgns.map((a,i)=>`<div class="ar" style="grid-template-columns:1fr 1fr 52px 30px"><span style="font-weight:700">${esc(a.cls)}</span><span style="color:var(--sub);font-size:11px">${esc(a.tb)}</span><span style="font-size:10px;color:var(--indigo)">${esc(a.role||'담임')}</span><button style="background:none;border:none;cursor:pointer;color:var(--red);font-size:14px;padding:0" onclick="removeA(${i})">✕</button></div>`).join('');
+    :`<div class="ar" style="grid-template-columns:1fr 1fr 52px 30px;background:#F8FAFC;font-size:10px;font-weight:700;color:var(--sub)"><span>반</span><span>과목</span><span>역할</span><span></span></div>`
+      +asgns.map((a,i)=>`<div class="ar" style="grid-template-columns:1fr 1fr 52px 30px"><span style="font-weight:700">${esc(a.classId)}</span><span style="color:var(--sub);font-size:11px">${esc(a.subject)}</span><span style="font-size:10px;color:var(--indigo)">${esc(a.role||'담임')}</span><button style="background:none;border:none;cursor:pointer;color:var(--red);font-size:14px;padding:0" onclick="removeA(${i})">✕</button></div>`).join('');
   let addAsgn='';
-  if(cfg){
-    let clsOpts='<option value="">-- 반 선택 --</option>',firstSh='',firstCls='';
-    for(const[sh,shD]of Object.entries(cfg.sheets||{})){for(const[cls]of Object.entries(shD.classes||{})){if(!firstSh){firstSh=sh;firstCls=cls;}clsOpts+=`<option value="${esc(sh)}|${esc(cls)}">${esc(cls)}</option>`;}}
-    const tbOpts=firstSh?('<option value="">-- 교재 선택 --</option>'+[...(cfg?.sheets?.[firstSh]?.classes?.[firstCls]?.textbooks||[])].sort((a,b)=>a.localeCompare(b,'ko')).map(t=>`<option>${esc(t)}</option>`).join('')):''
-    addAsgn=`<div style="padding:10px 12px;border-top:1px solid var(--border)"><div style="font-size:11px;font-weight:700;color:var(--sub);margin-bottom:8px">수업 추가</div><div style="display:grid;grid-template-columns:1fr 1fr 72px;gap:6px;margin-bottom:8px"><div><div class="sl">반</div><select class="inp sm" id="aCls" onchange="onCC()">${clsOpts}</select></div><div><div class="sl">교재</div><select class="inp sm" id="aTb">${tbOpts}</select></div><div><div class="sl">역할</div><select class="inp sm" id="aRole"><option>담임</option><option>부담임</option></select></div></div><button class="btn bsm" onclick="addA()">+ 추가</button></div>`;
+  if(config){
+    // 신규: classes/ 에서 반 목록 구성
+    let clsOpts='<option value="">-- 반 선택 --</option>';
+    let firstCls='';
+    for(const[classId,clsD] of Object.entries(config.classes||{})){
+      if(!firstCls)firstCls=classId;
+      clsOpts+=`<option value="${esc(classId)}">${esc(classId)}</option>`;
+    }
+    // subjects: 선택된 반의 courses 키 목록
+    const subjectOpts=firstCls
+      ?('<option value="">-- 과목 선택 --</option>'+Object.keys((config.classes?.[firstCls]?.courses)||{}).sort((a,b)=>a.localeCompare(b,'ko')).map(s=>`<option>${esc(s)}</option>`).join(''))
+      :'';
+    addAsgn=`<div style="padding:10px 12px;border-top:1px solid var(--border)"><div style="font-size:11px;font-weight:700;color:var(--sub);margin-bottom:8px">수업 추가</div><div style="display:grid;grid-template-columns:1fr 1fr 72px;gap:6px;margin-bottom:8px"><div><div class="sl">반</div><select class="inp sm" id="aCls" onchange="onCC()">${clsOpts}</select></div><div><div class="sl">과목</div><select class="inp sm" id="aTb">${subjectOpts}</select></div><div><div class="sl">역할</div><select class="inp sm" id="aRole"><option>담임</option><option>부담임</option></select></div></div><button class="btn bsm" onclick="addA()">+ 추가</button></div>`;
   }else{addAsgn=`<div style="padding:10px 12px;font-size:11px;color:var(--gray)">학생 명단을 먼저 불러오세요.</div>`;}
 
   // ── 자주 쓰는 문구 ──
@@ -54,27 +62,26 @@ function renderSettings(mc){
   // ── 초기화 UI (다중 선택형) ──
   const resetHtml=_renderResetHtml();
 
-  // ── 관리자: 교재 목록 관리 (교재명 레지스트리 — 학년학기 무관) ──
+  // ── 관리자: 과목 목록 관리 ──
   const tbMgmtHtml = adminOn ? (()=>{
-    const tbMap = cfg ? _ensureTextbookRegistry() : {};
-    const tbNames = Object.keys(tbMap).sort((a,b)=>a.localeCompare(b,'ko'));
-    const tbRows = tbNames.map(name=>`<div style="display:flex;align-items:center;padding:6px 12px;border-bottom:1px solid var(--border);gap:8px">
+    // 신규: 모든 classes의 courses를 수집
+    const subjectSet=new Set();
+    for(const clsD of Object.values(config?.classes||{})){
+      for(const s of Object.keys(clsD.courses||{}))subjectSet.add(s);
+    }
+    const subjectNames=[...subjectSet].sort((a,b)=>a.localeCompare(b,'ko'));
+    const tbRows = subjectNames.map(name=>`<div style="display:flex;align-items:center;padding:6px 12px;border-bottom:1px solid var(--border);gap:8px">
         <span style="flex:1;font-size:12px;font-weight:600">${esc(name)}</span>
-        <span class="chip" style="flex-shrink:0" onclick="rmTextbook('${esc(name)}')">${'×'}</span>
-      </div>`).join('')||'<div style="padding:8px 12px;font-size:11px;color:var(--gray)">등록된 교재 없음</div>';
+      </div>`).join('')||'<div style="padding:8px 12px;font-size:11px;color:var(--gray)">등록된 과목 없음</div>';
     return `<div class="sa admin-sec" id="sa-tbmgmt">
       <div class="sa-hdr${openSaIds.has('sa-tbmgmt')?' open':''}" onclick="_saToggle('sa-tbmgmt')">
         <span class="sa-ico">📖</span>
-        <span class="sa-lbl">교재 목록 관리</span>
+        <span class="sa-lbl">과목 목록</span>
         <span style="font-size:10px;background:#FEF3C7;color:#92400E;border-radius:8px;padding:1px 6px;font-weight:700;margin-right:4px">관리자</span>
         <span class="sa-chv">›</span>
       </div>
       <div class="sa-body${openSaIds.has('sa-tbmgmt')?' open':''}">
         ${tbRows}
-        <div style="padding:8px 12px;display:flex;gap:6px;border-top:1px solid var(--border)">
-          <input class="inp sm" id="tb-name-inp" placeholder="교재명" style="flex:1" onkeydown="if(event.key==='Enter')addTextbook()">
-          <button class="btn bsm" onclick="addTextbook()">+ 등록</button>
-        </div>
       </div>
     </div>`;
   })() : '';
@@ -97,12 +104,12 @@ function renderSettings(mc){
       <div class="sa-hdr${openSaIds.has('sa-fb')?' open':''}" onclick="_saToggle('sa-fb')">
         <span class="sa-ico">🔥</span>
         <span class="sa-lbl">Firebase 연결</span>
-        <span class="sa-sub">${fbUrl?'연결됨 ✓':'미설정'}</span>
+        <span class="sa-sub">${dbUrl?'연결됨 ✓':'미설정'}</span>
         <span class="sa-chv">›</span>
       </div>
       <div class="sa-body${openSaIds.has('sa-fb')?' open':''}">
-        <div class="sr"><div class="sl">DB URL</div><input class="inp" id="sUrl" value="${esc(fbUrl)}" placeholder="https://your-project.firebaseio.com" type="url" onkeydown="if(event.key==='Enter')saveFb()"></div>
-        <div class="sr"><div class="sl">경로 (Secret Path)</div><input class="inp" id="sPth" value="${esc(fbPath)}" placeholder="drw_a7f3k9x2" onkeydown="if(event.key==='Enter')saveFb()"></div>
+        <div class="sr"><div class="sl">DB URL</div><input class="inp" id="sUrl" value="${esc(dbUrl)}" placeholder="https://your-project.firebaseio.com" type="url" onkeydown="if(event.key==='Enter')saveFb()"></div>
+        <div class="sr"><div class="sl">경로 (Secret Path)</div><input class="inp" id="sPth" value="${esc(dbPath)}" placeholder="drw_a7f3k9x2" onkeydown="if(event.key==='Enter')saveFb()"></div>
         <div style="padding:10px 14px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn bp bsm" onclick="saveFb()">💾 저장</button><button class="btn bsm" onclick="loadCfg()">📥 학생 명단 불러오기</button></div>
         <div style="padding:0 14px 10px;font-size:10px;color:var(--sub)">💡 다른 기기에서 입력한 데이터는 위 버튼으로 수동 갱신하세요.</div>
       </div>
@@ -129,7 +136,7 @@ function renderSettings(mc){
             <button class="btn bp bsm" onclick="lookupInstr()" style="flex-shrink:0">조회</button>
           </div>
         </div>
-        <div style="padding:4px 14px 10px;font-size:11px;color:var(--sub)">이름 그대로 Firebase 키로 사용됩니다 (예: <code>instructors/홍길동</code>)</div>
+        <div style="padding:4px 14px 10px;font-size:11px;color:var(--sub)">이름 그대로 Firebase 키로 사용됩니다 (예: <code>config/instructors/홍길동</code>)</div>
       </div>
     </div>
 
@@ -163,7 +170,7 @@ function renderSettings(mc){
       <div class="sa-hdr${openSaIds.has('sa-cls')?' open':''}" onclick="_saToggle('sa-cls')">
         <span class="sa-ico">🏫</span>
         <span class="sa-lbl">학급 &amp; 학생 관리</span>
-        <span class="sa-sub">${cfg?Object.values(cfg.sheets||{}).reduce((n,s)=>n+Object.keys(s.classes||{}).length,0)+'개 학급':'–'}</span>
+        <span class="sa-sub">${config?Object.keys(config.classes||{}).length+'개 학급':'–'}</span>
         <span class="sa-chv">›</span>
       </div>
       <div class="sa-body${openSaIds.has('sa-cls')?' open':''}">${renderClsMgmt()}</div>
@@ -191,43 +198,42 @@ function renderSettings(mc){
     <div style="font-size:10px;color:var(--gray);text-align:center">`+`DailyReportWizard ${APP_VERSION} · Crafted by IDO(idocho@kakao.com) · Powered by Claude AI`+`</div>
   </div>`;
 
-  setSync(!!fbUrl&&!!fbPath);
+  setSync(!!dbUrl&&!!dbPath);
   if(adminOn)loadInstrsSection();
-  // 미로그인 시 내 계정 섹션 자동 열기
   if(!instr.name)_saOpen('sa-acct');
 }
 
 // ══════════════════════════════════════════════════════════
-//  학급 관리 — 2단계 드릴다운
+//  학급 관리 — 신규: classes/ 구조
 // ══════════════════════════════════════════════════════════
 function renderClsMgmt(){
   if(clsDrillSh===null)return renderClsMgmtTop();
-  return renderClsMgmtSheet(clsDrillSh);
+  return renderClsMgmtClass(clsDrillSh);
 }
 
 function renderClsMgmtTop(){
-  if(!cfg)return `<div class="card"><div class="sh">🏫 학급 &amp; 학생 관리</div><div style="padding:10px 12px;font-size:12px;color:var(--gray)">학생 명단을 먼저 불러오세요.</div></div>`;
+  if(!config)return `<div class="card"><div class="sh">🏫 학급 &amp; 학생 관리</div><div style="padding:10px 12px;font-size:12px;color:var(--gray)">학생 명단을 먼저 불러오세요.</div></div>`;
   _ensureConfigShape();
 
-  // 내 담당 학급 (assignments 기반)
-  const myClsSet=new Set((instructor?.assignments||[]).map(a=>`${a.sheet}|${a.cls}`));
+  // 내 담당 학급
+  const myClsSet=new Set((instructor?.assignments||[]).map(a=>a.classId));
   let myRows='';
-  for(const[sh,shD]of Object.entries(cfg.sheets||{})){
-    for(const[cls,clsD]of Object.entries(shD.classes||{})){
-      if(myClsSet.has(`${sh}|${cls}`)){
-        const myRole=(instructor?.assignments||[]).find(a=>a.sheet===sh&&a.cls===cls)?.role||'담임';
-        myRows+=buildClsAccordion(sh,cls,clsD,myRole);
-      }
+  for(const[classId,clsD] of Object.entries(config.classes||{})){
+    if(myClsSet.has(classId)){
+      const myRole=(instructor?.assignments||[]).find(a=>a.classId===classId)?.role||'담임';
+      myRows+=buildClsAccordion(classId,clsD,myRole);
     }
   }
 
-  // 전체 시트 드릴다운 버튼
-  const sheets=['M','T',...Object.keys(cfg.sheets||{}).filter(sh=>!['M','T'].includes(sh))];
-  const drillBtns=sheets.map(sh=>{
-    const cnt=Object.keys(cfg.sheets[sh]?.classes||{}).length;
-    return `<div class="drill-btn" onclick="clsDrillSh='${esc(sh)}';openSaIds.add('sa-cls');renderMain()">
+  // 전체 학급 드릴다운
+  const classIds=Object.keys(config.classes||{});
+  const drillBtns=classIds.map(classId=>{
+    const clsD=config.classes[classId];
+    const subjectCount=Object.keys(clsD.courses||{}).length;
+    const studentCount=((config._classStudents||{})[classId]||[]).length;
+    return `<div class="drill-btn" onclick="clsDrillSh='${esc(classId)}';openSaIds.add('sa-cls');renderMain()">
       <div style="width:32px;height:32px;border-radius:8px;background:var(--indigo-l);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0">📂</div>
-      <div style="flex:1"><div style="font-size:13px;font-weight:700">${esc(sh)}반</div><div style="font-size:11px;color:var(--gray)">${cnt}개 학급</div></div>
+      <div style="flex:1"><div style="font-size:13px;font-weight:700">${esc(classId)}</div><div style="font-size:11px;color:var(--gray)">학생 ${studentCount}명 · 과목 ${subjectCount}개</div></div>
       <span style="color:var(--gray);font-size:14px;font-weight:300">›</span>
     </div>`;
   }).join('');
@@ -237,60 +243,58 @@ function renderClsMgmtTop(){
     <div class="sh2">내 담당 학급</div>
     ${myRows||'<div style="padding:8px 12px;font-size:11px;color:var(--gray)">담당 수업을 추가하면 여기에 표시됩니다.</div>'}
     <div class="sh2">전체 학급 탐색</div>
-    ${drillBtns||'<div style="padding:8px 12px;font-size:11px;color:var(--gray)">등록된 시트가 없습니다.</div>'}
+    ${drillBtns||'<div style="padding:8px 12px;font-size:11px;color:var(--gray)">등록된 학급이 없습니다.</div>'}
   </div>`;
 }
 
-function renderClsMgmtSheet(sh){
-  if(!cfg)return '';
+function renderClsMgmtClass(classId){
+  if(!config)return '';
   _ensureConfigShape();
-  const shD=cfg.sheets?.[sh]||{classes:{}};
-  const shClasses=Object.entries(shD.classes||{});
-  let rows='';
-  for(const[cls,clsD]of shClasses){
-    const myRole=(instructor?.assignments||[]).find(a=>a.sheet===sh&&a.cls===cls)?.role||null;
-    rows+=buildClsAccordion(sh,cls,clsD,myRole);
-  }
+  const clsD=config.classes?.[classId]||{courses:{}};
+  const myRole=(instructor?.assignments||[]).find(a=>a.classId===classId)?.role||null;
   return `<div class="card">
     <div class="sh" style="display:flex;align-items:center;gap:8px;padding:7px 10px 7px 14px">
       <button class="btn bsm" onclick="clsDrillSh=null;renderMain()" style="flex-shrink:0;font-size:11px">← 뒤로</button>
-      <span style="flex:1">🏫 ${esc(sh)}반 학급 관리</span>
+      <span style="flex:1">🏫 ${esc(classId)} 학급 관리</span>
     </div>
-    ${rows||'<div style="padding:8px 12px;font-size:11px;color:var(--gray)">학급이 없습니다.</div>'}
+    ${buildClsAccordion(classId,clsD,myRole)}
     <div style="padding:10px 12px;border-top:1px solid var(--border)">
-      <button class="btn bsm" onclick="addCls('${esc(sh)}')">+ ${esc(sh)}반 학급 추가</button>
+      <button class="btn bsm" onclick="addCourse('${esc(classId)}')">+ 과목 추가</button>
     </div>
   </div>`;
 }
 
-function buildClsAccordion(sh,cls,clsD,myRole){
-  const sts=clsD.students||[],tbs=clsD.textbooks||[];
+function buildClsAccordion(classId,clsD,myRole){
+  const students=(config?._classStudents||{})[classId]||[];
+  const courses=clsD.courses||{};
+  const subjects=Object.keys(courses);
   const isSub=myRole==='부담임';
   const subBadge=isSub?`<span style="font-size:9px;background:#FEF3C7;color:#92400E;border-radius:8px;padding:1px 6px;font-weight:700;flex-shrink:0">부담임</span>`:'';
-  // data-sh / data-cls 어트리뷰트로 식별 — 한글 등 특수문자 클래스명의 clsKey 충돌 방지
-  const stuChips=sts.map(s=>`<span class="chip" onclick="rmStu('${esc(sh)}','${esc(cls)}','${esc(s.name)}')">${esc(s.name)} <span>×</span></span>`).join('');
-  const tbChips=tbs.map(t=>{const gs=getTbGrade(sh,cls,t)||'';const gsLabel=gs?(GRADE_SEM_LIST.find(g=>g.val===gs)?.label||gs):'';return`<span class="chip" onclick="rmTb('${esc(sh)}','${esc(cls)}','${esc(t)}')">${gsLabel?`<span style="color:var(--indigo);font-size:9px;font-weight:700;margin-right:3px">${esc(gsLabel)}</span>`:`<span style="color:var(--red);font-size:9px;margin-right:3px">미설정</span>`}${esc(t)} <span style="display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;margin-left:4px;border-radius:50%;background:#FEE2E2;color:#B91C1C;font-size:10px;font-weight:700;line-height:1">×</span></span>`;}).join('');
+  const stuChips=students.map(s=>`<span class="chip" onclick="rmStu('${esc(classId)}','${esc(s.nameKey)}')">${esc(s.name||s.nameKey)} <span>×</span></span>`).join('');
+  const courseChips=subjects.map(subj=>{
+    const curriculum=courses[subj]?.curriculum||'';
+    const gsLabel=curriculum?(GRADE_SEM_LIST.find(g=>g.val===curriculum)?.label||curriculum):'';
+    return`<span class="chip" onclick="rmCourse('${esc(classId)}','${esc(subj)}')">${gsLabel?`<span style="color:var(--indigo);font-size:9px;font-weight:700;margin-right:3px">${esc(gsLabel)}</span>`:`<span style="color:var(--red);font-size:9px;margin-right:3px">미설정</span>`}${esc(subj)} <span style="display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;margin-left:4px;border-radius:50%;background:#FEE2E2;color:#B91C1C;font-size:10px;font-weight:700;line-height:1">×</span></span>`;}).join('');
   return `<div style="border-bottom:1px solid var(--border)">
     <div class="acc-hdr" onclick="toggleAcc(this)">
       <span class="acc-arr" style="font-size:10px;color:var(--gray);width:14px;flex-shrink:0">▶</span>
-      <span style="font-size:13px;font-weight:700;flex:1">${esc(cls)}</span>
+      <span style="font-size:13px;font-weight:700;flex:1">${esc(classId)}</span>
       ${subBadge}
-      <span style="font-size:10px;color:var(--gray);margin:0 6px;white-space:nowrap">학생 ${sts.length} · 교재 ${tbs.length}</span>
-      <button class="btn br bsm" onclick="rmCls('${esc(sh)}','${esc(cls)}');event.stopPropagation()" style="padding:2px 7px;font-size:11px;flex-shrink:0">✕</button>
+      <span style="font-size:10px;color:var(--gray);margin:0 6px;white-space:nowrap">학생 ${students.length} · 과목 ${subjects.length}</span>
+      <button class="btn br bsm" onclick="rmCls('${esc(classId)}');event.stopPropagation()" style="padding:2px 7px;font-size:11px;flex-shrink:0">✕</button>
     </div>
     <div class="acc-body">
       <div class="sl">학생</div>
-      <div class="chips" data-sh="${esc(sh)}" data-cls="${esc(cls)}" data-chip-type="stu">${stuChips}<span class="chip" style="background:var(--indigo-l);border-color:var(--indigo);color:var(--indigo);cursor:pointer" onclick="addStuInline('${esc(sh)}','${esc(cls)}',this)">+ 추가</span></div>
-      <div class="sl" style="margin-top:10px">교재</div>
-      <div class="chips" data-sh="${esc(sh)}" data-cls="${esc(cls)}" data-chip-type="tb">${tbChips}<span class="chip" style="background:var(--indigo-l);border-color:var(--indigo);color:var(--indigo);cursor:pointer" onclick="addTbInline('${esc(sh)}','${esc(cls)}',this)">+ 교재 추가</span></div>
+      <div class="chips" data-classid="${esc(classId)}" data-chip-type="stu">${stuChips}<span class="chip" style="background:var(--indigo-l);border-color:var(--indigo);color:var(--indigo);cursor:pointer" onclick="addStuInline('${esc(classId)}',this)">+ 추가</span></div>
+      <div class="sl" style="margin-top:10px">과목</div>
+      <div class="chips" data-classid="${esc(classId)}" data-chip-type="course">${courseChips}<span class="chip" style="background:var(--indigo-l);border-color:var(--indigo);color:var(--indigo);cursor:pointer" onclick="addCourseInline('${esc(classId)}',this)">+ 과목 추가</span></div>
     </div>
   </div>`;
 }
 
-// ── 학생 인라인 추가 (아코디언 열림 상태 유지) ───────────────────
-function addStuInline(sh,cls,btnEl){
+// ── 학생 인라인 추가 ─────────────────────────────────────────────
+function addStuInline(classId,btnEl){
   const chips=btnEl.parentElement;
-  // 이미 입력 중이면 포커스만
   if(chips.querySelector('.stu-new-inp')){chips.querySelector('.stu-new-inp').focus();return;}
 
   const wrapper=document.createElement('span');
@@ -300,22 +304,36 @@ function addStuInline(sh,cls,btnEl){
   inp.style.cssText='border:none;background:transparent;font-size:11px;width:64px;color:var(--text);font-family:inherit;outline:none;';
   inp.placeholder='이름';
   const ok=document.createElement('span');
-  ok.textContent='✓';
-  ok.title='추가';
+  ok.textContent='✓';ok.title='추가';
   ok.style.cssText='cursor:pointer;color:var(--indigo);font-weight:700;font-size:13px;line-height:1;padding:0 2px;';
   const cancel=document.createElement('span');
   cancel.textContent='×';
   cancel.style.cssText='cursor:pointer;color:var(--gray);font-size:13px;line-height:1;';
   cancel.onclick=()=>wrapper.remove();
 
-  function doAdd(){
+  async function doAdd(){
     const n=inp.value.trim();
     if(!n){wrapper.remove();return;}
-    ensPath(sh,cls);
-    cfg.sheets[sh].classes[cls].students.push({name:n});
+    // 신규: students/{nameKey} = {name, class: classId}
+    // nameKey = 이름 (동명이인은 이름+숫자)
+    let nameKey=n;
+    // 중복 체크: config._classStudents 전체에서 nameKey 확인
+    const allStudents=config._classStudents||{};
+    const allKeys=Object.values(allStudents).flat().map(s=>s.nameKey);
+    if(allKeys.includes(nameKey)){
+      let i=0;
+      while(allKeys.includes(nameKey+i))i++;
+      nameKey=nameKey+i;
+    }
+    if(!config._classStudents)config._classStudents={};
+    if(!config._classStudents[classId])config._classStudents[classId]=[];
+    config._classStudents[classId].push({nameKey,name:n,class:classId});
     wrapper.remove();
-    refreshStuChips(sh,cls);  // chips만 갱신 → 아코디언 열림 유지
-    pushCfg();
+    refreshStuChips(classId);
+    // Firebase 저장: students/{nameKey}
+    if(dbUrl&&dbPath){
+      try{await fbPatch(`students/${nameKey}`,{name:n,class:classId});toast(`${n} 추가됨 ✅`);}catch(e){toast('저장 실패: '+e);}
+    }
   }
   ok.onclick=doAdd;
   inp.addEventListener('keydown',e=>{
@@ -327,16 +345,94 @@ function addStuInline(sh,cls,btnEl){
   inp.focus();
 }
 
-// chips 영역만 새로 그리기 (전체 재렌더 없음)
-function refreshStuChips(sh,cls){
-  // data-sh/data-cls 어트리뷰트로 탐색 — clsKey(한글→_) 충돌 방지
-  const sSh=sh.replace(/\\/g,'\\\\').replace(/"/g,'\\"');
-  const sCls=cls.replace(/\\/g,'\\\\').replace(/"/g,'\\"');
-  const el=document.querySelector(`[data-chip-type="stu"][data-sh="${sSh}"][data-cls="${sCls}"]`);
+function refreshStuChips(classId){
+  const sCls=classId.replace(/\\/g,'\\\\').replace(/"/g,'\\"');
+  const el=document.querySelector(`[data-chip-type="stu"][data-classid="${sCls}"]`);
   if(!el)return;
-  const sts=cfg.sheets?.[sh]?.classes?.[cls]?.students||[];
-  const stuChips=sts.map(s=>`<span class="chip" onclick="rmStu('${esc(sh)}','${esc(cls)}','${esc(s.name)}')">${esc(s.name)} <span>×</span></span>`).join('');
-  el.innerHTML=stuChips+`<span class="chip" style="background:var(--indigo-l);border-color:var(--indigo);color:var(--indigo);cursor:pointer" onclick="addStuInline('${esc(sh)}','${esc(cls)}',this)">+ 추가</span>`;
+  const students=(config?._classStudents||{})[classId]||[];
+  const stuChips=students.map(s=>`<span class="chip" onclick="rmStu('${esc(classId)}','${esc(s.nameKey)}')">${esc(s.name||s.nameKey)} <span>×</span></span>`).join('');
+  el.innerHTML=stuChips+`<span class="chip" style="background:var(--indigo-l);border-color:var(--indigo);color:var(--indigo);cursor:pointer" onclick="addStuInline('${esc(classId)}',this)">+ 추가</span>`;
+}
+
+// ── 과목 인라인 추가 ─────────────────────────────────────────────
+function addCourseInline(classId,btnEl){
+  const chips=btnEl.parentElement;
+  if(chips.querySelector('.course-inline-wrap')){return;}
+
+  const wrapper=document.createElement('div');
+  wrapper.className='course-inline-wrap';
+  wrapper.style.cssText='display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-top:5px;padding:6px 8px;background:var(--indigo-l);border:1px solid var(--indigo);border-radius:8px;';
+
+  // 학년학기(커리큘럼) select
+  const gsSel=document.createElement('select');
+  gsSel.style.cssText='font-size:11px;padding:3px 5px;border:1px solid var(--border);border-radius:5px;font-family:inherit;background:#fff;';
+  gsSel.innerHTML='<option value="">커리큘럼(선택)</option>'+
+    GRADE_SEM_LIST.map(g=>`<option value="${esc(g.val)}">${esc(g.label)}</option>`).join('');
+
+  // 과목명 입력
+  const subjectInp=document.createElement('input');
+  subjectInp.placeholder='과목명 (예: 3-1)';
+  subjectInp.style.cssText='font-size:11px;padding:3px 5px;border:1px solid var(--indigo);border-radius:5px;font-family:inherit;min-width:100px;';
+
+  // 교재명 입력
+  const tbInp=document.createElement('input');
+  tbInp.placeholder='교재명';
+  tbInp.style.cssText='font-size:11px;padding:3px 5px;border:1px solid var(--border);border-radius:5px;font-family:inherit;min-width:90px;';
+
+  const ok=document.createElement('span');
+  ok.textContent='✓';
+  ok.style.cssText='cursor:pointer;color:var(--indigo);font-weight:700;font-size:14px;padding:0 2px;';
+  const cancel=document.createElement('span');
+  cancel.textContent='×';
+  cancel.style.cssText='cursor:pointer;color:var(--gray);font-size:14px;padding:0 2px;';
+  cancel.onclick=()=>wrapper.remove();
+
+  async function doAdd(){
+    const gs=gsSel.value;
+    const subject=subjectInp.value.trim();
+    const textbook=tbInp.value.trim();
+    if(!subject){toast('과목명을 입력해 주세요.');return;}
+    const existingCourses=config?.classes?.[classId]?.courses||{};
+    if(existingCourses[subject]){toast('이미 추가된 과목입니다.');return;}
+    if(!config.classes)config.classes={};
+    if(!config.classes[classId])config.classes[classId]={group:'',courses:{}};
+    if(!config.classes[classId].courses)config.classes[classId].courses={};
+    const courseData={textbook,curriculum:gs};
+    config.classes[classId].courses[subject]=courseData;
+    wrapper.remove();
+    try{refreshCourseChips(classId);}catch(e){renderMain();}
+    // Firebase 저장: classes/{classId}/courses/{subject}
+    if(dbUrl&&dbPath){
+      try{
+        await fbPatch(`classes/${classId}/courses/${subject}`,courseData);
+        // instructor assignments에도 추가 (이 강사가 담당)
+        if(instructor?.id){
+          const asgKey=`${classId}|${subject}`;
+          await fbPatch(`config/instructors/${encodeURIComponent(instructor.id)}/assignments`,{[asgKey]:true}).catch(()=>{});
+        }
+        toast('과목 추가됨 ✅');
+      }catch(e){toast('저장 실패: '+e);}
+    }
+  }
+  ok.onclick=doAdd;
+  [gsSel,subjectInp,tbInp].forEach(el=>{el.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();ok.click();}});});
+
+  wrapper.appendChild(gsSel);wrapper.appendChild(subjectInp);wrapper.appendChild(tbInp);wrapper.appendChild(ok);wrapper.appendChild(cancel);
+  chips.parentElement.appendChild(wrapper);
+  subjectInp.focus();
+}
+
+function refreshCourseChips(classId){
+  const sCls=classId.replace(/\\/g,'\\\\').replace(/"/g,'\\"');
+  const el=document.querySelector(`[data-chip-type="course"][data-classid="${sCls}"]`);
+  if(!el)return;
+  const courses=config?.classes?.[classId]?.courses||{};
+  const courseChips=Object.keys(courses).map(subj=>{
+    const curriculum=courses[subj]?.curriculum||'';
+    const gsLabel=curriculum?(GRADE_SEM_LIST.find(g=>g.val===curriculum)?.label||curriculum):'';
+    return`<span class="chip" onclick="rmCourse('${esc(classId)}','${esc(subj)}')">${gsLabel?`<span style="color:var(--indigo);font-size:9px;font-weight:700;margin-right:3px">${esc(gsLabel)}</span>`:`<span style="color:var(--red);font-size:9px;margin-right:3px">미설정</span>`}${esc(subj)} <span style="display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;margin-left:4px;border-radius:50%;background:#FEE2E2;color:#B91C1C;font-size:10px;font-weight:700;line-height:1">×</span></span>`;
+  }).join('');
+  el.innerHTML=courseChips+`<span class="chip" style="background:var(--indigo-l);border-color:var(--indigo);color:var(--indigo);cursor:pointer" onclick="addCourseInline('${esc(classId)}',this)">+ 과목 추가</span>`;
 }
 
 // ── 프리셋 편집 (인플레이스) ──────────────────────────────────────
@@ -360,7 +456,7 @@ function savePreset(i){
   if(!instructor?.presets)return;
   instructor.presets[i]=val;
   saveLocal();
-  if(fbUrl&&fbPath&&instructor.id)fbPatch(`config/instructors/${encodeURIComponent(instructor.id)}`,{presets:instructor.presets}).catch(()=>{});
+  if(dbUrl&&dbPath&&instructor.id)fbPatch(`config/instructors/${encodeURIComponent(instructor.id)}`,{presets:instructor.presets}).catch(()=>{});
   toast('문구 수정됨 ✅');
   renderMain();
 }
@@ -369,15 +465,16 @@ function savePreset(i){
 //  설정 저장 / 강사 / 학급 관리
 // ══════════════════════════════════════════════════════════
 function saveFb(){
-  fbUrl=document.getElementById('sUrl')?.value.trim()||'';
-  fbPath=document.getElementById('sPth')?.value.trim()||'';
+  dbUrl=document.getElementById('sUrl')?.value.trim()||'';
+  dbPath=document.getElementById('sPth')?.value.trim()||'';
+  SS('drw_db_url',dbUrl);SS('drw_db_path',dbPath);
   saveLocal();toast('Firebase 설정 저장됨 ✅');
 }
-// 이름 직접 입력 → Firebase 단건 조회
+
 async function lookupInstr(){
   const name=(document.getElementById('acctName')?.value||'').trim();
   if(!name){toast('이름을 입력해 주세요.');return;}
-  if(!fbUrl||!fbPath){toast('Firebase 연결 정보를 먼저 저장하세요.');return;}
+  if(!dbUrl||!dbPath){toast('Firebase 연결 정보를 먼저 저장하세요.');return;}
   try{
     const d=await fbGet(`config/instructors/${encodeURIComponent(name)}`);
     if(d&&d.name){
@@ -396,25 +493,22 @@ const _HARDCODED_PRESETS=[
   '교재 검사 불가','교재 검사 거부','결석',
 ];
 function _defaultPresets(){
-  const saved=cfg?.presets?.['과제수행도'];
+  const saved=config?.presets?.['과제수행도'];
   return (saved&&saved.length>0)?saved:_HARDCODED_PRESETS;
 }
 async function _registerInstr(name){
   const defPresets=_defaultPresets();
   instructor={id:name,name,assignments:[],presets:defPresets};saveLocal();
-  if(fbUrl&&fbPath)await fbPatch(`config/instructors/${encodeURIComponent(name)}`,{name,assignments:[],presets:defPresets}).catch(()=>{});
+  if(dbUrl&&dbPath)await fbPatch(`config/instructors/${encodeURIComponent(name)}`,{name,assignments:[],presets:defPresets}).catch(()=>{});
   renderSb();renderMain();toast(`${name} 등록됨 ✅ — 담당 수업·자주 쓰는 문구를 설정해 주세요`);
 }
 
-// 관리자 인증 (SHA-256 비교)
 async function hashPw(pw){
   const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(pw));
   return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
 }
 async function toggleAdmin(){
-  if(adminOn){
-    adminOn=false;renderMain();return;
-  }
+  if(adminOn){adminOn=false;renderMain();return;}
   const pw=prompt('관리자 암호를 입력하세요');
   if(pw===null)return;
   const h=await hashPw(pw);
@@ -423,276 +517,156 @@ async function toggleAdmin(){
 }
 
 function onCC(){
-  const s=document.getElementById('aCls');if(!s||!cfg)return;
-  const[sh,cls]=s.value.split('|');
-  const tbs=[...(cfg?.sheets?.[sh]?.classes?.[cls]?.textbooks||[])].sort((a,b)=>a.localeCompare(b,'ko'));
-  const t=document.getElementById('aTb');if(t)t.innerHTML='<option value="">-- 교재 선택 --</option>'+tbs.map(x=>`<option>${esc(x)}</option>`).join('');
+  // 신규: 반 선택 시 해당 반의 courses 키 목록을 과목 셀렉트에 채움
+  const s=document.getElementById('aCls');if(!s||!config)return;
+  const classId=s.value;
+  const subjects=Object.keys(config?.classes?.[classId]?.courses||{}).sort((a,b)=>a.localeCompare(b,'ko'));
+  const t=document.getElementById('aTb');
+  if(t)t.innerHTML='<option value="">-- 과목 선택 --</option>'+subjects.map(x=>`<option>${esc(x)}</option>`).join('');
 }
 function addA(){
   if(!instructor){toast('먼저 계정을 설정해 주세요.');return;}
   const cs=document.getElementById('aCls'),ts=document.getElementById('aTb'),rs=document.getElementById('aRole');
   if(!cs||!ts)return;
-  const val=cs.value;
-  if(!val){toast('반을 선택해 주세요.');return;}
-  const[sheet,cls]=val.split('|'),tb=ts.value,role=rs?.value||'담임';
-  if(!sheet||!cls){toast('반을 선택해 주세요.');return;}
-  if(!tb){toast('교재를 선택해 주세요.');return;}
+  const classId=cs.value;
+  if(!classId){toast('반을 선택해 주세요.');return;}
+  const subject=ts.value,role=rs?.value||'담임';
+  if(!subject){toast('과목을 선택해 주세요.');return;}
+  // group: classes/{classId}/group
+  const group=config?.classes?.[classId]?.group||'';
   if(!instructor.assignments)instructor.assignments=[];
-  if(instructor.assignments.some(a=>a.sheet===sheet&&a.cls===cls&&a.tb===tb)){toast('이미 추가된 수업입니다.');return;}
-  instructor.assignments.push({sheet,cls,tb,role});saveLocal();
-  if(fbUrl&&fbPath&&instructor.id)fbPatch(`config/instructors/${encodeURIComponent(instructor.id)}`,{assignments:instructor.assignments}).catch(()=>{});
+  if(instructor.assignments.some(a=>a.classId===classId&&a.subject===subject)){toast('이미 추가된 수업입니다.');return;}
+  instructor.assignments.push({classId,subject,group,role});saveLocal();
+  if(dbUrl&&dbPath&&instructor.id)fbPatch(`config/instructors/${encodeURIComponent(instructor.id)}`,{assignments:instructor.assignments}).catch(()=>{});
   toast('담당 수업 추가됨 ✅');openSaIds.add('sa-asgn');renderMain();
 }
 function removeA(i){
   if(!instructor?.assignments)return;if(!confirm('이 담당 수업을 제거합니까?'))return;
   instructor.assignments.splice(i,1);if(curAI>=instructor.assignments.length)curAI=0;saveLocal();
-  if(fbUrl&&fbPath&&instructor.id)fbPatch(`config/instructors/${encodeURIComponent(instructor.id)}`,{assignments:instructor.assignments}).catch(()=>{});
+  if(dbUrl&&dbPath&&instructor.id)fbPatch(`config/instructors/${encodeURIComponent(instructor.id)}`,{assignments:instructor.assignments}).catch(()=>{});
   renderMain();renderSb();
 }
 
-function ensPath(sh,cls){
-  if(!cfg.sheets)cfg.sheets={};
-  if(!cfg.sheets[sh])cfg.sheets[sh]={classes:{}};
-  if(!cfg.sheets[sh].classes)cfg.sheets[sh].classes={};
-  if(!cfg.sheets[sh].classes[cls])cfg.sheets[sh].classes[cls]={students:[],textbooks:[]};
-  // 이미 존재하는 클래스라도 배열 필드가 누락된 경우(구버전 데이터) 초기화
-  if(!cfg.sheets[sh].classes[cls].students)cfg.sheets[sh].classes[cls].students=[];
-  if(!cfg.sheets[sh].classes[cls].textbooks)cfg.sheets[sh].classes[cls].textbooks=[];
-  if(!cfg.sheets[sh].classes[cls].tb_grade)cfg.sheets[sh].classes[cls].tb_grade={};
-}
-
 function _ensureConfigShape(){
-  if(!cfg)cfg={sheets:{},presets:{'과제수행도':[]},textbooks:{}};
-  if(!cfg.sheets)cfg.sheets={};
-  for(const sh of ['M','T']){
-    if(!cfg.sheets[sh])cfg.sheets[sh]={classes:{}};
-    if(!cfg.sheets[sh].classes)cfg.sheets[sh].classes={};
-  }
-  if(!cfg.textbooks)cfg.textbooks={};
-  return cfg;
+  if(!config)config={classes:{},instructors:{}};
+  if(!config.classes)config.classes={};
+  if(!config.instructors)config.instructors={};
+  return config;
 }
 
 async function pushCfg(){
   _ensureConfigShape();
   saveLocal();
-  if(!fbUrl||!fbPath)return;
+  if(!dbUrl||!dbPath)return;
   try{
-    const payload={sheets:cfg.sheets||{}};
-    if(cfg.textbooks)payload.textbooks=cfg.textbooks;
-    await fbPatch('config',payload);
+    await fbPatch('config',{classes:config.classes||{}});
     setSync(true);toast('저장됨 ✅');
-  }
-  catch(e){setSync(false);toast('저장 실패: '+e);}
+  }catch(e){setSync(false);toast('저장 실패: '+e);}
 }
 
-function _ensureTextbookRegistry(){
-  _ensureConfigShape();
-  for(const shD of Object.values(cfg.sheets||{})){
-    for(const clsD of Object.values(shD.classes||{})){
-      for(const tb of clsD.textbooks||[]){
-        if(tb)cfg.textbooks[tb]=true;
-      }
-    }
-  }
-  return cfg.textbooks;
-}
-
-function _assertAdminForTextbookDelete(){
-  if(adminOn)return true;
-  toast('교재 삭제는 관리자만 가능합니다.');
-  return false;
-}
-
-async function addTextbook(){
-  const name=document.getElementById('tb-name-inp')?.value.trim();
-  if(!name){toast('교재명을 입력해 주세요.');return;}
-  const registry=_ensureTextbookRegistry();
-  if(registry[name]){toast('이미 등록된 교재명입니다.');return;}
-  registry[name]=true;
-  await pushCfg();
-  openSaIds.add('sa-tbmgmt');renderMain();toast(`"${name}" 등록됨 ✅`);
-}
-async function rmTextbook(name){
-  if(!_assertAdminForTextbookDelete())return;
-  if(!confirm(`"${name}" 삭제합니까?\n모든 학급의 교재 목록에서도 제거됩니다.`))return;
-  if(!cfg?.textbooks)return;
-  delete cfg.textbooks[name];
-  for(const shD of Object.values(cfg.sheets||{})){
-    for(const clsD of Object.values(shD.classes||{})){
-      if(clsD.textbooks)clsD.textbooks=clsD.textbooks.filter(t=>t!==name);
-      if(clsD.tb_grade)delete clsD.tb_grade[name];
-    }
-  }
-  _syncAssignments();
-  await pushCfg();
-  openSaIds.add('sa-tbmgmt');renderMain();
-}
-const addGradeSemTb=addTextbook;
-const rmGradeSemTb=rmTextbook;
-function addCls(sh){
-  const c=prompt(`${sh}반 학급명 (예: 3MGM)`);
+function addCls(group){
+  const c=prompt(`학급명 (예: 3MGM)`);
   if(!c?.trim())return;
   _ensureConfigShape();
-  ensPath(sh,c.trim());
-  clsDrillSh=sh;  // 추가 후 해당 시트로 유지
-  openSaIds.add('sa-cls'); // 학급 관리 섹션 열린 상태 유지
+  if(!config.classes[c.trim()])config.classes[c.trim()]={group:group||'',courses:{}};
+  clsDrillSh=c.trim();
+  openSaIds.add('sa-cls');
   pushCfg();
   renderMain();
 }
+function addCourse(classId){
+  const subject=prompt(`${classId} 과목명 (예: 3-1):`);
+  if(!subject?.trim())return;
+  _ensureConfigShape();
+  if(!config.classes[classId])config.classes[classId]={group:'',courses:{}};
+  config.classes[classId].courses[subject.trim()]={textbook:'',curriculum:''};
+  openSaIds.add('sa-cls');
+  pushCfg();
+  renderMain();
+}
+
 function _syncAssignments(){
   if(!instructor?.assignments?.length)return;
   const before=instructor.assignments.length;
   instructor.assignments=instructor.assignments.filter(a=>{
-    const clsD=cfg.sheets?.[a.sheet]?.classes?.[a.cls];
+    const clsD=config?.classes?.[a.classId];
     if(!clsD)return false;
-    return !a.tb||(clsD.textbooks||[]).includes(a.tb);
+    return !a.subject||Object.prototype.hasOwnProperty.call(clsD.courses||{},a.subject);
   });
   if(instructor.assignments.length===before)return;
   if(curAI>=instructor.assignments.length)curAI=0;
   saveLocal();
-  if(fbUrl&&fbPath&&instructor.id)
+  if(dbUrl&&dbPath&&instructor.id)
     fbPatch(`config/instructors/${encodeURIComponent(instructor.id)}`,{assignments:instructor.assignments}).catch(()=>{});
 }
-function rmCls(sh,cls){
-  if(!confirm(`${cls} 학급을 삭제합니까?`))return;
-  delete cfg.sheets[sh].classes[cls];
+
+function rmCls(classId){
+  if(!confirm(`${classId} 학급을 삭제합니까?`))return;
+  delete config.classes[classId];
+  if(config._classStudents)delete config._classStudents[classId];
   if(instructor?.assignments){
     const before=instructor.assignments.length;
-    instructor.assignments=instructor.assignments.filter(a=>!(a.sheet===sh&&a.cls===cls));
+    instructor.assignments=instructor.assignments.filter(a=>a.classId!==classId);
     if(instructor.assignments.length!==before){
       if(curAI>=instructor.assignments.length)curAI=0;
       saveLocal();
-      if(fbUrl&&fbPath&&instructor.id)fbPatch(`config/instructors/${encodeURIComponent(instructor.id)}`,{assignments:instructor.assignments}).catch(()=>{});
+      if(dbUrl&&dbPath&&instructor.id)fbPatch(`config/instructors/${encodeURIComponent(instructor.id)}`,{assignments:instructor.assignments}).catch(()=>{});
     }
   }
   pushCfg();renderMain();
 }
-function rmStu(sh,cls,name){
-  if(!confirm(`${name}을(를) 삭제합니까?`))return;
-  cfg.sheets[sh].classes[cls].students=cfg.sheets[sh].classes[cls].students.filter(s=>s.name!==name);
-  refreshStuChips(sh,cls);  // chips만 갱신
-  pushCfg();
+
+async function rmStu(classId,nameKey){
+  const stu=((config?._classStudents||{})[classId]||[]).find(s=>s.nameKey===nameKey);
+  const displayName=stu?.name||nameKey;
+  if(!confirm(`${displayName}을(를) 삭제합니까?`))return;
+  if(config._classStudents?.[classId]){
+    config._classStudents[classId]=config._classStudents[classId].filter(s=>s.nameKey!==nameKey);
+  }
+  refreshStuChips(classId);
+  // Firebase: students/{nameKey} 삭제
+  if(dbUrl&&dbPath){
+    try{await fbPut(`students/${nameKey}`,null);}catch(e){}
+  }
 }
-// ── 교재 인라인 추가 — 학년학기 + 교재 선택/직접입력 ──────────────────────
-function addTbInline(sh,cls,btnEl){
-  const chips=btnEl.parentElement;
-  if(chips.querySelector('.tb-inline-wrap')){return;}
 
-  const wrapper=document.createElement('div');
-  wrapper.className='tb-inline-wrap';
-  wrapper.style.cssText='display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-top:5px;padding:6px 8px;background:var(--indigo-l);border:1px solid var(--indigo);border-radius:8px;';
-
-  // 학년학기 select
-  const gsSel=document.createElement('select');
-  gsSel.style.cssText='font-size:11px;padding:3px 5px;border:1px solid var(--border);border-radius:5px;font-family:inherit;background:#fff;';
-  gsSel.innerHTML='<option value="">학년학기</option>'+
-    GRADE_SEM_LIST.map(g=>`<option value="${esc(g.val)}">${esc(g.label)}</option>`).join('');
-
-  // 교재 select (전체 레지스트리)
-  const tbSel=document.createElement('select');
-  tbSel.style.cssText='font-size:11px;padding:3px 5px;border:1px solid var(--border);border-radius:5px;font-family:inherit;background:#fff;min-width:90px;';
-
-  // 직접입력 텍스트 (교재가 없을 때 또는 "직접입력" 선택 시)
-  const tbInp=document.createElement('input');
-  tbInp.placeholder='교재명 직접 입력';
-  tbInp.style.cssText='font-size:11px;padding:3px 5px;border:1px solid var(--indigo);border-radius:5px;font-family:inherit;display:none;min-width:100px;';
-
-  function refreshTbOpts(){
-    const allTbs=Object.keys(_ensureTextbookRegistry()).sort((a,b)=>a.localeCompare(b,'ko'));
-    const existing=cfg?.sheets?.[sh]?.classes?.[cls]?.textbooks||[];
-    const available=allTbs.filter(n=>!existing.includes(n));
-    tbSel.innerHTML='<option value="">교재 선택</option>'+
-      available.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join('')+
-      '<option value="__new__">✏️ 직접 입력...</option>';
-    tbInp.style.display='none';
+async function rmCourse(classId,subject){
+  if(!confirm(`"${subject}" 과목을 삭제합니까?`))return;
+  if(config?.classes?.[classId]?.courses)delete config.classes[classId].courses[subject];
+  try{refreshCourseChips(classId);}catch(e){}
+  if(dbUrl&&dbPath){
+    try{await fbPut(`classes/${classId}/courses/${subject}`,null);}catch(e){}
   }
-  refreshTbOpts();
-
-  tbSel.onchange=()=>{
-    if(tbSel.value==='__new__'){
-      tbInp.style.display='';tbInp.focus();
-    } else {
-      tbInp.style.display='none';tbInp.value='';
-    }
-  };
-
-  const ok=document.createElement('span');
-  ok.textContent='✓';
-  ok.style.cssText='cursor:pointer;color:var(--indigo);font-weight:700;font-size:14px;padding:0 2px;';
-  const cancel=document.createElement('span');
-  cancel.textContent='×';
-  cancel.style.cssText='cursor:pointer;color:var(--gray);font-size:14px;padding:0 2px;';
-  cancel.onclick=()=>wrapper.remove();
-  tbInp.onkeydown=e=>{if(e.key==='Enter')ok.click();};
-
-  async function doAdd(){
-    const gs=gsSel.value;
-    if(!gs){toast('학년학기를 선택해 주세요.');return;}
-    let t='';
-    if(tbSel.value==='__new__'){
-      t=tbInp.value.trim();
-      if(!t){toast('교재명을 입력해 주세요.');return;}
-      // 글로벌 레지스트리에도 등록
-      _ensureTextbookRegistry()[t]=true;
-    } else {
-      t=tbSel.value;
-      if(!t){toast('교재를 선택해 주세요.');return;}
-    }
-    const existingTbs=cfg?.sheets?.[sh]?.classes?.[cls]?.textbooks||[];
-    if(existingTbs.includes(t)){toast('이미 추가된 교재입니다.');return;}
-    ensPath(sh,cls);
-    cfg.sheets[sh].classes[cls].textbooks.push(t);
-    cfg.sheets[sh].classes[cls].tb_grade[t]=gs;
-    wrapper.remove();
-    try{refreshTbChips(sh,cls);}catch(e){renderMain();}
-    try{await pushCfg();}catch(e){toast('교재 저장 실패: '+e);}
-  }
-  ok.onclick=doAdd;
-  gsSel.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();ok.click();}};
-  tbSel.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();ok.click();}};
-  tbInp.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();ok.click();}};
-
-  wrapper.appendChild(gsSel);wrapper.appendChild(tbSel);wrapper.appendChild(tbInp);wrapper.appendChild(ok);wrapper.appendChild(cancel);
-  chips.parentElement.appendChild(wrapper);
-  gsSel.focus();
-}
-function refreshTbChips(sh,cls){
-  // data-sh/data-cls 어트리뷰트로 탐색 — clsKey(한글→_) 충돌 방지
-  const sSh=sh.replace(/\\/g,'\\\\').replace(/"/g,'\\"');
-  const sCls=cls.replace(/\\/g,'\\\\').replace(/"/g,'\\"');
-  const el=document.querySelector(`[data-chip-type="tb"][data-sh="${sSh}"][data-cls="${sCls}"]`);
-  if(!el)return;
-  const tbs=cfg.sheets?.[sh]?.classes?.[cls]?.textbooks||[];
-  const tbChips=tbs.map(t=>{const gs=getTbGrade(sh,cls,t)||'';const gsLabel=gs?(GRADE_SEM_LIST.find(g=>g.val===gs)?.label||gs):'';return`<span class="chip" onclick="rmTb('${esc(sh)}','${esc(cls)}','${esc(t)}')">${gsLabel?`<span style="color:var(--indigo);font-size:9px;font-weight:700;margin-right:3px">${esc(gsLabel)}</span>`:`<span style="color:var(--red);font-size:9px;margin-right:3px">미설정</span>`}${esc(t)} <span style="display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;margin-left:4px;border-radius:50%;background:#FEE2E2;color:#B91C1C;font-size:10px;font-weight:700;line-height:1">×</span></span>`;}).join('');
-  el.innerHTML=tbChips+`<span class="chip" style="background:var(--indigo-l);border-color:var(--indigo);color:var(--indigo);cursor:pointer" onclick="addTbInline('${esc(sh)}','${esc(cls)}',this)">+ 교재 추가</span>`;
-}
-function addTb(sh,cls){const t=prompt(`${cls} 교재명:`);if(!t?.trim())return;ensPath(sh,cls);cfg.sheets[sh].classes[cls].textbooks.push(t.trim());pushCfg();renderMain();}
-async function rmTb(sh,cls,tb){
-  if(!confirm(`"${tb}" 삭제합니까?`))return;
-  ensPath(sh,cls);
-  cfg.sheets[sh].classes[cls].textbooks=(cfg.sheets[sh].classes[cls].textbooks||[]).filter(t=>t!==tb);
-  if(cfg?.sheets?.[sh]?.classes?.[cls]?.tb_grade){
-    delete cfg.sheets[sh].classes[cls].tb_grade[tb];
-  }
-  try{refreshTbChips(sh,cls);}catch(e){}
-  try{
-    await pushCfg();
-  }catch(e){
-    toast('교재 삭제 저장 실패: '+e);
-  }
+  _syncAssignments();
+  renderMain();
 }
 
 async function loadCfg(){
-  if(!fbUrl||!fbPath){toast('Firebase URL과 경로를 먼저 저장하세요.');return;}
+  if(!dbUrl||!dbPath){toast('Firebase URL과 경로를 먼저 저장하세요.');return;}
   const mc=document.getElementById('mc');
   mc.innerHTML=`<div class="loading"><div class="spin"></div>불러오는 중...</div>`;
   try{
-    const data=await fbGet('config');
-    cfg=data||{sheets:{M:{classes:{}},T:{classes:{}}},presets:{'과제수행도':[]},textbooks:{}};
+    // 신규: config(classes+instructors) + students/ 전체 로드
+    const [cfgData,stuData]=await Promise.all([
+      fbGet('config').catch(()=>null),
+      fbGet('students').catch(()=>null),
+    ]);
+    config=cfgData||{classes:{},instructors:{}};
     _ensureConfigShape();
-    _ensureTextbookRegistry();
+    // students를 classId별로 캐싱
+    if(stuData&&typeof stuData==='object'){
+      const classStudents={};
+      for(const[nameKey,v] of Object.entries(stuData)){
+        const cid=v?.class;
+        if(cid){
+          if(!classStudents[cid])classStudents[cid]=[];
+          classStudents[cid].push({nameKey,...v});
+        }
+      }
+      config._classStudents=classStudents;
+    }
     saveLocal();setSync(true);
-    try{let s=await fbGet('session').catch(()=>null);if(!s?.class_data)s=await fbGet('lastSent').catch(()=>null);if(s?.class_data)for(const[k,v]of Object.entries(s.class_data))if(!progressData[k])progressData[k]=v;saveLocal();}catch(e){}
+    try{let s=await fbGet('session').catch(()=>null);if(s?.class_data)for(const[k,v]of Object.entries(s.class_data))if(!progressData[k])progressData[k]=v;saveLocal();}catch(e){}
     try{const d=await fbGet('input');if(d)Object.assign(inputData,d);saveLocal();}catch(e){}
     try{const d=await fbGet('obs');if(d)Object.assign(tagData,d);saveLocal();}catch(e){}
     if(instructor?.id){const id=await fbGet(`config/instructors/${encodeURIComponent(instructor.id)}`).catch(()=>null);if(id){Object.assign(instructor,id);saveLocal();}}
@@ -701,23 +675,21 @@ async function loadCfg(){
     renderMain();renderSb();
   }catch(e){setSync(false);toast('연결 실패: '+e);renderMain();}
 }
+
 // ── 초기화 scope 헬퍼 ───────────────────────────────────────────────
-// assignments 기반으로 삭제 대상 키 목록 생성
-// Returns: { inputKeys: string[], progressKeys: string[] }
 function _myResetKeys(){
   const asgns=instructor?.assignments||[];
   const inputKeys=[];
   const progressKeys=[];
   const noteKeySeen=new Set();
   for(const a of asgns){
-    const students=cfg?.sheets?.[a.sheet]?.classes?.[a.cls]?.students||[];
+    const students=(config?._classStudents||{})[a.classId]||[];
     for(const s of students){
-      inputKeys.push(`${a.sheet}|${a.cls}|${s.name}|${a.tb}`);
-      // __note__ 키는 tb와 무관하게 cls+name 기준으로 1개만 (중복 방지)
-      const nk=`${a.sheet}|${a.cls}|${s.name}|__note__`;
+      inputKeys.push(`${s.nameKey}|${a.subject}`);
+      const nk=`${s.nameKey}|__note__`;
       if(!noteKeySeen.has(nk)){noteKeySeen.add(nk);inputKeys.push(nk);}
     }
-    progressKeys.push(`${a.sheet}|${a.cls}|${a.tb}`);
+    progressKeys.push(`${a.classId}|${a.subject}`);
   }
   return{inputKeys,progressKeys};
 }
@@ -769,20 +741,18 @@ function _renderResetHtml(){
 }
 function _resetToggle(id){
   if(_resetSel.has(id))_resetSel.delete(id);else _resetSel.add(id);
-  // 설정 탭이 열려 있으면 해당 섹션만 부분 갱신
   const body=document.querySelector('#sa-reset .sa-body');
   if(body)body.innerHTML=_renderResetHtml();
 }
 async function _doResetPresets(){
   const def=_defaultPresets();
   if(instructor){instructor.presets=[...def];}
-  if(fbUrl&&fbPath&&instructor?.id){
+  if(dbUrl&&dbPath&&instructor?.id){
     await fbPatch(`config/instructors/${instructor.id}`,{presets:def}).catch(()=>{});
   }
   saveLocal();
 }
 
-// ── 초기화 실행 (다중 선택) ──────────────────────────────────────────
 async function clrSelected(){
   if(_resetSel.size===0)return;
   const sel=[..._resetSel];
@@ -797,13 +767,15 @@ async function clrSelected(){
     if(!confirm(`다음 항목을 초기화합니까?\n\n${labels}`))return;
   }
 
-  if(!fbUrl||!fbPath){
-    // 로컬 처리 (Firebase 없음)
+  if(!dbUrl||!dbPath){
     if(sel.includes('input')){const{inputKeys}=_myResetKeys();for(const k of inputKeys)delete inputData[k];}
     if(sel.includes('tags')){
       const dk=todayKey();const asgns=instructor?.assignments||[];
-      for(const a of asgns){const sts=cfg?.sheets?.[a.sheet]?.classes?.[a.cls]?.students||[];
-        for(const s of sts){const ok=`${a.sheet}|${a.cls}|${s.name}|${a.tb}`;if(tagData[ok]?.[dk])delete tagData[ok][dk];}
+      for(const a of asgns){
+        const students=(config?._classStudents||{})[a.classId]||[];
+        for(const s of students){
+          if(tagData?.[s.nameKey]?.[a.subject]?.[dk])delete tagData[s.nameKey][a.subject][dk];
+        }
       }
     }
     if(sel.includes('progress')){const{progressKeys}=_myResetKeys();for(const k of progressKeys)delete progressData[k];}
@@ -813,23 +785,27 @@ async function clrSelected(){
 
   try{
     const ops=[];
-    // ── 일반 항목 ──
     if(sel.includes('input')){
-      // 특이사항 메모만 (inputData의 __note__ 항목)
       const{inputKeys}=_myResetKeys();
-      const noteKeys=inputKeys.filter(k=>k.endsWith('|__note__'));
-      for(const k of noteKeys)delete inputData[k];
-      const p={};for(const k of noteKeys)p[k]=null;
-      if(Object.keys(p).length)ops.push(fbPatch('input',p));
+      for(const k of inputKeys)delete inputData[k];
+      // 신규: input/{nameKey}/{subject} 구조
+      const asgns=instructor?.assignments||[];
+      for(const a of asgns){
+        const students=(config?._classStudents||{})[a.classId]||[];
+        for(const s of students){
+          ops.push(fbPut(`input/${s.nameKey}/${a.subject}`,null).catch(()=>{}));
+        }
+      }
     }
     if(sel.includes('tags')){
-      // 수행도(assign_grade/assign_tags) + 모든 obs 태그 — 키: sheet|cls|name|tb
       const dk=todayKey();const asgns=instructor?.assignments||[];
       for(const a of asgns){
-        const sts=cfg?.sheets?.[a.sheet]?.classes?.[a.cls]?.students||[];
-        for(const s of sts){
-          const ok=`${a.sheet}|${a.cls}|${s.name}|${a.tb}`;
-          if(tagData[ok]?.[dk]){delete tagData[ok][dk];ops.push(fbPatch(`obs/${encodeURIComponent(ok)}`,{[dk]:null}));}
+        const students=(config?._classStudents||{})[a.classId]||[];
+        for(const s of students){
+          if(tagData?.[s.nameKey]?.[a.subject]?.[dk]){
+            delete tagData[s.nameKey][a.subject][dk];
+            ops.push(fbPatch(`obs/${s.nameKey}/${a.subject}`,{[dk]:null}));
+          }
         }
       }
     }
@@ -840,7 +816,6 @@ async function clrSelected(){
       if(Object.keys(p).length)ops.push(fbPatch('session/class_data',p));
     }
     if(sel.includes('presets'))ops.push(_doResetPresets());
-    // ── 관리자 항목 ──
     if(sel.includes('all-input')){inputData={};tagData={};ops.push(fbPut('input',null));ops.push(fbPut('obs',null));}
     if(sel.includes('all-progress')){progressData={};ops.push(fbPut('session',null));}
     if(sel.includes('assignments')){
@@ -848,9 +823,9 @@ async function clrSelected(){
       if(instrs)for(const id of Object.keys(instrs))ops.push(fbPatch(`config/instructors/${id}`,{assignments:[]}).catch(()=>{}));
     }
     if(sel.includes('config')){
-      ops.push(fbPut('config',null));ops.push(fbPut('input',null));ops.push(fbPut('session',null));
-      inputData={};progressData={};cfg=null;instructor=null;adminOn=false;
-      SS('drw_input','{}');SS('drw_prog','{}');SS('drw_cfg','');SS('drw_instr','');
+      ops.push(fbPut('config',null));ops.push(fbPut('input',null));ops.push(fbPut('session',null));ops.push(fbPut('students',null));
+      inputData={};progressData={};config=null;instructor=null;adminOn=false;
+      SS('drw_input','{}');SS('drw_prog','{}');SS('drw_config','');SS('drw_instr','');
     }
     await Promise.all(ops);
     saveLocal();
@@ -864,7 +839,6 @@ async function clrSelected(){
 //  강사 모달 / 관리
 // ══════════════════════════════════════════════════════════
 async function showIM(){
-  // 사이드바 뱃지 클릭 → 설정 > 내 계정 섹션으로 이동
   goNav('setting');
   setTimeout(()=>_saOpen('sa-acct'),50);
 }
@@ -879,7 +853,7 @@ async function createI(ctx){
 async function loadInstrsSection(){
   const card=document.getElementById('instrMgmtCard');if(!card)return;
   if(!adminOn){card.innerHTML='<div style="padding:10px 12px;font-size:12px;color:var(--gray)">관리자 모드가 필요합니다.</div>';return;}
-  if(!fbUrl||!fbPath){card.innerHTML='<div style="padding:10px 12px;font-size:12px;color:var(--gray)">Firebase 연결 후 사용 가능합니다.</div>';return;}
+  if(!dbUrl||!dbPath){card.innerHTML='<div style="padding:10px 12px;font-size:12px;color:var(--gray)">Firebase 연결 후 사용 가능합니다.</div>';return;}
   let instrs=[];
   try{const d=await fbGet('config/instructors');if(d)instrs=Object.entries(d).map(([id,v])=>({id,...v})).sort((a,b)=>(a.name||'').localeCompare(b.name||'','ko'));}catch(e){}
   const list=instrs.map(ins=>{
@@ -900,7 +874,7 @@ async function loadInstrsSection(){
   card.innerHTML=`${list||'<div style="padding:10px 12px;font-size:12px;color:var(--gray)">등록된 강사가 없습니다.</div>'}${newForm}`;
 }
 async function switchInstr(id){
-  if(!fbUrl||!fbPath){toast('Firebase 연결이 필요합니다.');return;}
+  if(!dbUrl||!dbPath){toast('Firebase 연결이 필요합니다.');return;}
   try{const d=await fbGet(`config/instructors/${encodeURIComponent(id)}`);if(!d){toast('강사 데이터 없음');return;}
   instructor={id,...d};saveLocal();curAI=0;renderSb();renderMain();toast(`${instructor.name}으로 전환됨 ✅`);}
   catch(e){toast('전환 실패: '+e);}
@@ -922,14 +896,14 @@ function addPreset(){
   if(!instructor.presets)instructor.presets=[];
   if(instructor.presets.includes(val)){toast('이미 있는 프리셋입니다.');return;}
   instructor.presets.push(val);inp.value='';saveLocal();
-  if(fbUrl&&fbPath&&instructor.id)fbPatch(`config/instructors/${encodeURIComponent(instructor.id)}`,{presets:instructor.presets}).catch(()=>{});
+  if(dbUrl&&dbPath&&instructor.id)fbPatch(`config/instructors/${encodeURIComponent(instructor.id)}`,{presets:instructor.presets}).catch(()=>{});
   renderMain();
 }
 function rmPreset(i){
   if(!instructor?.presets)return;
   if(!confirm(`"${instructor.presets[i]}" 프리셋을 삭제합니까?`))return;
   instructor.presets.splice(i,1);saveLocal();
-  if(fbUrl&&fbPath&&instructor.id)fbPatch(`config/instructors/${encodeURIComponent(instructor.id)}`,{presets:instructor.presets}).catch(()=>{});
+  if(dbUrl&&dbPath&&instructor.id)fbPatch(`config/instructors/${encodeURIComponent(instructor.id)}`,{presets:instructor.presets}).catch(()=>{});
   renderMain();
 }
 

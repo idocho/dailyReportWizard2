@@ -1,7 +1,9 @@
 # DailyReportWizard — 요구사항 명세서
 
 **Crafted by IDO(idocho@kakao.com) · Powered by Claude AI**  
-**문서 버전**: 5.8 · **앱 버전**: v2.0.0 · **최종 수정**: 2026-05-25
+**문서 버전**: 6.1 · **앱 버전**: v3.0.0 · **최종 수정**: 2026-05-28
+
+> Firebase 스키마 전체 명세: [ClassManager/documents/DB_SCHEMA.md](../../ClassManager/documents/DB_SCHEMA.md)
 
 ---
 
@@ -39,6 +41,9 @@
 | 5.2 | 2026-05-25 | 관찰 태그 대폭 개편. ① 과제 고정 등급 3→5단계(`done/most/half/little/none`). ② 컨디션 4→5단계(PES 화살표 스타일, `low` 추가). ③ 이해도 3→5단계(`top/good/normal_u/confused/hard`). ④ 하이라이트 단일→복수선택 전환(배열 저장). ⑤ 버튼 UX: 택1=pill(tg-radio), 복수=dashed square(tg-check). ⑥ 기본 프리셋 11→7개로 정리(`오답 풀이 안함` 추가). ⑦ PC 앱 A안: `obs/assign_grade` → `student_data` 매핑(`ASSIGN_GRADE_LABELS`). ⑧ `ai_engine.py` condition/understand/highlight 키 현행화 |
 | 5.3 | 2026-05-25 | PC 앱 과제 데이터 통합 고도화. ① `ASSIGN_GRADE_LABELS` 전문 라벨 확정(`과제 완료/대부분 수행/절반 수행/일부 수행/미수행`). ② `app.py` obs 매핑에 `assign_tags` 복수 추가 — `assign_grade` 라벨 + 다중 선택 태그를 `" / "` 구분자로 결합(`"대부분 수행 / 교재 미지참 / 오답 풀이 안함"` 형태). ③ Firebase `assign_tags` 배열·딕셔너리 이중 구조 모두 대응(배열이면 직접 사용, dict이면 키 정렬 후 값 추출) |
 | 5.5 | 2026-05-25 | 초기화 기능 수정. ① `tags` 초기화 obs 키 수정(`sheet\|cls\|name` → `sheet\|cls\|name\|tb`) — 구버전 키로 인해 tagData 조회 실패, 아무것도 삭제 안 되던 버그. ② 초기화 항목 재정의: "수행도 & 특이사항"을 "수행도 & 관찰 태그"(obs 전체)와 "특이사항 메모"(inputData notes만)로 분리 — v2.0에서 수행도가 obs/에 저장되므로 기존 `input` 초기화로 수행도 삭제 불가였던 혼동 해소. ③ `input` 초기화는 `__note__` 키만 삭제하도록 축소. ④ 관리자 `all-input` 초기화에 `obs/` 노드 삭제 추가(`tagData={}`, `fbPut('obs',null)`) |
+| 6.0 | 2026-05-27 | **DB 구조 전면 재설계** — 반 중심 → 학생 중심. 변수명 일괄 변경 (`sheet`→`group`, `cls`→`classId`, `tb`→`subject`, `cfg`→`config`, `okey` 제거 등). Firebase 경로 전면 변경. scores 노드 weekly/achievement 분리. 교재 등록 권한 강사로 명확화. 성적 입력 권한 분리 (반별=담당강사, 학년단위=담임). |
+| 6.1 | 2026-05-28 | **nameKey = 출결번호** — 이름 기반 키 + 동명이인 suffix 로직 폐기. 출결번호(불변 고유번호)를 Firebase 학생 키로 사용. ClassManager에서 발부 및 CSV 관리. |
+| 5.9 | 2026-05-25 | Claude 프롬프트 캐싱 적용. `Anthropic-Beta: prompt-caching-2024-07-31` 헤더 추가. system 필드를 배열+`cache_control: ephemeral` 구조로 변경 — 전체 AI생성 시 학생 수만큼 반복 호출되는 `_base_conditions()` 캐시 히트로 input 토큰 ~90% 절감 |
 | 5.8 | 2026-05-25 | AI 엔진별 API Key 독립 저장. `groq_api_key` / `openai_api_key` / `claude_api_key` 분리. 설정창 엔진 전환 시 해당 엔진 저장 키 자동 로드. `_get_engine_settings` 엔진별 키 우선 조회 → `ai_api_key` 폴백 |
 | 5.7 | 2026-05-25 | AI 생성 지침 8번 추가 — 과제 반복 금지. 진도·과제 정보는 메시지 별도 항목으로 전달되므로 특이사항에서 재낭독 금지 |
 | 5.6 | 2026-05-25 | ai_engine.py 개선. ① `_merge_student_tags()` 신설 — v5.4 교재별 obs 키(`sheet\|cls\|name\|tb`) 대응, 복수 교재 태그 병합(단일 필드 first-wins, 배열 필드 union). ② `gen_single`/`gen_all` obs 키 3분할→4분할 수정 (태그 미전달 버그 수정). ③ `_base_conditions()` 중복 제거 — 프롬프트 텍스트에서 제거, system 파라미터로만 전달. ④ `build_batch_prompt` 진도/과제 포함 — `gen_all` targets에 `progress` 필드 추가, 단건 프롬프트와 동일 수준 컨텍스트 제공. ⑤ Groq 모델 문서 정정 `llama-3.1-8b-instant` → `qwen/qwen3-32b` |
@@ -82,12 +87,21 @@ v2.0부터는 DailyReportAnalyzer가 월간 학부모 리포트를 생성할 수
 웹 PWA (index.html)                    PC 앱 (모듈 구조)
 ─────────────────────────────          ──────────────────────────────
 강사 등록 및 담당 수업 배정            Firebase에서 데이터 취합 (📥)
-반 공통 진도/과제 입력                 학생별 데이터 열람
-학생별 입력:                           특이사항 직접 편집
-  - 과제수행도                         AI 특이사항 초안 생성
-  - 수업 관찰 태그 (v2.0 신규)         (Groq / Claude / GPT 선택)
-학급·학생·교재·프리셋 관리             카카오톡 메시지 전송
+교재 등록/관리 (curriculum 지정)       학생별 데이터 열람
+반 공통 진도/과제 입력                 특이사항 직접 편집
+학생별 입력:                           AI 특이사항 초안 생성
+  - 과제수행도 (assign_grade)          (Groq / Claude / GPT 선택)
+  - 수업 관찰 태그 (obs/)              카카오톡 메시지 전송 (담임)
+  - 성적 입력 (scores/)
+프리셋 관리
 ```
+
+**권한 원칙 (v6.0)**
+- 학생 등록/삭제/반 배정: ClassManager 관리자 전용
+- 교재(subject) 등록: 강사 (담임/부담임 모두 가능)
+- 반별 주간 시험 성적 입력: 해당 subject의 `instructor`만
+- 학년단위 시험 성적 입력: 담임만
+- KakaoTalk 데일리 리포트 발송: 담임 (PC 앱)
 
 ※ **로컬 전용 시나리오 폐기** — Firebase 연결 필수  
 ※ **PC 앱 쓰기 제한**: Firebase 쓰기는 `lastSent/` 기록 + 강사 신규 등록만 허용  
@@ -836,4 +850,45 @@ cfg.sheets.M.classes.중1A.tb_grade  = { "최상위수학": "중1-1", "우공비
 | 웹 카카오톡 전송 | PC 앱 전용 확정 |
 | 모바일 앱 설치형 | APK 전환 계획 없음 |
 | PDF 출력 | Analyzer 단계에서 검토 |
+| 학생 등록/삭제/반 배정 | ClassManager 관리자 전용 |
+
+---
+
+## 12. v6.0 Firebase 경로 변환 (구 → 신)
+
+> 상세 스키마: [ClassManager/documents/DB_SCHEMA.md](../../ClassManager/documents/DB_SCHEMA.md)
+
+### 12.1 핵심 경로 변환
+
+| 구 경로 | 신 경로 |
+|---------|---------|
+| `config/sheets/{group}/classes/{classId}/students` | `students/?orderBy="class"&equalTo="{classId}"` |
+| `obs/{group}\|{classId}\|{nameKey}\|{subject}/{date}` | `obs/{nameKey}/{subject}/{date}` |
+| `input/{group}\|{classId}\|{nameKey}\|{subject}` | `input/{nameKey}/{subject}` |
+| `scores/{group}\|{classId}/{testKey}/students/{name}` | `scores/weekly/{classId}/{subject}/{testKey}/students/{nameKey}` |
+| `config/sheets/{g}/classes/{cls}/tb_grade/{tb}` | `classes/{classId}/courses/{subject}/curriculum` |
+
+### 12.2 성적 노드 분리
+
+| 시험 유형 | 신 경로 | 입력 권한 |
+|----------|---------|----------|
+| 주간Test, 직접입력 | `scores/weekly/{classId}/{subject}/{testKey}/` | 해당 subject instructor |
+| 성취도평가, 기출모의고사, 실전모의고사, 반배치고사 | `scores/achievement/{curriculumKey}/{testKey}/` | 담임만 |
+
+`curriculumKey`: curriculum 키의 `.`을 `_`로 치환 (Firebase 키 제약)  
+예) `middle_school.grade_3.semester_1` → `middle_school_grade_3_semester_1`
+
+### 12.3 변수명 변환
+
+| 구 변수명 | 신 변수명 |
+|----------|----------|
+| `sheet` / `sh` / `curSheet` | `group` / `activeGroup` |
+| `cls` / `src_cls` / `dst_cls` | `classId` / `sourceClassId` / `targetClassId` |
+| `tb` | `subject` |
+| `cfg` | `config` |
+| `okey` | 제거 (복합키 불필요) |
+| `fbUrl` / `fbPath` | `dbUrl` / `dbPath` |
+| `curNav` | `activeTab` |
+| `sts` | `students` |
 | PC 직접 진도/과제 입력 UI | v3.0에서 웹 전용으로 전환, PC UI 제거 완료 |
+| `name` (이름 기반 nameKey) | `nameKey` = 출결번호 (불변 고유번호, ClassManager 발부) |

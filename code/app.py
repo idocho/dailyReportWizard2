@@ -66,27 +66,29 @@ class App:
         self.root.minsize(920, 680)
         self.root.resizable(True, True)
 
-        self.cfg       = load_config()
+        self.config    = load_config()
         self.date_str  = today_str()
         # v3.0: 학생 수행도·특이사항은 웹에서 입력 → Firebase 가져오기로만 로드
         self.progress_data, _, _, _ = load_daily_cache()  # 진도/과제 캐시만 복원
         self.student_data = {}   # Firebase input/ 로드 시 채워짐
         self.note_data    = {}   # Firebase input/ 로드 시 채워짐
-        self.force_data   = {}   # (sheet,cls,name) → bool 강제완료 플래그
+        self.force_data   = {}   # (classId, nameKey) → bool 강제완료 플래그
         self.tag_data     = {}   # Firebase obs/ 노드에서 로드하는 수업 관찰 태그
-        self.status_w  = {}   # (sheet,cls,name) → (canvas, oval_id)
-        self.s_btn_map = {}   # (sheet,cls,name) → tk.Button
-        # (sheet,cls) -> bool (True if folded/collapsed)
+        self.all_students = {}   # Firebase students/ 전체 {nameKey: {name, class}}
+        self.all_classes  = {}   # Firebase classes/ 전체 {classId: {group, courses/...}}
+        self.status_w  = {}   # (classId, nameKey) → (canvas, oval_id)
+        self.s_btn_map = {}   # (classId, nameKey) → tk.Button
+        # (group, classId) -> bool (True if folded/collapsed)
         self.cls_fold_state = {}
-        # (sheet,cls) -> frame containing student rows (for show/hide)
+        # (group, classId) -> frame containing student rows (for show/hide)
         self.cls_container = {}
         # 기본: 모든 학급을 접힌 상태로 시작
-        for s, sdata in self.cfg.get('sheets', {}).items():
-            for c in sdata.get('classes', {}).keys():
-                self.cls_fold_state[(s, c)] = True
-        self.cur_sheet = 'M'
-        self.cur_cls   = None
-        self.cur_name  = None
+        for classId in self.all_classes.keys():
+            grp = self.all_classes[classId].get('group', '')
+            self.cls_fold_state[(grp, classId)] = True
+        self.activeGroup = 'M'
+        self.cur_cls   = None   # classId
+        self.cur_name  = None   # nameKey
         self._ai_last_call = 0.0       # 하위 호환용 (AiEngine이 갱신)
         self.ai = AiEngine(self)       # AI 생성 엔진
 
@@ -98,39 +100,43 @@ class App:
         self._switch_sheet('M')
 
         # Firebase 미설정 시 설정 안내
-        if not self.cfg.get('firebase_url') or not self.cfg.get('firebase_path'):
+        if not self.config.get('firebase_url') or not self.config.get('firebase_path'):
             self.root.after(300, self._prompt_first_run)
         else:
-            # 공용 교재/학급 목록은 Firebase config/sheets를 단일 원본으로 사용
+            # 공용 교재/학급 목록은 Firebase students/+classes를 단일 원본으로 사용
             self.root.after(300, self._sync_shared_sheets_from_firebase)
 
     def _sync_shared_sheets_from_firebase(self):
-        """시작 시 Firebase config/ 전체 동기화 — sheets + instructor assignments."""
+        """시작 시 Firebase students/ + classes/ + config/ 동기화."""
         try:
-            config_data = firebase_get(self.cfg, "config") or {}
+            config_data = firebase_get(self.config, "config") or {}
 
-            # 공용 학급 구조
-            if isinstance(config_data.get("sheets"), dict):
-                self.cfg["sheets"] = config_data["sheets"]
+            # 학생 명단 및 학급 구조 (v2.0 스키마)
+            fetched_students = firebase_get(self.config, "students") or {}
+            fetched_classes  = firebase_get(self.config, "classes") or {}
+            if isinstance(fetched_students, dict):
+                self.all_students = fetched_students
+            if isinstance(fetched_classes, dict):
+                self.all_classes = fetched_classes
 
             # 강사 assignments — instructor_id 있으면 Firebase 값으로 덮어쓰기
-            instructor_id = self.cfg.get("instructor_id", "")
+            instructor_id = self.config.get("instructor_id", "")
             if instructor_id:
                 instr = config_data.get("instructors", {}).get(instructor_id)
                 if instr is not None:
                     asgn = instr.get("assignments", [])
                     if isinstance(asgn, list):
-                        self.cfg["instructor_assignments"] = asgn
+                        self.config["instructor_assignments"] = asgn
                     elif isinstance(asgn, dict):
-                        self.cfg["instructor_assignments"] = list(asgn.values())
+                        self.config["instructor_assignments"] = list(asgn.values())
                     else:
-                        self.cfg["instructor_assignments"] = []
+                        self.config["instructor_assignments"] = []
                 else:
                     # Firebase에 강사 없음 → 빈 배열로 강제
-                    self.cfg["instructor_assignments"] = []
+                    self.config["instructor_assignments"] = []
 
-            save_config(self.cfg)
-            self._switch_sheet(self.cur_sheet)
+            save_config(self.config)
+            self._switch_sheet(self.activeGroup)
             return True
         except Exception:
             pass
@@ -223,49 +229,55 @@ class App:
 
     def _refresh_status_dots(self):
         """전체 학생 도트를 캐시 상태에 맞게 일괄 갱신 (_my_classes 범위)"""
-        sheet = self.cur_sheet
-        for cls, cls_data in self._my_classes(sheet):
-            for s in cls_data['students']:
-                self._update_dot(sheet, cls, s['name'])
+        group = self.activeGroup
+        for classId, cls_data in self._my_classes(group):
+            for nameKey in cls_data.get('student_keys', []):
+                self._update_dot(classId, nameKey)
 
-    def _populate_student_list(self, sheet):
+    def _populate_student_list(self, group):
         for w in self.sl_inner.winfo_children():
             w.destroy()
         self.s_btn_map.clear()
 
         # instructor_assignments 기반 담당 반 필터
-        assignments = self.cfg.get("instructor_assignments", [])
-        assigned_cls = {a['cls'] for a in assignments if a.get('sheet') == sheet}
+        assignments = self.config.get("instructor_assignments", [])
+        assigned_cls = {a['cls'] for a in assignments if a.get('sheet') == group}
         # 강사 계정 미설정 시만 전체 표시; 계정 있고 담당 없으면 빈 목록
-        show_all = not self.cfg.get("instructor_id") and not assignments
+        show_all = not self.config.get("instructor_id") and not assignments
 
-        # 부담임 판단용 맵 (sheet|cls → role)
-        asgn_role_map = {(a.get('sheet',''), a.get('cls','')): a.get('role','')
-                         for a in assignments}
+        # 부담임 판단용 맵 (classId → role)
+        asgn_role_map = {a.get('cls', ''): a.get('role', '') for a in assignments}
 
-        for cls, cls_data in self.cfg['sheets'][sheet]['classes'].items():
+        for classId, cls_data in self.all_classes.items():
+            # group 필터
+            if cls_data.get('group') != group:
+                continue
             # 담당 반만 표시
-            if not show_all and cls not in assigned_cls:
+            if not show_all and classId not in assigned_cls:
                 continue
 
-            # 부담임 판단: assignments.role 우선, 없으면 is_sub 폴백
-            role = asgn_role_map.get((sheet, cls), '')
+            # 이 반 소속 학생 nameKey 목록
+            class_student_keys = [k for k, v in self.all_students.items()
+                                   if v.get('class') == classId]
+
+            # 부담임 판단
+            role = asgn_role_map.get(classId, '')
             if role:
                 is_sub = (role == '부담임')
             else:
                 is_sub = cls_data.get('is_sub', False)
 
             # class header with fold/unfold button
-            lbl_text = f"🔒 {cls}" if is_sub else cls
+            lbl_text = f"🔒 {classId}" if is_sub else classId
             lbl_fg   = "#6B7280" if is_sub else "#475569"
             hdr = tk.Frame(self.sl_inner, bg=DARK)
             hdr.pack(fill='x', pady=(8,0))
             # fold toggle button
-            folded = self.cls_fold_state.get((sheet, cls), False)
+            folded = self.cls_fold_state.get((group, classId), False)
             tri = '▸' if folded else '▾'
-            def _make_toggle(sht, cl, hdr_frame):
+            def _make_toggle(grp, cl, hdr_frame):
                 def _toggle():
-                    key = (sht, cl)
+                    key = (grp, cl)
                     cur = self.cls_fold_state.get(key, False)
                     cont = self.cls_container.get(key)
                     if cont:
@@ -279,36 +291,36 @@ class App:
                             cont.pack_forget()
                     self.cls_fold_state[key] = not cur
                     # update triangle text
-                    btn.configure(text=( '▸' if self.cls_fold_state[key] else '▾') + ' ' + lbl_text)
+                    btn.configure(text=('▸' if self.cls_fold_state[key] else '▾') + ' ' + lbl_text)
                 return _toggle
 
             btn = tk.Button(hdr, text=(tri + ' ' + lbl_text), font=FS,
                             bg=DARK, fg=lbl_fg, relief='flat', bd=0,
-                            anchor='w', cursor='hand2', command=_make_toggle(sheet, cls, hdr))
+                            anchor='w', cursor='hand2', command=_make_toggle(group, classId, hdr))
             btn.pack(side='left', padx=10)
 
             # container for student rows
             cont = tk.Frame(self.sl_inner, bg=DARK)
-            key = (sheet, cls)
+            key = (group, classId)
             self.cls_container[key] = cont
             if not folded:
                 cont.pack(fill='x')
 
-            for s in cls_data['students']:
-                name = s['name']
+            for nameKey in class_student_keys:
+                display_name = self.all_students[nameKey].get('name', nameKey)
                 row = tk.Frame(cont, bg=DARK)
                 row.pack(fill='x')
-                sbtn = tk.Button(row, text=name, font=FB,
+                sbtn = tk.Button(row, text=display_name, font=FB,
                                  bg=DARK, fg=GRAY,
                                  relief='flat', bd=0, anchor='w',
                                  cursor='hand2', width=9,
-                                 command=lambda c=cls,n=name: self._select_student(sheet,c,n))
+                                 command=lambda c=classId, nk=nameKey: self._select_student(group, c, nk))
                 sbtn.pack(side='left', padx=(10,0), pady=1)
                 dc = tk.Canvas(row, width=10, height=10, bg=DARK, highlightthickness=0)
                 did = dc.create_oval(2,2,9,9, fill="#374151", outline="")
                 dc.pack(side='right', padx=8)
-                self.s_btn_map[(sheet,cls,name)] = sbtn
-                self.status_w[(sheet,cls,name)] = (dc, did)
+                self.s_btn_map[(classId, nameKey)] = sbtn
+                self.status_w[(classId, nameKey)] = (dc, did)
 
     # ── 중앙 ─────────────────────────────────────────────────────────
     def _build_center(self, parent):
@@ -334,36 +346,38 @@ class App:
         # 스크롤 영역
         self.c_canvas, self.c_inner = make_scroll_frame(f, bg=PANEL)
 
-    def _render_student(self, sheet, cls, name):
+    def _render_student(self, group, classId, nameKey):
         """v3.0 — 읽기 전용 뷰어 (입력 위젯 없음, Firebase 데이터 표시)"""
         for w in self.c_inner.winfo_children():
             w.destroy()
 
-        cls_data  = self.cfg['sheets'][sheet]['classes'][cls]
-        textbooks = cls_data.get('textbooks', [])
-        tb_grade  = cls_data.get('tb_grade', {})
-        room      = get_room(self.cfg, name)
+        cls_data  = self.all_classes.get(classId, {})
+        courses   = cls_data.get('courses', {})
+        subjects  = list(courses.keys())
+        tb_grade  = {subj: courses[subj].get('grade', '') for subj in subjects}
+        display_name = self.all_students.get(nameKey, {}).get('name', nameKey)
+        room      = get_room(self.config, display_name)
 
-        self.c_name.config(text=name)
-        self.c_sub.config(text=f"  {cls}")
+        self.c_name.config(text=display_name)
+        self.c_sub.config(text=f"  {classId}")
         self.c_room.config(text=f"→ {room}")
 
         # ── 강제 완료 토글 버튼 ──
-        force_key = (sheet, cls, name)
+        force_key = (classId, nameKey)
         is_forced = self.force_data.get(force_key, False)
 
         def _toggle_force(fk=force_key):
             self.force_data[fk] = not self.force_data.get(fk, False)
             save_daily_cache(self.progress_data, self.student_data,
                              self.note_data, self.force_data)
-            self._update_dot(sheet, cls, name)
+            self._update_dot(classId, nameKey)
             self._refresh_send_btn()
             self._refresh_statusbar()
-            self._render_student(sheet, cls, name)
+            self._render_student(group, classId, nameKey)
 
         force_btn_frame = tk.Frame(self.c_inner, bg=PANEL)
         force_btn_frame.pack(fill='x', padx=14, pady=(8, 0))
-        if self._is_sub_teacher(sheet, cls):
+        if self._is_sub_teacher(classId):
             # 부담임 반: 강제 완료 비활성화
             force_btn = tk.Button(
                 force_btn_frame, text="⚡ 강제 완료 (부담임 열람만)",
@@ -389,9 +403,9 @@ class App:
 
         # ── 진도/과제 요약 (반 공통, session/class_data에서 로드) ──
         has_progress = any(
-            self.progress_data.get((sheet, cls, tb), {}).get('progress') or
-            self.progress_data.get((sheet, cls, tb), {}).get('homework')
-            for tb in textbooks
+            self.progress_data.get((classId, subject), {}).get('progress') or
+            self.progress_data.get((classId, subject), {}).get('homework')
+            for subject in subjects
         )
         if has_progress:
             pf = tk.LabelFrame(pad, text="  오늘 수업 (반 공통)  ",
@@ -399,11 +413,11 @@ class App:
                                fg="#0F6E56", bg="#F0FDF4", padx=10, pady=8,
                                highlightbackground="#BBF7D0")
             pf.pack(fill='x', pady=(0, 12))
-            for tb in textbooks:
-                pd_val = self.progress_data.get((sheet, cls, tb), {})
+            for subject in subjects:
+                pd_val = self.progress_data.get((classId, subject), {})
                 if pd_val.get('progress') or pd_val.get('homework'):
-                    gs = tb_grade.get(tb, '')
-                    tb_lbl = f"{gs} {tb}".strip() if gs else tb
+                    gs = tb_grade.get(subject, '')
+                    tb_lbl = f"{gs} {subject}".strip() if gs else subject
                     tk.Label(pf, text=tb_lbl, font=("맑은 고딕", 8, "bold"),
                              bg="#F0FDF4", fg=INDIGO).pack(anchor='w', pady=(2,0))
                     if pd_val.get('progress'):
@@ -415,14 +429,14 @@ class App:
                                  font=FS, bg="#F0FDF4", fg=TEXT
                                  ).pack(anchor='w')
 
-        # ── 교재별 과제수행도 (읽기 전용) ──
-        for tb in textbooks:
-            student_key = (sheet, cls, name, tb)
+        # ── 과목별 과제수행도 (읽기 전용) ──
+        for subject in subjects:
+            student_key = (classId, nameKey, subject)
             val      = self.student_data.get(student_key, {}).get('value', '')
             filled   = bool(val.strip())
 
-            gs = tb_grade.get(tb, '')
-            tb_lbl = f"{gs} {tb}".strip() if gs else tb
+            gs = tb_grade.get(subject, '')
+            tb_lbl = f"{gs} {subject}".strip() if gs else subject
             lf = tk.LabelFrame(pad, text=f"  {tb_lbl}  ",
                                font=("맑은 고딕", 9, "bold"),
                                fg=SUBTEXT, bg=PANEL, padx=10, pady=8)
@@ -442,7 +456,7 @@ class App:
                      ).pack(side='left', fill='x', expand=True)
 
         # ── 특이사항 (편집 가능 + AI 생성) ──
-        note_key = (sheet, cls, name)
+        note_key = (classId, nameKey)
         note_val = self.note_data.get(note_key, {}).get('value', '')
         sep = tk.Frame(pad, height=1, bg=BORDER)
         sep.pack(fill='x', pady=(4, 8))
@@ -457,12 +471,12 @@ class App:
         ai_btn.pack(side='right')
 
         # 부담임 과목은 AI생성 비활성화
-        if self._is_sub_teacher(sheet, cls):
+        if self._is_sub_teacher(classId):
             ai_btn.config(state='disabled', text="✨ AI생성 (부담임)",
                           bg="#F1F5F9", fg=GRAY, cursor='arrow')
         else:
             # 쿨다운 잔여 시간에 따라 초기 상태 설정
-            _engine = self.cfg.get('ai_engine_type', 'groq').strip().lower()
+            _engine = self.config.get('ai_engine_type', 'groq').strip().lower()
             _cooldown = AI_COOLDOWN_GROQ if _engine == 'groq' else AI_COOLDOWN_PAID
             _rem = max(0, _cooldown - (time.time() - self._ai_last_call))
             if _rem > 0:
@@ -470,7 +484,7 @@ class App:
                 self._start_cooldown_tick(ai_btn)
 
         # Text 위젯 — 담임: 편집 가능 / 부담임: 읽기 전용
-        is_sub = self._is_sub_teacher(sheet, cls)
+        is_sub = self._is_sub_teacher(classId)
         import sys as _sys
         _note_font = ("Segoe UI Emoji", 9) if _sys.platform == "win32" else FE
         note_txt = tk.Text(pad, font=_note_font, bg="#F8FAFC", fg=TEXT,
@@ -513,7 +527,7 @@ class App:
             note_txt.bind('<Shift-Return>', _on_shift_return)
 
         ai_btn.config(command=lambda: self._gen_ai_note(
-            sheet, cls, name, textbooks, note_txt, ai_btn, tb_grade=tb_grade))
+            group, classId, nameKey, subjects, note_txt, ai_btn, tb_grade=tb_grade))
 
         self.c_canvas.yview_moveto(0)
         self._update_preview()
@@ -624,7 +638,7 @@ class App:
         # v3.0: _save_values() 제거 — 입력 위젯 없음, Firebase에서만 로드
         self._update_preview()
         if self.cur_name:
-            self._update_dot(self.cur_sheet, self.cur_cls, self.cur_name)
+            self._update_dot(self.cur_cls, self.cur_name)
         self._refresh_send_btn()
         self._refresh_statusbar()
 
@@ -633,18 +647,20 @@ class App:
         pass
 
     def _update_preview(self):
-        s, c, n = self.cur_sheet, self.cur_cls, self.cur_name
-        if not n: return
-        cls_data  = self.cfg['sheets'][s]['classes'][c]
-        textbooks = cls_data.get('textbooks', [])
-        tb_grade  = cls_data.get('tb_grade', {})
-        room      = get_room(self.cfg, n)
-        class_info = {tb: self.progress_data.get((s,c,tb), {'progress':'','homework':''})
-                      for tb in textbooks}
-        assign_map = {tb: self.student_data.get((s,c,n,tb),{}).get('value','')
-                      for tb in textbooks}
-        note = self.note_data.get((s,c,n),{}).get('value','')
-        msg  = build_message(self.date_str, class_info, n, assign_map, note, tb_grade=tb_grade)
+        group, classId, nameKey = self.activeGroup, self.cur_cls, self.cur_name
+        if not nameKey: return
+        cls_data  = self.all_classes.get(classId, {})
+        courses   = cls_data.get('courses', {})
+        subjects  = list(courses.keys())
+        tb_grade  = {subj: courses[subj].get('grade', '') for subj in subjects}
+        display_name = self.all_students.get(nameKey, {}).get('name', nameKey)
+        room      = get_room(self.config, display_name)
+        class_info = {subj: self.progress_data.get((classId, subj), {'progress':'','homework':''})
+                      for subj in subjects}
+        assign_map = {subj: self.student_data.get((classId, nameKey, subj), {}).get('value','')
+                      for subj in subjects}
+        note = self.note_data.get((classId, nameKey), {}).get('value','')
+        msg  = build_message(self.date_str, class_info, display_name, assign_map, note, tb_grade=tb_grade)
         self.to_lbl.config(text=f"→  {room}")
         self.preview.config(state='normal')
         self.preview.delete('1.0','end')
@@ -652,93 +668,101 @@ class App:
         self.preview.config(state='disabled')
         self.char_lbl.config(text=f"{len(msg)}자")
 
-    def _is_sub_teacher(self, sheet, cls):
-        """현재 강사가 해당 cls에서 부담임인지 확인"""
-        for a in self.cfg.get("instructor_assignments", []):
-            if a.get('sheet') == sheet and a.get('cls') == cls:
+    def _is_sub_teacher(self, classId):
+        """현재 강사가 해당 classId에서 부담임인지 확인"""
+        for a in self.config.get("instructor_assignments", []):
+            if a.get('cls') == classId:
                 return a.get('role') == '부담임'
         return False
 
-    def _my_classes(self, sheet) -> list:
-        """내 담당 반만 반환 → [(cls, cls_data), ...] 튜플 리스트
+    def _my_classes(self, group) -> list:
+        """내 담당 반만 반환 → [(classId, cls_data), ...] 튜플 리스트
         - instructor_id 미설정 + assignments 없음: 전체 반 (show_all)
         - instructor_id 설정 + assignments 없음: 빈 목록
-        - assignments 있음: 해당 sheet의 담당 반만
+        - assignments 있음: 해당 group의 담당 반만
         모든 학생 관련 연산(상태바·이동·전송·초기화·AI)에 일관 적용.
         """
-        assignments = self.cfg.get("instructor_assignments", [])
-        all_classes = self.cfg['sheets'].get(sheet, {}).get('classes', {})
+        assignments = self.config.get("instructor_assignments", [])
+        group_classes = {cid: cd for cid, cd in self.all_classes.items()
+                         if cd.get('group') == group}
         if not assignments:
-            if not self.cfg.get("instructor_id"):
-                return list(all_classes.items())  # 계정 미설정 → 전체 표시
+            if not self.config.get("instructor_id"):
+                return list(group_classes.items())  # 계정 미설정 → 전체 표시
             return []  # 계정 있고 담당 없음 → 빈 목록
-        assigned_cls = {a['cls'] for a in assignments if a.get('sheet') == sheet}
-        return [(cls, cd) for cls, cd in all_classes.items() if cls in assigned_cls]
+        assigned_cls = {a['cls'] for a in assignments if a.get('sheet') == group}
+        return [(cid, cd) for cid, cd in group_classes.items() if cid in assigned_cls]
 
-    def _student_status(self, sheet, cls, name):
+    def _student_status(self, classId, nameKey):
         # 강제 완료 플래그 우선
-        if self.force_data.get((sheet, cls, name)):
+        if self.force_data.get((classId, nameKey)):
             return STATUS_READY
-        tbs    = self.cfg['sheets'][sheet]['classes'][cls].get('textbooks', [])
-        filled = sum(1 for tb in tbs
-                     if self.student_data.get((sheet,cls,name,tb),{}).get('value',''))
-        if filled == 0:         return STATUS_EMPTY
-        if filled < len(tbs):   return STATUS_PARTIAL
+        courses  = self.all_classes.get(classId, {}).get('courses', {})
+        subjects = list(courses.keys())
+        filled = sum(1 for subj in subjects
+                     if self.student_data.get((classId, nameKey, subj), {}).get('value', ''))
+        if filled == 0:             return STATUS_EMPTY
+        if filled < len(subjects):  return STATUS_PARTIAL
         # 과제수행도 완료 → 반 공통 진도/과제도 하나 이상 있어야 READY
         has_progress = any(
-            self.progress_data.get((sheet, cls, tb), {}).get('progress', '') or
-            self.progress_data.get((sheet, cls, tb), {}).get('homework', '')
-            for tb in tbs
+            self.progress_data.get((classId, subj), {}).get('progress', '') or
+            self.progress_data.get((classId, subj), {}).get('homework', '')
+            for subj in subjects
         )
         return STATUS_READY if has_progress else STATUS_PARTIAL
 
-    def _update_dot(self, sheet, cls, name):
-        st = self._student_status(sheet, cls, name)
-        pair = self.status_w.get((sheet, cls, name))
+    def _update_dot(self, classId, nameKey):
+        st = self._student_status(classId, nameKey)
+        pair = self.status_w.get((classId, nameKey))
         if pair:
             pair[0].itemconfig(pair[1], fill=DOT_COLOR[st])
 
-    def _collect_ready(self, sheet):
+    def _collect_ready(self, group):
         """
         전송 준비 완료 학생만 수집
         ─ 조건: STATUS_READY (과제수행도 완료 + 진도/과제 입력)
         ─ _my_classes() 화이트리스트 + _is_sub_teacher() 부담임 제외 일관 적용
         """
         result = []
-        for cls, cls_data in self._my_classes(sheet):
-            if self._is_sub_teacher(sheet, cls):
+        for classId, cls_data in self._my_classes(group):
+            if self._is_sub_teacher(classId):
                 continue
-            textbooks  = cls_data.get('textbooks', [])
-            tb_grade   = cls_data.get('tb_grade', {})
-            class_info = {tb: self.progress_data.get((sheet,cls,tb), {'progress':'','homework':''})
-                          for tb in textbooks}
-            for s in cls_data['students']:
-                name = s['name']
-                if self._student_status(sheet, cls, name) != STATUS_READY:
+            courses    = cls_data.get('courses', {})
+            subjects   = list(courses.keys())
+            tb_grade   = {subj: courses[subj].get('grade', '') for subj in subjects}
+            class_info = {subj: self.progress_data.get((classId, subj), {'progress':'','homework':''})
+                          for subj in subjects}
+            class_student_keys = [k for k, v in self.all_students.items()
+                                   if v.get('class') == classId]
+            for nameKey in class_student_keys:
+                if self._student_status(classId, nameKey) != STATUS_READY:
                     continue
-                assign_map = {tb: self.student_data.get((sheet,cls,name,tb),{}).get('value','')
-                              for tb in textbooks}
-                note = self.note_data.get((sheet,cls,name),{}).get('value','')
-                msg  = build_message(self.date_str, class_info, name, assign_map, note, tb_grade=tb_grade)
-                result.append({'name': name, 'room': get_room(self.cfg, name), 'msg': msg})
+                display_name = self.all_students[nameKey].get('name', nameKey)
+                assign_map = {subj: self.student_data.get((classId, nameKey, subj), {}).get('value','')
+                              for subj in subjects}
+                note = self.note_data.get((classId, nameKey), {}).get('value','')
+                msg  = build_message(self.date_str, class_info, display_name, assign_map, note, tb_grade=tb_grade)
+                result.append({'name': display_name, 'room': get_room(self.config, display_name), 'msg': msg})
         return result
 
     def _refresh_send_btn(self):
-        n = len(self._collect_ready(self.cur_sheet))
+        n = len(self._collect_ready(self.activeGroup))
         self.send_btn.config(
             text=f"🚀  카카오톡 전송 ({n}명)",
             bg=ACCENT if n>0 else "#E2E8F0",
             fg="#1A1D2E" if n>0 else GRAY)
 
     def _refresh_statusbar(self):
-        sheet = self.cur_sheet
+        group = self.activeGroup
         done, part, empty = [], [], []
-        for cls, cls_data in self._my_classes(sheet):
-            for s in cls_data['students']:
-                st = self._student_status(sheet, cls, s['name'])
-                if st == STATUS_READY:     done.append(s['name'])
-                elif st == STATUS_PARTIAL: part.append(s['name'])
-                else:                     empty.append(s['name'])
+        for classId, cls_data in self._my_classes(group):
+            class_student_keys = [k for k, v in self.all_students.items()
+                                   if v.get('class') == classId]
+            for nameKey in class_student_keys:
+                display_name = self.all_students[nameKey].get('name', nameKey)
+                st = self._student_status(classId, nameKey)
+                if st == STATUS_READY:     done.append(display_name)
+                elif st == STATUS_PARTIAL: part.append(display_name)
+                else:                     empty.append(display_name)
         parts = []
         if done:  parts.append(f"완료 {len(done)}명")
         if part:  parts.append(f"진행중 {len(part)}명")
@@ -752,47 +776,48 @@ class App:
         self._status_tooltip_text = "\n".join(tip_lines)
 
     # ── 학생 이동 ────────────────────────────────────────────────────
-    def _student_list_flat(self, sheet):
+    def _student_list_flat(self, group):
         """◀/▶ 이동용 학생 목록 — _my_classes() 범위만 포함"""
         result = []
-        for cls, cd in self._my_classes(sheet):
-            for s in cd['students']:
-                result.append((cls, s['name']))
+        for classId, cd in self._my_classes(group):
+            for nameKey in [k for k, v in self.all_students.items()
+                            if v.get('class') == classId]:
+                result.append((classId, nameKey))
         return result
 
-    def _select_student(self, sheet, cls, name):
+    def _select_student(self, group, classId, nameKey):
         if self.cur_name:
-            old = self.s_btn_map.get((self.cur_sheet, self.cur_cls, self.cur_name))
+            old = self.s_btn_map.get((self.cur_cls, self.cur_name))
             if old: old.config(bg=DARK, fg=GRAY)
-        self.cur_sheet, self.cur_cls, self.cur_name = sheet, cls, name
-        btn = self.s_btn_map.get((sheet, cls, name))
+        self.activeGroup, self.cur_cls, self.cur_name = group, classId, nameKey
+        btn = self.s_btn_map.get((classId, nameKey))
         if btn: btn.config(bg=INDIGO, fg='white')
-        self._render_student(sheet, cls, name)
+        self._render_student(group, classId, nameKey)
 
     def _prev_student(self):
-        lst = self._student_list_flat(self.cur_sheet)
+        lst = self._student_list_flat(self.activeGroup)
         cur = (self.cur_cls, self.cur_name)
         if cur in lst:
             i = lst.index(cur)
             if i > 0:
-                c, n = lst[i-1]
-                self._select_student(self.cur_sheet, c, n)
+                c, nk = lst[i-1]
+                self._select_student(self.activeGroup, c, nk)
 
     def _next_student(self):
-        lst = self._student_list_flat(self.cur_sheet)
+        lst = self._student_list_flat(self.activeGroup)
         cur = (self.cur_cls, self.cur_name)
         if cur in lst:
             i = lst.index(cur)
             if i < len(lst)-1:
-                c, n = lst[i+1]
-                self._select_student(self.cur_sheet, c, n)
+                c, nk = lst[i+1]
+                self._select_student(self.activeGroup, c, nk)
 
 
     # ── 시트 전환 ────────────────────────────────────────────────────
     def _refresh_student_view(self):
         """프리셋 변경 후 현재 학생 입력 화면 즉시 갱신"""
-        if self.cur_sheet and self.cur_cls and self.cur_name:
-            self._render_student(self.cur_sheet, self.cur_cls, self.cur_name)
+        if self.activeGroup and self.cur_cls and self.cur_name:
+            self._render_student(self.activeGroup, self.cur_cls, self.cur_name)
 
     def _open_reset_dialog(self):
         """🗑 초기화 선택 다이얼로그"""
@@ -810,7 +835,7 @@ class App:
                   font=FS, bg="#FEF2F2", fg="#EF4444", relief='flat',
                   cursor='hand2', pady=7,
                   command=lambda: [
-                      self._reset_class_data(self.cur_sheet, self.cur_cls),
+                      self._reset_class_data(self.activeGroup, self.cur_cls),
                       win.destroy()]
                   ).pack(fill='x', padx=16, pady=2)
 
@@ -825,28 +850,29 @@ class App:
                   command=win.destroy
                   ).pack(fill='x', padx=16, pady=(2, 16))
 
-    def _reset_class_data(self, sheet=None, cls=None):
+    def _reset_class_data(self, group=None, classId=None):
         """반별 학생 입력 데이터 로컬 초기화 (과제수행도·특이사항) — DB 쓰기 없음"""
-        s = sheet or self.cur_sheet
-        c = cls   or self.cur_cls
-        if not c: return
-        students = self.cfg['sheets'][s]['classes'].get(c, {}).get('students', [])
-        tbs      = self.cfg['sheets'][s]['classes'].get(c, {}).get('textbooks', [])
+        grp = group   or self.activeGroup
+        cid = classId or self.cur_cls
+        if not cid: return
+        cls_student_keys = [k for k, v in self.all_students.items()
+                             if v.get('class') == cid]
+        courses  = self.all_classes.get(cid, {}).get('courses', {})
+        subjects = list(courses.keys())
 
-        for st in students:
-            name = st['name']
-            for tb in tbs:
-                key = (s, c, name, tb)
+        for nameKey in cls_student_keys:
+            for subject in subjects:
+                key = (cid, nameKey, subject)
                 if key in self.student_data:
                     self.student_data[key] = {'value': ''}
-            note_key = (s, c, name)
+            note_key = (cid, nameKey)
             if note_key in self.note_data:
                 self.note_data[note_key] = {'value': ''}
 
         save_daily_cache(self.progress_data, self.student_data, self.note_data, self.force_data)
 
         if self.cur_name:
-            self._render_student(s, c, self.cur_name)
+            self._render_student(grp, cid, self.cur_name)
         self._refresh_status_dots()
         self._refresh_send_btn()
         self._refresh_statusbar()
@@ -860,15 +886,15 @@ class App:
         save_daily_cache(self.progress_data, {}, {}, {})
 
         if self.cur_name:
-            self._render_student(self.cur_sheet, self.cur_cls, self.cur_name)
+            self._render_student(self.activeGroup, self.cur_cls, self.cur_name)
         self._refresh_status_dots()
         self._refresh_send_btn()
         self._refresh_statusbar()
 
     def _pull_mobile_data(self):
-        """📥 데이터 가져오기 — Firebase input/ + session/class_data 전체 로드 (v3.0)"""
-        url  = self.cfg.get('firebase_url', '')
-        path = self.cfg.get('firebase_path', '')
+        """📥 데이터 가져오기 — Firebase input/ + session/class_data 전체 로드 (v2.0)"""
+        url  = self.config.get('firebase_url', '')
+        path = self.config.get('firebase_path', '')
         if not url or not path:
             messagebox.showwarning("Firebase 미설정",
                 "설정에서 Firebase URL과 경로를 입력해 주세요.")
@@ -881,39 +907,40 @@ class App:
             self.progress_data.clear()
             self.force_data.clear()
 
-            # ── 0. config/ (sheets + presets + 강사 데이터) ──
-            config_data = firebase_get(self.cfg, "config") or {}
+            # ── 0. config/ + students/ + classes/ 동기화 ──
+            config_data = firebase_get(self.config, "config") or {}
             self._sync_shared_sheets_from_firebase()
 
             # 강사별 presets + assignments 우선, 없으면 전역 presets 사용
-            instructor_id = self.cfg.get('instructor_id', '')
+            instructor_id = self.config.get('instructor_id', '')
             if instructor_id and config_data.get("instructors", {}).get(instructor_id):
                 instr_data = config_data["instructors"][instructor_id]
                 if instr_data.get("presets"):
-                    self.cfg["presets"] = {"과제수행도": instr_data["presets"]}
+                    self.config["presets"] = {"과제수행도": instr_data["presets"]}
                 # assignments 저장 → 담당 반 필터링·부담임 판단에 사용
-                self.cfg["instructor_assignments"] = instr_data.get("assignments", [])
+                self.config["instructor_assignments"] = instr_data.get("assignments", [])
                 instr_name = instr_data.get("name", instructor_id)
             elif config_data.get("presets"):
-                self.cfg["presets"] = config_data["presets"]
-                self.cfg["instructor_assignments"] = []
+                self.config["presets"] = config_data["presets"]
+                self.config["instructor_assignments"] = []
                 instr_name = ""
             else:
-                self.cfg["instructor_assignments"] = []
+                self.config["instructor_assignments"] = []
                 instr_name = ""
 
-            save_config(self.cfg)
+            save_config(self.config)
             # 학생 목록 갱신 — after() 금지 (이벤트 루프 재진입 TclError 방지)
-            self._switch_sheet(self.cur_sheet)
+            self._switch_sheet(self.activeGroup)
 
             # ── 1. 학생별 수행도·특이사항 (input/ 노드) ──
-            input_data = firebase_get(self.cfg, "input") or {}
+            # 구조: {nameKey: {subject: {assign, note}}}
+            input_data = firebase_get(self.config, "input") or {}
 
             # ── 2. 반 공통 진도/과제 (session/class_data) ──
-            session_raw = firebase_get(self.cfg, "session")
+            session_raw = firebase_get(self.config, "session")
             if session_raw is None:
                 # session 노드 자체 없음 → lastSent 폴백
-                last_raw   = firebase_get(self.cfg, "lastSent") or {}
+                last_raw   = firebase_get(self.config, "lastSent") or {}
                 class_data = last_raw.get("class_data", {})
                 date_str   = last_raw.get("date", "")
             else:
@@ -923,7 +950,8 @@ class App:
                 date_str    = session_raw.get("date", "")
 
             # ── 3. 수업 관찰 태그 (obs/ 노드, v2.0 신규) ──
-            tag_raw = fetch_tags(self.cfg)
+            # 구조: {nameKey: {subject: {date: {...}}}}
+            tag_raw = fetch_tags(self.config)
             if tag_raw:
                 self.tag_data.update(tag_raw)
 
@@ -936,44 +964,47 @@ class App:
             self._import_mobile_data(input_data)
 
             # ── obs/ assign_grade + assign_tags → student_data 매핑 (v2.0) ──
-            # 웹 앱이 assign_grade/assign_tags를 obs/{sh}|{cls}|{name}|{tb}/{date} 에 저장
+            # 웹 앱이 assign_grade/assign_tags를 obs/{nameKey}/{subject}/{date} 에 저장
             _today = today_key()
-            for _okey, _date_map in self.tag_data.items():
-                if not isinstance(_date_map, dict):
+            for _nameKey, _subject_map in self.tag_data.items():
+                if not isinstance(_subject_map, dict):
                     continue
-                _oparts = _okey.split('|', 3)   # sheet|cls|name|tb
-                if len(_oparts) != 4:
+                # 이 nameKey 가 속한 classId 조회
+                _classId = self.all_students.get(_nameKey, {}).get('class', '')
+                if not _classId:
                     continue
-                _sh, _cls, _name, _tb = _oparts
-                _day = _date_map.get(_today, {})
-                if not isinstance(_day, dict):
-                    continue
+                for _subject, _date_map in _subject_map.items():
+                    if not isinstance(_date_map, dict):
+                        continue
+                    _day = _date_map.get(_today, {})
+                    if not isinstance(_day, dict):
+                        continue
 
-                # assign_grade → 라벨
-                _gk = _day.get('assign_grade', '')
-                _grade_lbl = ASSIGN_GRADE_LABELS.get(_gk, '') if _gk else ''
+                    # assign_grade → 라벨
+                    _gk = _day.get('assign_grade', '')
+                    _grade_lbl = ASSIGN_GRADE_LABELS.get(_gk, '') if _gk else ''
 
-                # assign_tags (복수선택 프리셋 — Firebase 배열/객체 모두 대응)
-                _raw_tags = _day.get('assign_tags') or []
-                if isinstance(_raw_tags, dict):
-                    _raw_tags = [v for _, v in sorted(_raw_tags.items())]
-                _tag_lbls = [str(t) for t in _raw_tags if t]
+                    # assign_tags (복수선택 프리셋 — Firebase 배열/객체 모두 대응)
+                    _raw_tags = _day.get('assign_tags') or []
+                    if isinstance(_raw_tags, dict):
+                        _raw_tags = [v for _, v in sorted(_raw_tags.items())]
+                    _tag_lbls = [str(t) for t in _raw_tags if t]
 
-                # 결합: "대부분 수행 / 교재 미지참 / 오답 풀이 안함"
-                _combined = ' / '.join(p for p in [_grade_lbl] + _tag_lbls if p)
-                if not _combined:
-                    continue
+                    # 결합: "대부분 수행 / 교재 미지참 / 오답 풀이 안함"
+                    _combined = ' / '.join(p for p in [_grade_lbl] + _tag_lbls if p)
+                    if not _combined:
+                        continue
 
-                self.student_data[(_sh, _cls, _name, _tb)] = {'value': _combined}
+                    self.student_data[(_classId, _nameKey, _subject)] = {'value': _combined}
 
             # ── session/class_data → progress_data (항상 덮어쓰기) ──
             applied_prog = 0
             for key_str, v in class_data.items():
                 parts = key_str.split('|')
-                if len(parts) != 3:
+                if len(parts) != 2:
                     continue
-                sheet, cls, tb = parts
-                tk_key = (sheet, cls, tb)
+                classId, subject = parts
+                tk_key = (classId, subject)
                 prog = v.get('progress', '') if isinstance(v, dict) else ''
                 hw   = v.get('homework',  '') if isinstance(v, dict) else ''
                 self.progress_data[tk_key] = {'progress': prog, 'homework': hw}
@@ -984,7 +1015,7 @@ class App:
             self._refresh_send_btn()
             self._refresh_statusbar()
             if self.cur_name:
-                self._render_student(self.cur_sheet, self.cur_cls, self.cur_name)
+                self._render_student(self.activeGroup, self.cur_cls, self.cur_name)
 
             date_info = f"  ({date_str} 기준)" if date_str else ""
             messagebox.showinfo("가져오기 완료",
@@ -995,59 +1026,55 @@ class App:
             messagebox.showerror("오류", f"가져오기 실패:\n{e}")
 
     def _import_mobile_data(self, data):
-        """Firebase input/ 노드에서 학생 데이터 반영
-        progress/homework managed via session/ node — skip here
+        """Firebase input/ 노드에서 학생 데이터 반영 (v2.0 스키마)
+        구조: {nameKey: {subject: {assign, note}}}
         · 과제수행도: 항상 웹 데이터로 교체
         · 메모/특이사항: 항상 웹 데이터로 교체
         """
         if not data:
             return
 
-        for key_str, v in data.items():
-            parts = key_str.split('|')
-
-            # 진도/과제 키 → 무시 (session/ 노드로 별도 관리)
-            if parts[0] in ('progress', 'homework'):
+        for nameKey, subjects in data.items():
+            if not isinstance(subjects, dict):
                 continue
-
-            # 메모/특이사항 — 항상 웹 데이터로 교체
-            if len(parts) == 4 and parts[3] == '__note__':
-                sheet, cls, name, _ = parts
-                note_key = (sheet, cls, name)
-                if isinstance(v, dict):
-                    val = v.get('note', '')
-                elif v is None:
-                    val = ''
-                else:
-                    val = str(v)
-                self.note_data[note_key] = {'value': val}
-
-            # 과제수행도 — 항상 교체
-            elif len(parts) == 4:
-                sheet, cls, name, tb = parts
-                student_key = (sheet, cls, name, tb)
-                val = v.get('assign', '') if isinstance(v, dict) else str(v)
-                self.student_data[student_key] = {'value': val}
+            # 이 nameKey 가 속한 classId 조회
+            classId = self.all_students.get(nameKey, {}).get('class', '')
+            if not classId:
+                continue
+            for subject, payload in subjects.items():
+                if not isinstance(payload, dict):
+                    continue
+                # 과제수행도
+                assign_val = payload.get('assign', '')
+                student_key = (classId, nameKey, subject)
+                self.student_data[student_key] = {'value': assign_val}
+                # 메모/특이사항
+                note_val = payload.get('note', '')
+                if note_val:
+                    note_key = (classId, nameKey)
+                    self.note_data[note_key] = {'value': note_val}
 
         save_daily_cache(self.progress_data, self.student_data, self.note_data, self.force_data)
         if self.cur_name:
-            self._render_student(self.cur_sheet, self.cur_cls, self.cur_name)
+            self._render_student(self.activeGroup, self.cur_cls, self.cur_name)
         self._refresh_send_btn()
         self._refresh_statusbar()
 
 
-    def _switch_sheet(self, sheet):
+    def _switch_sheet(self, group):
         self._save_values()
-        self.cur_sheet = sheet
+        self.activeGroup = group
         self.cur_cls = self.cur_name = None
-        self._populate_student_list(sheet)
+        self._populate_student_list(group)
         for s, b in self.sheet_btns.items():
-            b.config(bg=PANEL if s==sheet else "#E2E8F0",
-                     fg=TEXT  if s==sheet else SUBTEXT)
+            b.config(bg=PANEL if s==group else "#E2E8F0",
+                     fg=TEXT  if s==group else SUBTEXT)
         # 첫 학생 선택 (_my_classes 범위 내에서)
-        for cls, cd in self._my_classes(sheet):
-            if cd['students']:
-                self._select_student(sheet, cls, cd['students'][0]['name'])
+        for classId, cd in self._my_classes(group):
+            first_keys = [k for k, v in self.all_students.items()
+                          if v.get('class') == classId]
+            if first_keys:
+                self._select_student(group, classId, first_keys[0])
                 break
         self._refresh_status_dots()
         self._refresh_send_btn()
@@ -1115,11 +1142,11 @@ class App:
         delay_grid.columnconfigure(1, weight=1)
 
         tk.Label(delay_grid, text="대기 시간(초)", font=FS, bg=BG, fg=SUBTEXT).grid(row=0, column=0, sticky='w', pady=3, padx=(0,8))
-        wait_var = tk.StringVar(value=str(self.cfg.get('wait_time', 0.5)))
+        wait_var = tk.StringVar(value=str(self.config.get('wait_time', 0.5)))
         tk.Entry(delay_grid, textvariable=wait_var, font=FS, relief='solid', bd=1).grid(row=0, column=1, sticky='ew', ipady=3)
 
         tk.Label(delay_grid, text="카톡 접두사", font=FS, bg=BG, fg=SUBTEXT).grid(row=1, column=0, sticky='w', pady=3, padx=(0,8))
-        prefix_var = tk.StringVar(value=self.cfg.get('room_prefix', '오직 '))
+        prefix_var = tk.StringVar(value=self.config.get('room_prefix', '오직 '))
         tk.Entry(delay_grid, textvariable=prefix_var, font=FS, relief='solid', bd=1).grid(row=1, column=1, sticky='ew', ipady=3)
 
         # ── ② Firebase Database 연결 설정 ───────────────────
@@ -1131,11 +1158,11 @@ class App:
         fb_grid.columnconfigure(1, weight=1)
 
         tk.Label(fb_grid, text="DB URL", font=FS, bg=BG, fg=SUBTEXT).grid(row=0, column=0, sticky='w', pady=3, padx=(0,8))
-        fb_url_var = tk.StringVar(value=self.cfg.get('firebase_url', ''))
+        fb_url_var = tk.StringVar(value=self.config.get('firebase_url', ''))
         tk.Entry(fb_grid, textvariable=fb_url_var, font=FS, relief='solid', bd=1).grid(row=0, column=1, sticky='ew', ipady=3)
 
         tk.Label(fb_grid, text="DB 경로", font=FS, bg=BG, fg=SUBTEXT).grid(row=1, column=0, sticky='w', pady=3, padx=(0,8))
-        fb_path_var = tk.StringVar(value=self.cfg.get('firebase_path', ''))
+        fb_path_var = tk.StringVar(value=self.config.get('firebase_path', ''))
         tk.Entry(fb_grid, textvariable=fb_path_var, font=FS, relief='solid', bd=1).grid(row=1, column=1, sticky='ew', ipady=3)
 
         def _test_connection():
@@ -1164,7 +1191,7 @@ class App:
         self._settings_section(inner, "내 강사 계정")
         tk.Label(inner, text="강사 이름을 입력하고 조회하세요. 등록된 계정이 없으면 신규 등록합니다.", font=FS, bg=BG, fg=SUBTEXT, wraplength=460).pack(anchor='w', padx=16, pady=(0,6))
 
-        cur_name = self.cfg.get('instructor_id', '')
+        cur_name = self.config.get('instructor_id', '')
         cur_lbl = tk.Label(inner, text=f"현재 계정: {cur_name or '(없음)'}", font=FB, bg=BG, fg=INDIGO if cur_name else GRAY, anchor='w')
         cur_lbl.pack(fill='x', padx=16, pady=(0,4))
 
@@ -1186,32 +1213,32 @@ class App:
             if not url or not path:
                 messagebox.showwarning("알림", "Firebase URL과 경로를 먼저 입력하세요.", parent=win)
                 return
-            self.cfg['firebase_url'] = url
-            self.cfg['firebase_path'] = path
+            self.config['firebase_url'] = url
+            self.config['firebase_path'] = path
             status_lbl.config(text="조회 중...", fg=GRAY)
             lookup_btn.config(state='disabled')
 
             def _fetch():
                 try:
                     from firebase import firebase_get, firebase_put
-                    data = firebase_get(self.cfg, f"config/instructors/{name}")
+                    data = firebase_get(self.config, f"config/instructors/{name}")
                     is_new = not data
                     if is_new:
-                        firebase_put(self.cfg, f"config/instructors/{name}", {"assignments": [], "presets": []})
+                        firebase_put(self.config, f"config/instructors/{name}", {"assignments": [], "presets": []})
 
-                    self.cfg['instructor_id'] = name
+                    self.config['instructor_id'] = name
                     self._sync_shared_sheets_from_firebase()
 
                     if is_new:
                         # 신규 강사: assignments 없음 → 전체 학생 노출 방지
-                        self.cfg['instructor_assignments'] = []
+                        self.config['instructor_assignments'] = []
                         win.after(0, lambda: messagebox.showinfo(
                             "안내",
                             f"신규 강사 계정 [{name}]을 등록했습니다.\n웹에서 담당 수업을 배정하세요.",
                             parent=win))
                     else:
                         asgn = data.get("assignments", [])
-                        self.cfg['instructor_assignments'] = asgn if isinstance(asgn, list) else []
+                        self.config['instructor_assignments'] = asgn if isinstance(asgn, list) else []
                     
                     win.after(0, lambda: [
                         cur_lbl.config(text=f"현재 계정: {name}", fg=INDIGO),
@@ -1235,21 +1262,21 @@ class App:
         def _fetch_class_data():
             url = fb_url_var.get().strip()
             path = fb_path_var.get().strip()
-            if not url or not path or not self.cfg.get('instructor_id'):
+            if not url or not path or not self.config.get('instructor_id'):
                 messagebox.showwarning("알림", "강사 계정 조회를 먼저 완료해 주세요.", parent=win)
                 return
             try:
                 from firebase import firebase_get
                 self._sync_shared_sheets_from_firebase()
-                asgn = firebase_get(self.cfg, f"config/instructors/{self.cfg['instructor_id']}/assignments")
+                asgn = firebase_get(self.config, f"config/instructors/{self.config['instructor_id']}/assignments")
                 if isinstance(asgn, list):
-                    self.cfg['instructor_assignments'] = asgn
+                    self.config['instructor_assignments'] = asgn
                 elif isinstance(asgn, dict):
-                    self.cfg['instructor_assignments'] = list(asgn.values())
+                    self.config['instructor_assignments'] = list(asgn.values())
                 else:
-                    self.cfg['instructor_assignments'] = []
-                save_config(self.cfg)
-                self._switch_sheet(self.cur_sheet)
+                    self.config['instructor_assignments'] = []
+                save_config(self.config)
+                self._switch_sheet(self.activeGroup)
                 messagebox.showinfo("성공", "Firebase로부터 학급 명단 동기화 완료!", parent=win)
             except Exception as e:
                 messagebox.showerror("오류", f"명단 가져오기 실패:\n{e}", parent=win)
@@ -1268,7 +1295,7 @@ class App:
 
         # 깔끔하게 groq, openai, claude 3가지 항목만 선택하는 드롭다운
         tk.Label(ai_grid, text="AI 엔진 종류", font=FS, bg=BG, fg=SUBTEXT).grid(row=0, column=0, sticky='w', pady=6, padx=(0,8))
-        engine_var = tk.StringVar(value=self.cfg.get('ai_engine_type', 'groq'))
+        engine_var = tk.StringVar(value=self.config.get('ai_engine_type', 'groq'))
         cmb_engine = ttk.Combobox(ai_grid, textvariable=engine_var, state="readonly", font=FS)
         cmb_engine['values'] = ('groq', 'openai', 'claude')
         cmb_engine.grid(row=0, column=1, sticky='ew', pady=6)
@@ -1277,9 +1304,9 @@ class App:
         tk.Label(ai_grid, text="API Key", font=FS, bg=BG, fg=SUBTEXT).grid(row=1, column=0, sticky='w', pady=3, padx=(0,8))
         
         def _key_for_engine(eng):
-            k = self.cfg.get(f'{eng}_api_key', '').strip()
+            k = self.config.get(f'{eng}_api_key', '').strip()
             if not k:
-                k = self.cfg.get('ai_api_key', '').strip()
+                k = self.config.get('ai_api_key', '').strip()
             return k
 
         default_key = _key_for_engine(engine_var.get())
@@ -1301,25 +1328,25 @@ class App:
         def _save_all():
             try:
                 try:
-                    self.cfg['wait_time'] = float(wait_var.get().strip())
+                    self.config['wait_time'] = float(wait_var.get().strip())
                 except ValueError:
-                    self.cfg['wait_time'] = 0.5
-                self.cfg['room_prefix'] = prefix_var.get().strip()
+                    self.config['wait_time'] = 0.5
+                self.config['room_prefix'] = prefix_var.get().strip()
 
-                self.cfg['firebase_url'] = fb_url_var.get().strip()
-                self.cfg['firebase_path'] = fb_path_var.get().strip()
+                self.config['firebase_url'] = fb_url_var.get().strip()
+                self.config['firebase_path'] = fb_path_var.get().strip()
 
                 # 엔진 다중화 세팅 주입
                 chosen_engine = engine_var.get().strip().lower()
                 chosen_key = ai_key_var.get().strip()
-                
-                self.cfg['ai_engine_type'] = chosen_engine
-                self.cfg['ai_api_key'] = chosen_key
-                self.cfg[f'{chosen_engine}_api_key'] = chosen_key
 
-                save_config(self.cfg)
-                
-                self._populate_student_list(self.cur_sheet)
+                self.config['ai_engine_type'] = chosen_engine
+                self.config['ai_api_key'] = chosen_key
+                self.config[f'{chosen_engine}_api_key'] = chosen_key
+
+                save_config(self.config)
+
+                self._populate_student_list(self.activeGroup)
                 self._refresh_student_view()
                 
                 messagebox.showinfo("완료", "모든 설정이 안전하게 로컬에 저장되었습니다.", parent=win)
@@ -1333,9 +1360,9 @@ class App:
         tk.Button(btn_row, text="취소", font=FS, bg="#E2E8F0", fg=TEXT, relief='flat', padx=16, pady=8, command=win.destroy, cursor='hand2').pack(side='right', padx=8)
 
 
-    def _gen_ai_note(self, sheet, cls, name, textbooks, note_txt, ai_btn=None, tb_grade=None):
+    def _gen_ai_note(self, group, classId, nameKey, subjects, note_txt, ai_btn=None, tb_grade=None):
         """AI 특이사항 단건 생성 — AiEngine에 위임."""
-        self.ai.gen_single(sheet, cls, name, textbooks, note_txt, ai_btn, tb_grade=tb_grade)
+        self.ai.gen_single(group, classId, nameKey, subjects, note_txt, ai_btn, tb_grade=tb_grade)
 
     def _start_cooldown_tick(self, btn):
         """AI 쿨다운 틱 — AiEngine에 위임."""
@@ -1343,7 +1370,7 @@ class App:
 
     def _gen_ai_note_all(self):
         """일괄 AI 생성 — AiEngine에 위임."""
-        self.ai.gen_all(self.cur_sheet)
+        self.ai.gen_all(self.activeGroup)
 
     def _settings_section(self, parent, title):
         tk.Label(parent, text=title,
@@ -1356,18 +1383,18 @@ class App:
             messagebox.showerror("오류",
                 "pyautogui / pyperclip이 설치되어 있지 않습니다.\n"
                 "pip install pyautogui pyperclip"); return
-        sheet  = self.cur_sheet
-        ready  = self._collect_ready(sheet)
+        group  = self.activeGroup
+        ready  = self._collect_ready(group)
         if not ready:
             messagebox.showinfo("알림",
                 "전송 준비된 학생이 없습니다.\n"
                 "모든 교재의 과제수행도를 입력한 학생만 전송됩니다."); return
 
         all_names = [
-            s['name']
-            for cls, cd in self._my_classes(sheet)
-            if not self._is_sub_teacher(sheet, cls)
-            for s in cd['students']
+            self.all_students[nk].get('name', nk)
+            for classId, cd in self._my_classes(group)
+            if not self._is_sub_teacher(classId)
+            for nk in [k for k, v in self.all_students.items() if v.get('class') == classId]
         ]
         ready_names = [r['name'] for r in ready]
         skipped = [n for n in all_names if n not in ready_names]
@@ -1381,7 +1408,7 @@ class App:
         threading.Thread(target=self._do_send, args=(ready,), daemon=True).start()
 
     def _do_send(self, msgs):
-        wait  = self.cfg.get('wait_time', 0.5)
+        wait  = self.config.get('wait_time', 0.5)
         total = len(msgs)
         time.sleep(3)
         for i, m in enumerate(msgs):
@@ -1416,12 +1443,12 @@ class App:
         self.force_data.clear()
         save_daily_cache(self.progress_data, {}, {}, {})
 
-        url  = self.cfg.get('firebase_url', '')
-        path = self.cfg.get('firebase_path', '')
+        url  = self.config.get('firebase_url', '')
+        path = self.config.get('firebase_path', '')
         if url and path:
             def _push_last_sent():
                 try:
-                    firebase_put(self.cfg, "lastSent", {
+                    firebase_put(self.config, "lastSent", {
                         "date": self.date_str,
                         "class_data": {}
                     })
@@ -1433,6 +1460,6 @@ class App:
 
     def _refresh_after_reset(self):
         if self.cur_name:
-            self._render_student(self.cur_sheet, self.cur_cls, self.cur_name)
+            self._render_student(self.activeGroup, self.cur_cls, self.cur_name)
         self._refresh_send_btn()
         self._refresh_statusbar()

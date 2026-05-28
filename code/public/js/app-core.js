@@ -114,47 +114,53 @@ const TAGS = {
   ],
 };
 
-let cfg=null,inputData={},progressData={},tagData={},instructor=null;
-let curNav='input',curAI=0,fbUrl='',fbPath='',curSheet='';
-let clsDrillSh=null; // 학급 관리 드릴다운 상태 (null=최상위, 'M'/'T'=시트)
-let adminOn=false;   // 관리자 모드 세션 상태 (새로고침 시 해제)
-let sbFolded={};     // 사이드바 시트 섹션 접힘 상태 {시트명: true/false}
+// config: { classes: {classId: {group, courses: {subject: {textbook, curriculum, instructor}}}}, instructors: {...} }
+let config=null,inputData={},progressData={},tagData={},instructor=null;
+let activeTab='input',curAI=0,dbUrl='',dbPath='',activeGroup='';
+let _devDate=null; // 🔧 테스트용 날짜 오버라이드 (null=오늘)
+let clsDrillSh=null; // 학급 관리 드릴다운 상태 (null=최상위, classId)
+let adminOn=false;   // 관리자 세션 상태 (새로고침 시 해제)
+let sbFolded={};     // 사이드바 그룹 섹션 접힘 상태 {그룹명: true/false}
 let _resetSel=new Set(); // 초기화 다중 선택 상태
 let openSaIds=new Set(['sa-fb']); // 설정 아코디언 열림 상태 — renderMain() 재렌더 후 복원용
 // 점수 입력 상태
-let scoreData={};        // {clsKey: {testKey: testObj}}
-let scoreEditing=null;   // {clsKey,testKey} | null(=신규)
+let scoreData={};        // {weekly: {subject: {testKey: testObj}}, achievement: {curriculumKey: {testKey: testObj}}}
+let scoreEditing=null;   // {classId,subject,testKey,isAchievement} | null(=신규)
 let scoreView='list';    // 'list' | 'edit'
 const SCORE_TYPES=['주간Test','기출모의고사','실전모의고사','성취도평가','반배치고사','직접입력'];
+const ACHIEVEMENT_TYPES=['성취도평가','기출모의고사','실전모의고사','반배치고사'];
 // SHA-256("idocho")
 const ADMIN_HASH='f3fd1456b2db60728b102561496c156e4c4adf0e537d4c45fa0add381fdd9a1e';
 
 const LS=k=>localStorage.getItem(k);
 const SS=(k,v)=>localStorage.setItem(k,v);
 function loadLocal(){
-  fbUrl=LS('drw_fb_url')||'';fbPath=LS('drw_fb_path')||'';
+  dbUrl=LS('drw_db_url')||'';dbPath=LS('drw_db_path')||'';
   try{inputData=JSON.parse(LS('drw_input')||'{}');}catch(e){inputData={};}
   try{progressData=JSON.parse(LS('drw_prog')||'{}');}catch(e){progressData={};}
   try{tagData=JSON.parse(LS('drw_tags')||LS('drw_obs')||'{}');}catch(e){tagData={};}
   try{instructor=JSON.parse(LS('drw_instr')||'null');}catch(e){instructor=null;}
-  try{cfg=JSON.parse(LS('drw_cfg')||'null');}catch(e){cfg=null;}
+  try{config=JSON.parse(LS('drw_config')||'null');}catch(e){config=null;}
 }
 function saveLocal(){
-  SS('drw_fb_url',fbUrl);SS('drw_fb_path',fbPath);
+  SS('drw_db_url',dbUrl);SS('drw_db_path',dbPath);
   SS('drw_input',JSON.stringify(inputData));
   SS('drw_prog',JSON.stringify(progressData));
   SS('drw_tags',JSON.stringify(tagData));
   if(instructor)SS('drw_instr',JSON.stringify(instructor));
-  if(cfg)SS('drw_cfg',JSON.stringify(cfg));
+  if(config)SS('drw_config',JSON.stringify(config));
 }
 
-function fbE(n){return `${fbUrl.replace(/\/$/,'')}/${fbPath.replace(/^\/|\/$/g,'')}/${n}.json`;}
+function fbE(n){return `${dbUrl.replace(/\/$/,'')}/${dbPath.replace(/^\/|\/$/g,'')}/${n}.json`;}
 async function fbGet(n){const r=await fetch(fbE(n));if(!r.ok)throw n+':'+r.status;return r.json();}
 async function fbPut(n,d){const r=await fetch(fbE(n),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)});if(!r.ok)throw n+':'+r.status;return r.json();}
 async function fbPatch(n,d){const r=await fetch(fbE(n),{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)});if(!r.ok)throw n+':'+r.status;return r.json();}
 
 const DAYS=['일','월','화','수','목','금','토'];
-function today(){const d=new Date();return `${d.getMonth()+1}/${d.getDate()} (${DAYS[d.getDay()]})`;}
+function today(){
+  if(_devDate){const p=_devDate.split('-');const d=new Date(_devDate);return`🔧 ${Number(p[1])}/${Number(p[2])} (${DAYS[d.getDay()]})`;}
+  const d=new Date();return `${d.getMonth()+1}/${d.getDate()} (${DAYS[d.getDay()]})`;
+}
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
 function toast(m,ms=2500){const e=document.getElementById('toast');e.textContent=m;e.classList.add('show');clearTimeout(e._t);e._t=setTimeout(()=>e.classList.remove('show'),ms);}
 function setSync(ok){/* syncBadge 제거됨 (v0.9.4) */}
@@ -180,128 +186,182 @@ function getCurriculumByGradeSem(gradeSem){
   }
   return [];
 }
-function getTbGrade(sheet,cls,tb){
-  const map=cfg?.sheets?.[sheet]?.classes?.[cls]?.tb_grade;
-  if(!map||typeof map!=='object')return '';
-  if(Object.prototype.hasOwnProperty.call(map,tb))return map[tb]||'';
-  const nt=_normTbName(tb);
-  if(Object.prototype.hasOwnProperty.call(map,nt))return map[nt]||'';
-  for(const [k,v] of Object.entries(map)){
-    if(_normTbName(k)===nt)return v||'';
-  }
-  return '';
+
+/**
+ * 신규: classes/{classId}/courses/{subject}/curriculum → GRADE_SEM 형식으로 반환
+ * curriculum 키 형식: "middle_school.grade_3.semester_1" → "중3-1"
+ */
+function getCurriculumForSubject(classId, subject){
+  const course = config?.classes?.[classId]?.courses?.[subject];
+  if(!course)return '';
+  return course.curriculum || '';
+}
+
+/**
+ * curriculum 키(점 표기) → curriculumKey(언더스코어)
+ */
+function curriculumToKey(curriculum){
+  return (curriculum||'').replaceAll('.','_');
 }
 
 async function pushInput(key,val){
   inputData[key]=val;saveLocal();
-  if(!fbUrl||!fbPath)return;
+  if(!dbUrl||!dbPath)return;
   // 쓰기 권한 가드: 내 assignments 범위 내 키만 Firebase PATCH
   const p=key.split('|');
   if(p.length===4){
-    const [sh,cl,,tb]=p;
-    const realTb=tb==='__note__'?null:tb;
-    if(!_canWrite(sh,cl,realTb))return;
+    const [,classId,,subject]=p;
+    const realSubject=subject==='__note__'?null:subject;
+    if(!_canWrite(classId,realSubject))return;
   }
   try{await fbPatch('input',{[key]:val});setSync(true);}catch(e){setSync(false);}
 }
 async function pushProgress(pkey,val){
   progressData[pkey]=val;saveLocal();
-  if(!fbUrl||!fbPath)return;
+  if(!dbUrl||!dbPath)return;
   const p=pkey.split('|');
-  if(p.length===3){
-    const [sh,cl,tb]=p;
-    if(!_canWrite(sh,cl,tb))return;
+  if(p.length===2){
+    const [classId,subject]=p;
+    if(!_canWrite(classId,subject))return;
   }
   try{await fbPatch('session/class_data',{[pkey]:val});setSync(true);}catch(e){setSync(false);}
 }
 
 // ── 오늘 날짜 키 (YYYY-MM-DD) ────────────────────────────────────
-function todayKey(){const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
-
-// ── tags 저장 키: "sheet|cls|name|tb" → tagData[okey][YYYY-MM-DD] ─
-function getTags(sheet,cls,name,tb){
-  const okey=`${sheet}|${cls}|${name}|${tb}`;
-  if(!tagData[okey])tagData[okey]={};
-  if(!tagData[okey][todayKey()])tagData[okey][todayKey()]={};
-  return tagData[okey][todayKey()];
+function todayKey(){
+  if(_devDate)return _devDate;
+  const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
-async function pushObs(sheet,cls,name,tb){
+function setDevDate(val){_devDate=val||null;renderMain();}
+
+// ── 🔧 더미 세션 생성 (현재 반 전체 학생 → _devDate로 obs 푸시) ─────
+async function devPushDummy(){
+  if(!_devDate){toast('날짜를 먼저 선택하세요.');return;}
+  if(!dbUrl||!dbPath){toast('Firebase 연결 필요.');return;}
+  const asgns=instructor?.assignments||[];
+  if(!asgns.length){toast('담당 수업 없음.');return;}
+  const a=asgns[curAI];
+  // 신규: students/ 전체 로드 후 classId 필터
+  let classStudents=[];
+  try{
+    const allStudents=await fbGet('students')||{};
+    classStudents=Object.entries(allStudents)
+      .filter(([,v])=>v?.class===a.classId)
+      .map(([nameKey,v])=>({nameKey,...v}));
+  }catch(e){toast('학생 로드 실패: '+e);return;}
+  if(!classStudents.length){toast('학생 없음.');return;}
+  const _r=arr=>arr[Math.floor(Math.random()*arr.length)];
+  const _pick=(arr,n)=>{const s=[...arr];const r=[];for(let i=0;i<n&&s.length;i++){const idx=Math.floor(Math.random()*s.length);r.push(s.splice(idx,1)[0]);}return r;};
+  let ok=0,skip=0;
+  for(const stu of classStudents){
+    const nameKey=stu.nameKey;
+    // 이미 해당 날짜 데이터 있으면 스킵
+    const existing=tagData?.[nameKey]?.[a.subject]?.[_devDate];
+    if(existing&&Object.keys(existing).length>0){skip++;continue;}
+    const dummy={
+      condition: _r(['great','good','good','normal','normal','normal','low','bad']),
+      understand: _r(['top','good','good','normal_u','normal_u','normal_u','confused','hard']),
+      assign_grade: _r(['done','done','done','most','most','half','little','none']),
+      understand_sub: _pick(['self_solve','retry','confused'],Math.random()<0.5?1:0),
+      engage: _pick(['present','question','help','preview','error_fix'],Math.random()<0.4?1:0),
+      caution: _pick(['sleepy','chat','attitude','late'],Math.random()<0.15?1:0),
+      highlight: _pick(['perfect','improved','mastered','effort'],Math.random()<0.1?1:0),
+    };
+    if(!tagData[nameKey])tagData[nameKey]={};
+    if(!tagData[nameKey][a.subject])tagData[nameKey][a.subject]={};
+    tagData[nameKey][a.subject][_devDate]=dummy;
+    try{await fbPatch(`obs/${nameKey}/${a.subject}`,{[_devDate]:dummy});ok++;}catch(e){}
+  }
   saveLocal();
-  if(!fbUrl||!fbPath)return;
-  if(!_canWrite(sheet,cls,tb))return;
-  const okey=`${sheet}|${cls}|${name}|${tb}`;
+  const skipMsg=skip?` (${skip}명 기존 데이터 유지)`:'';
+  toast(`✅ ${_devDate} 더미 ${ok}명 생성${skipMsg}`);
+  renderMain();
+}
+
+// ── tags 저장 키: tagData[nameKey][subject][YYYY-MM-DD] ─
+function getTags(classId,nameKey,subject){
+  if(!tagData[nameKey])tagData[nameKey]={};
+  if(!tagData[nameKey][subject])tagData[nameKey][subject]={};
+  if(!tagData[nameKey][subject][todayKey()])tagData[nameKey][subject][todayKey()]={};
+  return tagData[nameKey][subject][todayKey()];
+}
+async function pushObs(classId,nameKey,subject){
+  saveLocal();
+  if(!dbUrl||!dbPath)return;
+  if(!_canWrite(classId,subject))return;
   const dateKey=todayKey();
-  const val=tagData[okey]?.[dateKey]||{};
-  // Firebase 경로: obs/{sheet}|{cls}|{name}|{tb}/{YYYY-MM-DD}
-  try{await fbPatch(`obs/${encodeURIComponent(okey)}`,{[dateKey]:val});setSync(true);}catch(e){setSync(false);}
+  const val=tagData?.[nameKey]?.[subject]?.[dateKey]||{};
+  // Firebase 경로: obs/{nameKey}/{subject}/{YYYY-MM-DD}
+  try{await fbPatch(`obs/${nameKey}/${subject}`,{[dateKey]:val});setSync(true);}catch(e){setSync(false);}
 }
 
 // ── 태그 토글 핸들러 ─────────────────────────────────────────────
-function onTagCondition(el,sheet,cls,name,tb){
+function onTagCondition(el,classId,nameKey,subject){
   const k=el.dataset.k;
-  const tags=getTags(sheet,cls,name,tb);
+  const tags=getTags(classId,nameKey,subject);
   tags.condition = tags.condition===k ? null : k;
   const cell=el.closest('.tg-cell');
   if(cell)cell.querySelectorAll('.tg-radio[data-g="condition"]').forEach(b=>{
     b.classList.toggle('sel-c', b.dataset.k===tags.condition);
   });
-  pushObs(sheet,cls,name,tb);
+  pushObs(classId,nameKey,subject);
 }
-function onTagUnderstand(el,sheet,cls,name,tb){
+function onTagUnderstand(el,classId,nameKey,subject){
   const k=el.dataset.k;
-  const tags=getTags(sheet,cls,name,tb);
+  const tags=getTags(classId,nameKey,subject);
   tags.understand = tags.understand===k ? null : k;
   const cell=el.closest('.tg-cell');
   if(cell)cell.querySelectorAll('.tg-radio[data-g="understand"]').forEach(b=>{
     b.classList.toggle('sel-c', b.dataset.k===tags.understand);
   });
-  pushObs(sheet,cls,name,tb);
+  pushObs(classId,nameKey,subject);
 }
-function onTagMulti(el,sheet,cls,name,field,tb){
+function onTagMulti(el,classId,nameKey,field,subject){
   const k=el.dataset.k;
-  const tags=getTags(sheet,cls,name,tb);
+  const tags=getTags(classId,nameKey,subject);
   if(!tags[field])tags[field]=[];
   const idx=tags[field].indexOf(k);
   if(idx>=0)tags[field].splice(idx,1); else tags[field].push(k);
   el.classList.toggle('sel-m', tags[field].includes(k));
-  pushObs(sheet,cls,name,tb);
+  pushObs(classId,nameKey,subject);
 }
 
 /**
  * 쓰기 권한 가드 — instructor.assignments 기반
- * tb=null 이면 sheet|cls 레벨 검사 (특이사항)
- * instructor 미설정 시 항상 false (모든 쓰기 차단)
+ * subject=null 이면 classId 레벨 검사
+ * instructor 미설정 시 항상 false
  */
-function _canWrite(sheet,cls,tb){
+function _canWrite(classId,subject){
   if(!instructor)return false;
   const asgns=instructor.assignments||[];
-  if(!asgns.length)return true; // assignments 없으면 전체 허용 (show_all)
+  if(!asgns.length)return true; // assignments 없으면 전체 허용
   return asgns.some(a=>
-    a.sheet===sheet && a.cls===cls && (tb===null||a.tb===tb)
+    a.classId===classId && (subject===null||a.subject===subject)
   );
 }
 
 function goNav(n){
-  curNav=n;
+  activeTab=n;
   if(n==='scores'){scoreView='list';scoreEditing=null;_loadScoreDataIfNeeded();}
   ['input','scores','setting'].forEach(x=>{const e=document.getElementById('nav_'+x);if(e)e.classList.toggle('on',x===n);});
   renderSb();renderMain();
 }
 function selA(i){
-  const newSh=instructor?.assignments?.[i]?.sheet||curSheet;
-  sbFolded[newSh]=false; // 선택 시트 강제 펼침 (다른 시트는 fold 상태 유지)
-  curAI=i;curSheet=newSh;if(curNav!=='scores')curNav='input';renderSb();renderMain();
+  const a=instructor?.assignments?.[i];
+  const newGroup=a?.group||activeGroup;
+  sbFolded[newGroup]=false;
+  curAI=i;activeGroup=newGroup;if(activeTab!=='scores')activeTab='input';renderSb();renderMain();
 }
-function selSheet(sh){
-  sbFolded[sh]=false; // 선택 시트 강제 펼침
-  curSheet=sh;
+function selGroup(gr){
+  sbFolded[gr]=false;
+  activeGroup=gr;
   const asgns=instructor?.assignments||[];
-  const idx=asgns.findIndex(a=>a.sheet===sh);
+  const idx=asgns.findIndex(a=>a.group===gr);
   if(idx>=0)curAI=idx;
   renderSb();renderMain();
 }
-function sbToggle(sh){
-  sbFolded[sh]=sbFolded[sh]!==true; // 토글 (기본 펼침 → 접힘 → 펼침)
+function sbToggle(gr){
+  sbFolded[gr]=sbFolded[gr]!==true;
   renderSb();
 }
 
@@ -309,21 +369,21 @@ function renderSb(){
   const sb=document.getElementById('sb');if(!sb)return;
   const asgns=instructor?.assignments||[];
   let aHtml='';
-  if(curNav==='input'||curNav==='scores'){
+  if(activeTab==='input'||activeTab==='scores'){
     aHtml='<div class="sb-lbl">내 담당 수업</div>';
     if(!asgns.length){
       aHtml+=`<div style="padding:8px 13px;font-size:11px;color:rgba(255,255,255,.3)">설정에서 추가하세요</div>`;
     } else {
-      const sheets=[...new Set(asgns.map(a=>a.sheet))];
-      sheets.forEach(sh=>{
-        const shAsgns=asgns.filter(a=>a.sheet===sh);
-        const folded=sbFolded[sh]===true;
+      const groups=[...new Set(asgns.map(a=>a.group||''))];
+      groups.forEach(gr=>{
+        const grAsgns=asgns.filter(a=>(a.group||'')===gr);
+        const folded=sbFolded[gr]===true;
         const arrow=folded?'▸':'▾';
-        aHtml+=`<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 13px 2px;font-size:9px;font-weight:700;color:rgba(255,255,255,.4);letter-spacing:.08em;cursor:pointer;user-select:none" onclick="sbToggle('${esc(sh)}')">${esc(sh)}반 <span style="font-size:11px;opacity:.7">${arrow}</span></div>`;
+        aHtml+=`<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 13px 2px;font-size:9px;font-weight:700;color:rgba(255,255,255,.4);letter-spacing:.08em;cursor:pointer;user-select:none" onclick="sbToggle('${esc(gr)}')">${esc(gr||'기타')} <span style="font-size:11px;opacity:.7">${arrow}</span></div>`;
         if(!folded){
-          shAsgns.forEach(a=>{
+          grAsgns.forEach(a=>{
             const i=asgns.indexOf(a);
-            aHtml+=`<div class="sb-a${i===curAI?' on':''}" onclick="selA(${i})"><div style="font-size:11px;font-weight:700">${esc(a.cls)}</div><div style="font-size:10px;color:rgba(255,255,255,.45);margin-top:1px">${esc(a.tb)}</div></div>`;
+            aHtml+=`<div class="sb-a${i===curAI?' on':''}" onclick="selA(${i})"><div style="font-size:11px;font-weight:700">${esc(a.classId)}</div><div style="font-size:10px;color:rgba(255,255,255,.45);margin-top:1px">${esc(a.subject)}</div></div>`;
           });
         }
       });
@@ -341,9 +401,9 @@ function renderSb(){
       </div>
     </div>
     <div class="sb-nav">
-      <div class="sni${curNav==='input'?' on':''}" onclick="goNav('input')">✏️ 수업 입력</div>
-      <div class="sni${curNav==='scores'?' on':''}" onclick="goNav('scores')">📊 성적 입력</div>
-      <div class="sni${curNav==='setting'?' on':''}" onclick="goNav('setting')">⚙️ 설정</div>
+      <div class="sni${activeTab==='input'?' on':''}" onclick="goNav('input')">✏️ 수업 입력</div>
+      <div class="sni${activeTab==='scores'?' on':''}" onclick="goNav('scores')">📊 성적 입력</div>
+      <div class="sni${activeTab==='setting'?' on':''}" onclick="goNav('setting')">⚙️ 설정</div>
     </div>
     ${aHtml}
     <div style="flex:1"></div>
@@ -353,14 +413,26 @@ function renderSb(){
 
 function renderMhdr(title){/* PC 전용 — 모바일 헤더 미사용 */}
 function makeTb(title,sub=''){
-  return `<div class="topbar"><div><div style="font-size:14px;font-weight:700">${esc(title)}</div>${sub?`<div style="font-size:11px;color:var(--sub);margin-top:1px">${esc(sub)}</div>`:''}</div></div>`;
+  const devBadge=_devDate
+    ?`<div style="display:flex;align-items:center;gap:6px;background:#7c3a00;border:1px solid #f97316;border-radius:8px;padding:4px 8px">
+        <span style="font-size:10px;color:#fb923c;font-weight:700;white-space:nowrap">🔧 테스트</span>
+        <input type="date" value="${_devDate}" onchange="setDevDate(this.value)"
+          style="font-size:11px;background:transparent;border:none;color:#fed7aa;outline:none;cursor:pointer;width:110px">
+        <button onclick="devPushDummy()" title="현재 반 전체 학생에게 이 날짜로 랜덤 더미 데이터 생성"
+          style="font-size:10px;background:#92400e;border:1px solid #fb923c;border-radius:4px;color:#fed7aa;cursor:pointer;padding:2px 6px;white-space:nowrap">🎲 더미</button>
+        <button onclick="setDevDate('')" style="font-size:10px;background:none;border:none;color:#fb923c;cursor:pointer;padding:0;line-height:1">✕</button>
+      </div>`
+    :`<button onclick="setDevDate('${(()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');})()}')"
+        style="font-size:10px;background:var(--panel2,#2a2a3a);border:1px solid var(--border);border-radius:6px;color:var(--sub);padding:3px 8px;cursor:pointer">
+        🔧 날짜 변경
+      </button>`;
+  return `<div class="topbar"><div><div style="font-size:14px;font-weight:700">${esc(title)}</div>${sub?`<div style="font-size:11px;color:${_devDate?'#fb923c':'var(--sub)'};margin-top:1px">${esc(sub)}</div>`:''}</div>${devBadge}</div>`;
 }
 
 function render(){renderSb();renderMain();}
 function renderMain(){
   const mc=document.getElementById('mc');if(!mc)return;
-  if(curNav==='input')renderInput(mc);
-  else if(curNav==='scores')renderScores(mc);
+  if(activeTab==='input')renderInput(mc);
+  else if(activeTab==='scores')renderScores(mc);
   else renderSettings(mc);
 }
-

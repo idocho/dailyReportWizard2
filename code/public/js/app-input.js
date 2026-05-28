@@ -3,54 +3,58 @@
 // ══════════════════════════════════════════════════════════
 function renderInput(mc){
   renderMhdr('수업 입력');
-  if(!cfg){mc.innerHTML=makeTb('수업 입력',today())+`<div class="empty">⚙️ 설정에서 Firebase 연결 후<br>학생 명단을 불러오세요.</div>`;return;}
+  if(!config){mc.innerHTML=makeTb('수업 입력',today())+`<div class="empty">⚙️ 설정에서 Firebase 연결 후<br>학생 명단을 불러오세요.</div>`;return;}
   const asgns=instructor?.assignments||[];
   if(!asgns.length){mc.innerHTML=makeTb('수업 입력',today())+`<div class="empty">설정 → 내 담당 수업에서<br>담당 수업을 추가해 주세요.</div>`;return;}
   if(curAI>=asgns.length)curAI=0;
-  // curSheet 초기화 (최초 진입 또는 유효하지 않을 때)
-  const availSheets=[...new Set(asgns.map(a=>a.sheet))];
-  if(!curSheet||!availSheets.includes(curSheet))curSheet=asgns[curAI]?.sheet||availSheets[0]||'';
-  // curAI가 curSheet와 불일치하면 해당 시트 첫 번째 assignment로 보정
-  if(asgns[curAI]?.sheet!==curSheet){
-    const idx=asgns.findIndex(a=>a.sheet===curSheet);
+  // activeGroup 초기화 (최초 진입 또는 유효하지 않을 때)
+  const availGroups=[...new Set(asgns.map(a=>a.group||''))];
+  if(!activeGroup||!availGroups.includes(activeGroup))activeGroup=asgns[curAI]?.group||availGroups[0]||'';
+  // curAI가 activeGroup와 불일치하면 해당 그룹 첫 번째 assignment로 보정
+  if((asgns[curAI]?.group||'')!==activeGroup){
+    const idx=asgns.findIndex(a=>(a.group||'')===activeGroup);
     if(idx>=0)curAI=idx;
   }
   const a=asgns[curAI];
-  const clsD=cfg.sheets?.[a.sheet]?.classes?.[a.cls];
-  const students=clsD?.students||[];
+  const {classId, subject} = a;
+
+  // 신규: students/ 에서 classId로 필터된 학생 목록 (이미 로드된 경우 config.classStudents 캐시 활용)
+  const students = (config._classStudents||{})[classId] || [];
+
   // 프리셋 소스: instructor.presets 우선
-  const presets=instructor?.presets||cfg?.presets?.['과제수행도']||[];
-  const pkey=`${a.sheet}|${a.cls}|${a.tb}`;
+  const presets=instructor?.presets||config?.presets?.['과제수행도']||[];
+  const pkey=`${classId}|${subject}`;
   const pd=progressData[pkey]||{};
 
   let mTabs='';
   if(asgns.length>1){
-    let sheetTabHtml='';
-    if(availSheets.length>1){
-      const shBtns=availSheets.map(function(sh){
-        const act=sh===curSheet;
+    let groupTabHtml='';
+    if(availGroups.length>1){
+      const grBtns=availGroups.map(function(gr){
+        const act=gr===activeGroup;
         const borderColor=act?'var(--indigo)':'transparent';
         const textColor=act?'var(--indigo)':'var(--sub)';
-        return '<button onclick="selSheet(\'' +esc(sh)+ '\')" style="flex:1;padding:8px 0;border:none;border-bottom:2px solid '+borderColor+';background:transparent;color:'+textColor+';font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">'+esc(sh)+'반</button>';
+        return '<button onclick="selGroup(\'' +esc(gr)+ '\')" style="flex:1;padding:8px 0;border:none;border-bottom:2px solid '+borderColor+';background:transparent;color:'+textColor+';font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">'+esc(gr||'기타')+'</button>';
       }).join('');
-      sheetTabHtml='<div style="display:flex;gap:0;background:var(--panel);border-bottom:1px solid var(--border)">'+shBtns+'</div>';
+      groupTabHtml='<div style="display:flex;gap:0;background:var(--panel);border-bottom:1px solid var(--border)">'+grBtns+'</div>';
     }
-    const shAsgns=asgns.filter(function(a){return a.sheet===curSheet;});
-    const tabs=shAsgns.map(function(x){
+    const grAsgns=asgns.filter(function(a){return (a.group||'')===activeGroup;});
+    const tabs=grAsgns.map(function(x){
       const i=asgns.indexOf(x);
       const sel=i===curAI;
       const bg=sel?'var(--indigo)':'var(--bg)';
       const fg=sel?'#fff':'var(--sub)';
-      const xGs=getTbGrade(x.sheet,x.cls,x.tb)||'';const xGsL=xGs?(GRADE_SEM_LIST.find(g=>g.val===xGs)?.label||xGs):'';
-      return '<button onclick="selA('+i+')" style="padding:5px 12px;border-radius:16px;border:1px solid var(--border);background:'+bg+';color:'+fg+';font-size:11px;font-weight:700;white-space:nowrap;cursor:pointer;font-family:inherit">'+esc(x.cls)+(xGsL?' <span style="opacity:.7;font-size:9px">'+esc(xGsL)+'</span> ':' ')+esc(x.tb)+'</button>';
+      const curriculum=getCurriculumForSubject(x.classId,x.subject)||'';
+      const gsLabel=curriculum?(GRADE_SEM_LIST.find(g=>g.val===curriculum)?.label||curriculum):'';
+      return '<button onclick="selA('+i+')" style="padding:5px 12px;border-radius:16px;border:1px solid var(--border);background:'+bg+';color:'+fg+';font-size:11px;font-weight:700;white-space:nowrap;cursor:pointer;font-family:inherit">'+esc(x.classId)+(gsLabel?' <span style="opacity:.7;font-size:9px">'+esc(gsLabel)+'</span> ':' ')+esc(x.subject)+'</button>';
     }).join('');
-    mTabs='<div class="m">'+sheetTabHtml+'<div style="display:flex;gap:6px;padding:10px 12px;overflow-x:auto;background:var(--panel);border-bottom:1px solid var(--border)">'+tabs+'</div></div>';
+    mTabs='<div class="m">'+groupTabHtml+'<div style="display:flex;gap:6px;padding:10px 12px;overflow-x:auto;background:var(--panel);border-bottom:1px solid var(--border)">'+tabs+'</div></div>';
   }
 
-  // 진도 피커 초기값 파싱 — grade_sem은 학급-교재 조합에 종속 (tb_grade)
-  const gradeSem=getTbGrade(a.sheet,a.cls,a.tb)||'';
-  const gsLabel=gradeSem?(GRADE_SEM_LIST.find(g=>g.val===gradeSem)?.label||gradeSem):'';
-  const curCurr=getCurriculumByGradeSem(gradeSem);
+  // 진도 피커 초기값 파싱 — curriculum은 classes/{classId}/courses/{subject}/curriculum
+  const curriculum=getCurriculumForSubject(classId,subject)||'';
+  const gsLabel=curriculum?(GRADE_SEM_LIST.find(g=>g.val===curriculum)?.label||curriculum):'';
+  const curCurr=getCurriculumByGradeSem(curriculum);
   const pgVal=pd.progress||'';
   // pgVal 형식: "대단원 › 소단원" or "대단원" or 자유텍스트
   let pgMainIdx=-1,pgSubIdx=-1,pgFreeVal='',pgIsFree=false;
@@ -117,7 +121,7 @@ function renderInput(mc){
     </div>
   </div>`;
   const pForm=`<div class="pf">
-    <div style="font-size:12px;font-weight:700;color:var(--sub);margin-bottom:10px">📚 오늘 수업 — ${esc(a.cls)} · ${gsLabel?`<span style="color:var(--indigo);font-size:10px;font-weight:700;margin-right:3px">${esc(gsLabel)}</span>`:''}${esc(a.tb)}</div>
+    <div style="font-size:12px;font-weight:700;color:var(--sub);margin-bottom:10px">📚 오늘 수업 — ${esc(classId)} · ${gsLabel?`<span style="color:var(--indigo);font-size:10px;font-weight:700;margin-right:3px">${esc(gsLabel)}</span>`:''}${esc(subject)}</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
       <div><div class="fl">진도</div>${pgPicker}</div>
       <div><div class="fl">과제</div>${hwPicker}</div>
@@ -125,25 +129,27 @@ function renderInput(mc){
   </div>`;
 
   const dk=todayKey();
-  const done=students.filter(s=>tagData[`${a.sheet}|${a.cls}|${s.name}|${a.tb}`]?.[dk]?.assign_grade).length;
+  const done=students.filter(s=>tagData?.[s.nameKey]?.[subject]?.[dk]?.assign_grade).length;
   let dtRows='';
 
   for(const s of students){
-    const ikey=`${a.sheet}|${a.cls}|${s.name}|${a.tb}`;
-    const nkey=`${a.sheet}|${a.cls}|${s.name}|__note__`;
-    const note=inputData[nkey]?.note||'';
-    const dc=dotClass(a.sheet,a.cls,s.name,a.tb);
-    const tags=tagData[`${a.sheet}|${a.cls}|${s.name}|${a.tb}`]?.[dk]||{};
+    const nameKey=s.nameKey;
+    const displayName=s.name||nameKey;
+    // input 저장: inputData[nameKey][subject] (신규 구조)
+    const inputEntry=inputData?.[nameKey]?.[subject]||{};
+    const note=inputEntry.note||'';
+    const dc=dotClass(classId,nameKey,subject);
+    const tags=tagData?.[nameKey]?.[subject]?.[dk]||{};
 
     // 과제 고정 등급 (택1)
     const agBtns=ASSIGN_GRADES.map(g=>{
       const sel=tags.assign_grade===g.key;
-      return `<button class="tg-radio${sel?' sel-c ag-'+g.key:''}" data-k="${esc(g.key)}" onclick="onAssignGrade(this,'${esc(a.sheet)}','${esc(a.cls)}','${esc(s.name)}','${esc(a.tb)}')">${esc(g.label)}</button>`;
+      return `<button class="tg-radio${sel?' sel-c ag-'+g.key:''}" data-k="${esc(g.key)}" onclick="onAssignGrade(this,'${esc(classId)}','${esc(nameKey)}','${esc(subject)}')">${esc(g.label)}</button>`;
     }).join('');
     // 추가 프리셋 (복수선택)
     const apBtns=presets.map(p=>{
       const sel=(tags.assign_tags||[]).includes(p);
-      return `<button class="tg-check${sel?' sel-m':''}" data-p="${esc(p)}" onclick="onAssignTag(this,'${esc(a.sheet)}','${esc(a.cls)}','${esc(s.name)}','${esc(a.tb)}')">${esc(p)}</button>`;
+      return `<button class="tg-check${sel?' sel-m':''}" data-p="${esc(p)}" onclick="onAssignTag(this,'${esc(classId)}','${esc(nameKey)}','${esc(subject)}')">${esc(p)}</button>`;
     }).join('');
 
     // condition 버튼 (PES 화살표)
@@ -151,41 +157,41 @@ function renderInput(mc){
       const sel=tags.condition===t.key;
       const rot=COND_ARROWS[t.key]??90;
       const svg=`<svg width="12" height="12" viewBox="0 0 24 24" style="transform:rotate(${rot}deg);flex-shrink:0"><polygon points="12,2 22,22 12,16 2,22" fill="currentColor"/></svg>`;
-      return `<button class="tg-radio${sel?' sel-c':''}" data-k="${esc(t.key)}" data-g="condition" onclick="onTagCondition(this,'${esc(a.sheet)}','${esc(a.cls)}','${esc(s.name)}','${esc(a.tb)}')">${svg}${esc(t.label)}</button>`;
+      return `<button class="tg-radio${sel?' sel-c':''}" data-k="${esc(t.key)}" data-g="condition" onclick="onTagCondition(this,'${esc(classId)}','${esc(nameKey)}','${esc(subject)}')">${svg}${esc(t.label)}</button>`;
     }).join('');
 
     // understand 버튼 (1택) + understand_sub (멀티)
     const undBtns=TAGS.understand.map(t=>{
       const sel=tags.understand===t.key;
-      return `<button class="tg-radio${sel?' sel-c':''}" data-k="${esc(t.key)}" data-g="understand" onclick="onTagUnderstand(this,'${esc(a.sheet)}','${esc(a.cls)}','${esc(s.name)}','${esc(a.tb)}')">${esc(t.label)}</button>`;
+      return `<button class="tg-radio${sel?' sel-c':''}" data-k="${esc(t.key)}" data-g="understand" onclick="onTagUnderstand(this,'${esc(classId)}','${esc(nameKey)}','${esc(subject)}')">${esc(t.label)}</button>`;
     }).join('');
     const undSubBtns=TAGS.understand_sub.map(t=>{
       const sel=(tags.understand_sub||[]).includes(t.key);
-      return `<button class="tg-check${sel?' sel-m':''}" data-k="${esc(t.key)}" onclick="onTagMulti(this,'${esc(a.sheet)}','${esc(a.cls)}','${esc(s.name)}','understand_sub','${esc(a.tb)}')">${esc(t.label)}</button>`;
+      return `<button class="tg-check${sel?' sel-m':''}" data-k="${esc(t.key)}" onclick="onTagMulti(this,'${esc(classId)}','${esc(nameKey)}','understand_sub','${esc(subject)}')">${esc(t.label)}</button>`;
     }).join('');
 
     // engage + caution 멀티
     const engBtns=TAGS.engage.map(t=>{
       const sel=(tags.engage||[]).includes(t.key);
-      return `<button class="tg-check${sel?' sel-m':''}" data-k="${esc(t.key)}" onclick="onTagMulti(this,'${esc(a.sheet)}','${esc(a.cls)}','${esc(s.name)}','engage','${esc(a.tb)}')">${esc(t.label)}</button>`;
+      return `<button class="tg-check${sel?' sel-m':''}" data-k="${esc(t.key)}" onclick="onTagMulti(this,'${esc(classId)}','${esc(nameKey)}','engage','${esc(subject)}')">${esc(t.label)}</button>`;
     }).join('');
     const cauBtns=TAGS.caution.map(t=>{
       const sel=(tags.caution||[]).includes(t.key);
-      return `<button class="tg-check${sel?' sel-m':''}" data-k="${esc(t.key)}" data-g="caution" onclick="onTagMulti(this,'${esc(a.sheet)}','${esc(a.cls)}','${esc(s.name)}','caution','${esc(a.tb)}')">${esc(t.label)}</button>`;
+      return `<button class="tg-check${sel?' sel-m':''}" data-k="${esc(t.key)}" data-g="caution" onclick="onTagMulti(this,'${esc(classId)}','${esc(nameKey)}','caution','${esc(subject)}')">${esc(t.label)}</button>`;
     }).join('');
     const extraBtns = TAGS.extra.map(t => {
         const sel = (tags.extra || []).includes(t.key);
-        return `<button class="tg-check${sel?' sel-m':''}" data-k="${esc(t.key)}" onclick="onTagMulti(this,'${esc(a.sheet)}','${esc(a.cls)}','${esc(s.name)}','extra','${esc(a.tb)}')">${esc(t.label)}</button>`;
+        return `<button class="tg-check${sel?' sel-m':''}" data-k="${esc(t.key)}" onclick="onTagMulti(this,'${esc(classId)}','${esc(nameKey)}','extra','${esc(subject)}')">${esc(t.label)}</button>`;
     }).join('');
     const hlBtns=TAGS.highlight.map(t=>{
       const hlArr=Array.isArray(tags.highlight)?tags.highlight:(tags.highlight?[tags.highlight]:[]);
       const sel=hlArr.includes(t.key);
-      return `<button class="tg-check${sel?' sel-m':''}" data-k="${esc(t.key)}" data-g="highlight" onclick="onTagMulti(this,'${esc(a.sheet)}','${esc(a.cls)}','${esc(s.name)}','highlight','${esc(a.tb)}')">${esc(t.label)}</button>`;
+      return `<button class="tg-check${sel?' sel-m':''}" data-k="${esc(t.key)}" data-g="highlight" onclick="onTagMulti(this,'${esc(classId)}','${esc(nameKey)}','highlight','${esc(subject)}')">${esc(t.label)}</button>`;
     }).join('');
     dtRows+=`<div class="si-card">
       <div class="si-left">
-        <span class="dot ${dc}" data-ikey="${esc(ikey)}"></span>
-        <span class="si-lname">${esc(s.name)}</span>
+        <span class="dot ${dc}" data-namekey="${esc(nameKey)}" data-subject="${esc(subject)}"></span>
+        <span class="si-lname">${esc(displayName)}</span>
       </div>
       <div class="si-right">
         <div class="si-row">
@@ -211,14 +217,14 @@ function renderInput(mc){
         </div>
         <div class="si-row">
           <span class="si-lbl">메모</span>
-          <input class="inp sm" value="${esc(note)}" placeholder="특이사항" data-key="${esc(nkey)}" oninput="onNI(this)" style="width:100%">
+          <input class="inp sm" value="${esc(note)}" placeholder="특이사항" data-namekey="${esc(nameKey)}" data-subject="${esc(subject)}" oninput="onNI(this)" style="width:100%">
         </div>
       </div>
     </div>`;
   }
 
   const noStu=`<div class="empty" style="padding:20px;font-size:12px">이 반에 학생이 없습니다.</div>`;
-  mc.innerHTML=makeTb(`${a.cls} · ${gsLabel?gsLabel+' ':''}${a.tb}`,today())+mTabs+
+  mc.innerHTML=makeTb(`${classId} · ${gsLabel?gsLabel+' ':''}${subject}`,today())+mTabs+
     `<div style="padding:14px 14px 10px"><div class="card">${pForm}</div></div>
      <div style="padding:0 14px 14px">
        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
@@ -230,53 +236,79 @@ function renderInput(mc){
 }
 
 // ── 과제 고정 등급 (택1) ──────────────────────────────────────────
-function onAssignGrade(el,sheet,cls,name,tb){
+function onAssignGrade(el,classId,nameKey,subject){
   const k=el.dataset.k;
-  const tags=getTags(sheet,cls,name,tb);
+  const tags=getTags(classId,nameKey,subject);
   tags.assign_grade=tags.assign_grade===k?null:k;
   el.closest('.tg-cell').querySelectorAll('[data-k]').forEach(b=>{
     const s=b.dataset.k===tags.assign_grade;
     b.className='tg-radio'+(s?' sel-c ag-'+b.dataset.k:'');
   });
-  const d=document.querySelector(`.dot[data-ikey="${CSS.escape(sheet+'|'+cls+'|'+name+'|'+tb)}"]`);
-  if(d)d.className='dot '+dotClass(sheet,cls,name,tb);
+  // 신호등 갱신: data-namekey + data-subject 어트리뷰트 사용
+  const d=document.querySelector(`.dot[data-namekey="${CSS.escape(nameKey)}"][data-subject="${CSS.escape(subject)}"]`);
+  if(d)d.className='dot '+dotClass(classId,nameKey,subject);
   const a=instructor?.assignments?.[curAI];
-  if(a){const sts=cfg?.sheets?.[a.sheet]?.classes?.[a.cls]?.students||[];
-    const cnt=sts.filter(s=>tagData[`${a.sheet}|${a.cls}|${s.name}|${a.tb}`]?.[todayKey()]?.assign_grade).length;
-    const dc=document.getElementById('doneCount');if(dc)dc.textContent=`${cnt}/${sts.length}명 완료`;}
-  pushObs(sheet,cls,name,tb);
+  if(a){
+    const students=(config?._classStudents||{})[a.classId]||[];
+    const cnt=students.filter(s=>tagData?.[s.nameKey]?.[a.subject]?.[todayKey()]?.assign_grade).length;
+    const dc=document.getElementById('doneCount');if(dc)dc.textContent=`${cnt}/${students.length}명 완료`;
+  }
+  pushObs(classId,nameKey,subject);
 }
 
 // ── 과제 추가 프리셋 (복수선택) ───────────────────────────────────
-function onAssignTag(el,sheet,cls,name,tb){
+function onAssignTag(el,classId,nameKey,subject){
   const p=el.dataset.p;
-  const tags=getTags(sheet,cls,name,tb);
+  const tags=getTags(classId,nameKey,subject);
   if(!tags.assign_tags)tags.assign_tags=[];
   const idx=tags.assign_tags.indexOf(p);
   if(idx>=0)tags.assign_tags.splice(idx,1); else tags.assign_tags.push(p);
   el.classList.toggle('sel-m',tags.assign_tags.includes(p));
-  pushObs(sheet,cls,name,tb);
+  pushObs(classId,nameKey,subject);
+}
+
+// ── 특이사항 메모 저장 ────────────────────────────────────────────
+function onNI(el){
+  const nameKey=el.dataset.namekey;
+  const subject=el.dataset.subject;
+  // inputData[nameKey][subject] = {note: ...}
+  if(!inputData[nameKey])inputData[nameKey]={};
+  const cur={...inputData[nameKey][subject]||{}};
+  cur.note=el.value;
+  inputData[nameKey][subject]=cur;
+  saveLocal();
+  if(!dbUrl||!dbPath)return;
+  if(!_canWrite(instructor?.assignments?.[curAI]?.classId||'',subject))return;
+  fbPatch(`input/${nameKey}/${subject}`,{note:el.value}).then(()=>setSync(true)).catch(()=>setSync(false));
 }
 
 // ── 수행도 버튼 (레거시, 미사용) ─────────────────────────────────
 function onPB(btn){
-  const key=btn.dataset.key,pi=parseInt(btn.dataset.pi);
-  const presets=instructor?.presets||cfg?.presets?.['과제수행도']||[];
+  const nameKey=btn.dataset.namekey,subject=btn.dataset.subject,pi=parseInt(btn.dataset.pi);
+  const presets=instructor?.presets||config?.presets?.['과제수행도']||[];
   const val=presets[pi]||'';
-  pushInput(key,{assign:val});
+  if(!inputData[nameKey])inputData[nameKey]={};
+  if(!inputData[nameKey][subject])inputData[nameKey][subject]={};
+  inputData[nameKey][subject].assign=val;
+  saveLocal();
+  if(dbUrl&&dbPath)fbPatch(`input/${nameKey}/${subject}`,{assign:val}).catch(()=>{});
   document.querySelectorAll('.px,.pb').forEach(b=>{
-    if(b.dataset.key!==key||b.dataset.pi===undefined)return;
+    if(b.dataset.namekey!==nameKey||b.dataset.subject!==subject||b.dataset.pi===undefined)return;
     const bpi=parseInt(b.dataset.pi),s=bpi===pi;
     b.classList.toggle('sel',s);b.style.background=s?BC[bpi%BC.length]:'';b.style.borderColor=s?'transparent':'';b.style.color=s?'#fff':'';
     if(s){
-      const d=document.querySelector(`.dot[data-ikey="${key}"]`);
-      if(d){const p=key.split('|');if(p.length===4)d.className='dot '+dotClass(p[0],p[1],p[2],p[3]);}
+      const d=document.querySelector(`.dot[data-namekey="${CSS.escape(nameKey)}"][data-subject="${CSS.escape(subject)}"]`);
+      if(d){const a=instructor?.assignments?.[curAI];if(a)d.className='dot '+dotClass(a.classId,nameKey,subject);}
     }
   });
   const a=instructor?.assignments?.[curAI];
-  if(a){const sts=cfg?.sheets?.[a.sheet]?.classes?.[a.cls]?.students||[];const done=sts.filter(s=>inputData[`${a.sheet}|${a.cls}|${s.name}|${a.tb}`]?.assign?.trim()).length;const dc=document.getElementById('doneCount');if(dc)dc.textContent=`${done}/${sts.length}명 완료`;}
+  if(a){
+    const students=(config?._classStudents||{})[a.classId]||[];
+    const done=students.filter(s=>inputData?.[s.nameKey]?.[a.subject]?.assign?.trim()).length;
+    const dc=document.getElementById('doneCount');if(dc)dc.textContent=`${done}/${students.length}명 완료`;
+  }
 }
-function onNI(el){pushInput(el.dataset.key,{note:el.value});}
+
 // ── 진도 cascade 피커 ─────────────────────────────────────────────
 // 단원명에서 앞 번호 제거: "Ⅰ. 소인수분해" → "소인수분해", "1. 덧셈과 뺄셈" → "덧셈과 뺄셈"
 function stripIdx(s){return s.replace(/^[ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩ]+\.\s*/u,'').replace(/^\d+\.\s*/,'');}
@@ -303,14 +335,11 @@ function pgMainChange(sel, pkey) {
     return;
   }
   // 소단원 목록 채우기
-  const mainSel = document.getElementById('pg-main');
-  const gradeSem2 = (function() {
-    const pkey2 = mainSel ? mainSel.dataset.pkey || '' : '';
-    const parts = pkey2.split('|');
-    const tbKey = parts.length >= 3 ? parts.slice(2).join('|') : '';
-    return getTbGrade(parts[0],parts[1],tbKey)||'';
-  })();
-  const curr = getCurriculumByGradeSem(gradeSem2);
+  const parts = pkey.split('|');
+  const pkeyClassId = parts[0]||'';
+  const pkeySubject = parts.slice(1).join('|')||'';
+  const curriculum2 = getCurriculumForSubject(pkeyClassId, pkeySubject)||'';
+  const curr = getCurriculumByGradeSem(curriculum2);
   const idx = parseInt(val);
   if (!isNaN(idx) && curr[idx]) {
     subSel.innerHTML = '<option value="">소단원 선택...</option>' +
@@ -338,9 +367,10 @@ function pgBuild(pkey) {
     }
   } else {
     const parts = pkey.split('|');
-    const tbKey = parts.length >= 3 ? parts.slice(2).join('|') : '';
-    const gradeSem3 = getTbGrade(parts[0],parts[1],tbKey)||'';
-    const curr = getCurriculumByGradeSem(gradeSem3);
+    const pkeyClassId = parts[0]||'';
+    const pkeySubject = parts.slice(1).join('|')||'';
+    const curriculum3 = getCurriculumForSubject(pkeyClassId, pkeySubject)||'';
+    const curr = getCurriculumByGradeSem(curriculum3);
     const mainIdx = parseInt(mainVal);
     if (isNaN(mainIdx) || !curr[mainIdx]) { if (preview) preview.className = 'pg-preview'; return; }
     const mainText = stripIdx(curr[mainIdx].main);
@@ -403,7 +433,6 @@ function hwBuild(pkey){
 function onPI(el){
   const pkey=el.dataset.pkey,field=el.dataset.field;
   const cur={...progressData[pkey]||{}};cur[field]=el.value;pushProgress(pkey,cur);
-  // 진도/과제 변경 시 해당 반 학생 도트 일괄 갱신
   _updateDotsForPkey(pkey);
 }
 
@@ -411,8 +440,8 @@ function onPI(el){
 // g(초록): 수행도 입력 + 진도/과제 하나 이상 입력
 // y(노랑): 수행도 입력 + 진도/과제 미입력
 // e(회색): 수행도 미입력
-function dotClass(sheet,cls,name,tb){
-  const grade=tagData[`${sheet}|${cls}|${name}|${tb}`]?.[todayKey()]?.assign_grade;
+function dotClass(classId,nameKey,subject){
+  const grade=tagData?.[nameKey]?.[subject]?.[todayKey()]?.assign_grade;
   if(!grade)return'e';
   if(grade==='done')return'g';
   return'y'; // partial·none
@@ -420,11 +449,14 @@ function dotClass(sheet,cls,name,tb){
 // 진도/과제 입력 시 현재 화면에 보이는 해당 반 학생 도트 업데이트
 function _updateDotsForPkey(pkey){
   const parts=pkey.split('|');
-  if(parts.length!==3) return;
-  const [sh,cl,tb]=parts;
-  document.querySelectorAll('.dot[data-ikey]').forEach(d=>{
-    const k=d.dataset.ikey.split('|');
-    if(k.length===4&&k[0]===sh&&k[1]===cl&&k[3]===tb)
-      d.className='dot '+dotClass(sh,cl,k[2],tb);
+  if(parts.length<2) return;
+  const classId=parts[0];
+  const subject=parts.slice(1).join('|');
+  document.querySelectorAll('.dot[data-namekey][data-subject]').forEach(d=>{
+    if(d.dataset.subject===subject){
+      const a=instructor?.assignments?.[curAI];
+      if(a&&a.classId===classId)
+        d.className='dot '+dotClass(classId,d.dataset.namekey,subject);
+    }
   });
 }

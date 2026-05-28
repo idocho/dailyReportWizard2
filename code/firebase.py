@@ -2,11 +2,13 @@
 firebase.py — Firebase Realtime Database REST 유틸
 Crafted by IDO(idocho@kakao.com) · Powered by Claude AI
 
-노드 구조:
-  config/          학생 명단, 강사, 프리셋
-  input/           과제수행도 + 특이사항
+노드 구조 (v2.0 스키마):
+  students/        학생 명단 {nameKey: {name, class}}
+  classes/         학급 정보 {classId: {group, courses/{subject}/...}}
+  config/          강사·프리셋 정보
+  input/           과제수행도 + 특이사항 {nameKey: {subject: {assign, note}}}
   session/         진도/과제 (class_data)
-  obs/             수업 관찰 태그 (DRW 2.0 신규)
+  obs/             수업 관찰 태그 {nameKey: {subject: {date: {...}}}}
   lastSent/        마지막 전송 데이터 (폴백용)
 """
 import json
@@ -57,22 +59,19 @@ def today_key():
     return datetime.date.today().isoformat()
 
 
-def fetch_tags(cfg):
-    """수업 관찰 태그 전체 로드 → dict. (Firebase: obs/ 노드)
-    구조: { "sheet|cls|name": { "YYYY-MM-DD": { condition, understand, ... } } }
-    """
+def fetch_tags(config):
+    """obs/ 전체 로드. 구조: {nameKey: {subject: {date: {...}}}}"""
     try:
-        data = firebase_get(cfg, "obs")
+        data = firebase_get(config, "obs")
         return data if isinstance(data, dict) else {}
     except Exception:
         return {}
 
 
-def fetch_tags_today(cfg, sheet, cls, name):
-    """특정 학생의 오늘 수업 관찰 태그만 로드. (Firebase: obs/ 노드)"""
-    okey = urllib.parse.quote(f"{sheet}|{cls}|{name}", safe='')
+def fetch_tags_today(config, nameKey, subject):
+    """특정 학생의 오늘 obs 로드."""
     try:
-        data = firebase_get(cfg, f"obs/{okey}/{today_key()}")
+        data = firebase_get(config, f"obs/{nameKey}/{subject}/{today_key()}")
         return data if isinstance(data, dict) else {}
     except Exception:
         return {}
