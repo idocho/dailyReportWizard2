@@ -360,21 +360,15 @@ function addCourseInline(classId,btnEl){
   wrapper.className='course-inline-wrap';
   wrapper.style.cssText='display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-top:5px;padding:6px 8px;background:var(--indigo-l);border:1px solid var(--indigo);border-radius:8px;';
 
-  // 학년학기(커리큘럼) select
+  // 커리큘럼 = 과목 식별자 (별도 과목명 없음)
   const gsSel=document.createElement('select');
-  gsSel.style.cssText='font-size:11px;padding:3px 5px;border:1px solid var(--border);border-radius:5px;font-family:inherit;background:#fff;';
-  gsSel.innerHTML='<option value="">커리큘럼(선택)</option>'+
+  gsSel.style.cssText='font-size:11px;padding:3px 5px;border:1px solid var(--indigo);border-radius:5px;font-family:inherit;background:#fff;';
+  gsSel.innerHTML='<option value="">과목 선택</option>'+
     GRADE_SEM_LIST.map(g=>`<option value="${esc(g.val)}">${esc(g.label)}</option>`).join('');
-
-  // 과목명 입력 (커리큘럼 선택 시 자동 입력, 수정 가능)
-  const subjectInp=document.createElement('input');
-  subjectInp.placeholder='과목명';
-  subjectInp.style.cssText='font-size:11px;padding:3px 5px;border:1px solid var(--indigo);border-radius:5px;font-family:inherit;min-width:80px;';
-  gsSel.addEventListener('change',()=>{if(!subjectInp.value.trim())subjectInp.value=gsSel.value;});
 
   // 교재명 입력
   const tbInp=document.createElement('input');
-  tbInp.placeholder='교재명';
+  tbInp.placeholder='교재명 (선택)';
   tbInp.style.cssText='font-size:11px;padding:3px 5px;border:1px solid var(--border);border-radius:5px;font-family:inherit;min-width:90px;';
 
   const ok=document.createElement('span');
@@ -386,26 +380,22 @@ function addCourseInline(classId,btnEl){
   cancel.onclick=()=>wrapper.remove();
 
   async function doAdd(){
-    const gs=gsSel.value;
-    const subject=subjectInp.value.trim();
+    const subject=gsSel.value;
     const textbook=tbInp.value.trim();
-    if(!subject){toast('과목명을 입력해 주세요.');return;}
+    if(!subject){toast('과목을 선택해 주세요.');return;}
     const existingCourses=config?.classes?.[classId]?.courses||{};
     if(existingCourses[subject]){toast('이미 추가된 과목입니다.');return;}
     if(!config.classes)config.classes={};
     if(!config.classes[classId])config.classes[classId]={group:'',courses:{}};
     if(!config.classes[classId].courses)config.classes[classId].courses={};
-    const courseData={textbook,curriculum:gs};
+    const courseData={textbook,curriculum:subject};
     config.classes[classId].courses[subject]=courseData;
     wrapper.remove();
     try{refreshCourseChips(classId);}catch(e){renderMain();}
-    // Firebase 저장: classes/{classId}/courses/{subject}
     if(dbUrl&&dbPath){
       try{
         await fbPatch(`classes/${classId}/courses/${subject}`,courseData);
-        // instructor assignments에도 추가 (이 강사가 담당)
         if(instructor?.id){
-          // assignments는 배열 구조 유지 — 맵으로 쓰면 데스크톱 앱과 스키마 충돌
           const already=(instructor.assignments||[]).some(a=>a.classId===classId&&a.subject===subject);
           if(!already){
             instructor.assignments=[...(instructor.assignments||[]),{classId,subject,role:'담임'}];
@@ -418,11 +408,11 @@ function addCourseInline(classId,btnEl){
     }
   }
   ok.onclick=doAdd;
-  [gsSel,subjectInp,tbInp].forEach(el=>{el.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();ok.click();}});});
+  [gsSel,tbInp].forEach(el=>{el.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();ok.click();}});});
 
-  wrapper.appendChild(gsSel);wrapper.appendChild(subjectInp);wrapper.appendChild(tbInp);wrapper.appendChild(ok);wrapper.appendChild(cancel);
+  wrapper.appendChild(gsSel);wrapper.appendChild(tbInp);wrapper.appendChild(ok);wrapper.appendChild(cancel);
   chips.parentElement.appendChild(wrapper);
-  subjectInp.focus();
+  gsSel.focus();
 }
 
 function refreshCourseChips(classId){
