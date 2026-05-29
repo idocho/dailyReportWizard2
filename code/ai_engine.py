@@ -345,7 +345,7 @@ class AiEngine:
         self._last_call = 0.0
 
     def _check_cooldown(self):
-        engine_type = self.app.cfg.get('ai_engine_type', 'groq').strip().lower()
+        engine_type = self.app.config.get('ai_engine_type', 'groq').strip().lower()
         cooldown = AI_COOLDOWN_GROQ if engine_type == 'groq' else AI_COOLDOWN_PAID
         remaining = max(0, cooldown - (time.time() - self._last_call))
         if remaining > 0:
@@ -361,12 +361,12 @@ class AiEngine:
         """App 설정 딕셔너리로부터 활성화된 엔진 타입과 해당 Key를 리턴합니다.
         (설정 키 명칭은 사용 중인 app.cfg 규격에 부합하게 맞추어 조율하세요)
         """
-        engine_type = self.app.cfg.get('ai_engine_type', 'groq').strip().lower()
+        engine_type = self.app.config.get('ai_engine_type', 'groq').strip().lower()
         
         # UI에서 설정한 단일 통합 키 혹은 개별 키 저장값 연동
-        api_key = self.app.cfg.get(f'{engine_type}_api_key', '').strip()
+        api_key = self.app.config.get(f'{engine_type}_api_key', '').strip()
         if not api_key:
-            api_key = self.app.cfg.get('ai_api_key', '').strip()
+            api_key = self.app.config.get('ai_api_key', '').strip()
 
         if not api_key:
             from tkinter import messagebox
@@ -546,7 +546,7 @@ class AiEngine:
                 def _ok(u=updated):
                     self._mark_called()
                     if app.cur_name:
-                        app._render_student(app.cur_sheet, app.cur_cls, app.cur_name)
+                        app._render_student(app.activeGroup, app.cur_cls, app.cur_name)
                     messagebox.showinfo("일괄 AI 생성 완료", f"{u}명의 특이사항 작성이 완료되었습니다.")
                 app.root.after(0, _ok)
 
@@ -564,7 +564,7 @@ class AiEngine:
             try:
                 if not btn.winfo_exists():
                     return
-                engine_type = self.app.cfg.get('ai_engine_type', 'groq').strip().lower()
+                engine_type = self.app.config.get('ai_engine_type', 'groq').strip().lower()
                 cooldown = AI_COOLDOWN_GROQ if engine_type == 'groq' else AI_COOLDOWN_PAID
                 remaining = max(0, cooldown - (time.time() - self._last_call))        
                 if remaining > 0:
