@@ -67,12 +67,12 @@ _HIGHLIGHT_TEXT = {
 
 
 def _merge_student_tags(tag_data: dict, sheet: str, cls: str, name: str, textbooks: list) -> dict:
-    """교재별 분리된 tag_data에서 학생의 오늘 태그를 교재 전체 병합."""
+    """v2.0: tag_data = {nameKey: {subject: {date: {tags}}}}"""
     today = today_key()
     merged = {}
     for tb in textbooks:
-        okey = f"{sheet}|{cls}|{name}|{tb}"
-        tb_tags = tag_data.get(okey, {}).get(today, {})
+        # v2.0 구조: tag_data[nameKey][subject][date]
+        tb_tags = tag_data.get(name, {}).get(tb, {}).get(today, {})
         if not tb_tags:
             continue
         for field in ('condition', 'understand', 'highlight'):
@@ -164,15 +164,17 @@ def _base_conditions() -> str:
 # ── 단건 생성 프롬프트 ───────────────────────────────────────────────
 def build_single_prompt(sheet, cls, name, textbooks, student_data, progress_data,
                         existing_note, tags, tb_grade=None):
-    """단건 AI 생성용 프롬프트 조립 (이벤트 반영 최적화)."""
+    """단건 AI 생성용 프롬프트 조립 (v2.0 키 구조)."""
     _tg = tb_grade or {}
     lines = []
     for tb in textbooks:
-        val = student_data.get((sheet, cls, name, tb), {}).get('value', '')
+        # v2.0: student_data 키 = (classId, nameKey, subject)
+        val = student_data.get((cls, name, tb), {}).get('value', '')
         if val:
             gs = _tg.get(tb, '')
             tb_lbl = f"{gs} {tb}".strip() if gs else tb
-            pd_val = progress_data.get((sheet, cls, tb), {})
+            # v2.0: progress_data 키 = (classId, subject)
+            pd_val = progress_data.get((cls, tb), {})
             lines.append(
                 f"- {tb_lbl}: 수행도={val}"
                 + (f", 진도={pd_val['progress']}" if pd_val.get('progress') else "")
@@ -386,7 +388,8 @@ class AiEngine:
 
         app = self.app
 
-        note_key = (sheet, cls, name)
+        # v2.0: note_data 키 = (classId, nameKey)
+        note_key = (cls, name)
         try:
             raw_note = note_txt.get('1.0', 'end').rstrip('\n')
             existing_note = raw_note.encode('utf-16', 'surrogatepass').decode('utf-16')
@@ -455,41 +458,49 @@ class AiEngine:
 
         targets = []
         for cls, cls_data in app._my_classes(sheet):
-            if app._is_sub_teacher(sheet, cls):
+            if app._is_sub_teacher(cls):
                 continue
-            tbs      = cls_data.get('textbooks', [])
-            tb_grade = cls_data.get('tb_grade', {})
-            for stu in cls_data.get('students', []):
-                name = stu['name']
-                if app._student_status(sheet, cls, name) != 'ready':
+            # v2.0: 과목은 courses 키, 학생은 all_students에서 필터
+            courses  = cls_data.get('courses', {})
+            tbs      = list(courses.keys())
+            tb_grade = {s: courses[s].get('curriculum', '') for s in tbs}
+            class_students = [
+                (nk, app.all_students[nk].get('name', nk))
+                for nk, v in app.all_students.items()
+                if v.get('class') == cls
+            ]
+            for nameKey, display_name in class_students:
+                if app._student_status(cls, nameKey) != 'ready':
                     continue
 
-                # 유효 데이터 필터링 맵 구조 조립
                 student_book_data = {}
                 for tb in tbs:
-                    val = app.student_data.get((sheet, cls, name, tb), {}).get('value', '')
+                    # v2.0: student_data 키 = (classId, nameKey, subject)
+                    val = app.student_data.get((cls, nameKey, tb), {}).get('value', '')
                     if val:
                         gs = tb_grade.get(tb, '')
                         key = f"{gs} {tb}".strip() if gs else tb
                         student_book_data[key] = val
 
-                tags = _merge_student_tags(app.tag_data, sheet, cls, name, tbs)
+                tags = _merge_student_tags(app.tag_data, sheet, cls, nameKey, tbs)
                 if DEBUG_AI_PROMPT:
-                    print(f"[BATCH] {name}({cls})  tags={tags if tags else '(없음)'}")
+                    print(f"[BATCH] {display_name}({cls})  tags={tags if tags else '(없음)'}")
                 progress_book_data = {}
                 for _tb in tbs:
                     _gs = tb_grade.get(_tb, '')
                     _key = f"{_gs} {_tb}".strip() if _gs else _tb
-                    _pd = app.progress_data.get((sheet, cls, _tb), {})
+                    # v2.0: progress_data 키 = (classId, subject)
+                    _pd = app.progress_data.get((cls, _tb), {})
                     if _pd.get('progress') or _pd.get('homework'):
                         progress_book_data[_key] = _pd
                 targets.append({
                     "sheet":    sheet,
                     "cls":      cls,
-                    "name":     name,
+                    "name":     display_name,
                     "data":     student_book_data,
                     "progress": progress_book_data,
-                    "existing": app.note_data.get((sheet, cls, name), {}).get('value', '').strip(),
+                    # v2.0: note_data 키 = (classId, nameKey)
+                    "existing": app.note_data.get((cls, nameKey), {}).get('value', '').strip(),
                     "tags":     tags,
                 })
 
@@ -513,14 +524,21 @@ class AiEngine:
                 clean = raw.replace('```json', '').replace('```', '').strip()
                 parsed = json.loads(clean)
 
+                # display_name → nameKey 역조회 맵
+                name_to_key = {
+                    v.get('name', nk): nk
+                    for nk, v in app.all_students.items()
+                }
                 updated = 0
                 for item in parsed:
-                    n = item.get('name', '').strip()
-                    c = item.get('cls',  '').strip()
+                    display_n = item.get('name', '').strip()
+                    c         = item.get('cls',  '').strip()
                     note_text = item.get('note', '').strip()
-                    if not n or not note_text:
+                    if not display_n or not note_text:
                         continue
-                    app.note_data[(sheet, c, n)] = {'value': note_text}
+                    # v2.0: note_data 키 = (classId, nameKey)
+                    nk = name_to_key.get(display_n, display_n)
+                    app.note_data[(c, nk)] = {'value': note_text}
                     updated += 1
 
                 save_daily_cache(app.progress_data, app.student_data, app.note_data, app.force_data)
