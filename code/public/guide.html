@@ -164,6 +164,23 @@
   .dlbtn:hover{background:var(--indigo-d)}
   .dlbtn:active{transform:translateY(1px)}
 
+  /* engine guide links */
+  .alink{display:inline-block; background:var(--indigo); color:#fff; text-decoration:none; font-size:13px;
+    font-weight:700; padding:7px 14px; border-radius:9px; margin:4px 0;}
+  .alink:hover{background:var(--indigo-d)}
+
+  /* engine sub-tabs */
+  .etabs{display:flex; flex-wrap:wrap; gap:8px; margin:6px 0 18px}
+  .etab{flex:1; min-width:88px; padding:11px 6px; border:1px solid var(--border); background:var(--panel);
+    border-radius:11px; cursor:pointer; font-family:inherit; font-size:13.5px; font-weight:800; color:var(--sub);
+    transition:all .15s; text-align:center;}
+  .etab .badge{display:block; font-size:10.5px; font-weight:700; margin-top:3px; letter-spacing:.02em}
+  .etab.free .badge{color:var(--green)} .etab.paid .badge{color:var(--amber)}
+  .etab.on{border-color:var(--indigo); background:var(--indigo-l); color:var(--indigo-d); box-shadow:0 1px 4px rgba(67,56,202,.15)}
+  .epane{display:none} .epane.on{display:block; animation:fade .2s ease}
+  .pill{display:inline-block; font-size:11px; font-weight:800; padding:2px 9px; border-radius:20px; letter-spacing:.03em; margin-left:6px;}
+  .pill.free{background:#DCFCE7; color:#166534} .pill.paid{background:#FEF3C7; color:#92400E}
+
   footer{text-align:center; font-size:12px; color:var(--gray); padding:30px 20px 50px}
   footer a{font-weight:600}
 </style>
@@ -356,6 +373,131 @@
     </div>
   </div>
 
+  <h2 class="sec">4부 · AI 엔진 키 발급</h2>
+  <p class="lead">
+    위 <b>✨ AI생성</b>을 쓰려면 외부 AI 엔진의 <b>API Key</b>가 필요합니다. 엔진마다 발급처가 다르며,
+    아래에서 <b>엔진을 고르면</b> 발급 방법과 앱 등록 방법을 볼 수 있습니다. <b>비용·발급 난이도</b>를 보고 고르세요.
+  </p>
+
+  <div class="note tip">
+    <span class="ico">⭐</span>
+    <div><b>추천: Gemini.</b> 무료에 월 사용 제한이 없고(하루 요청 한도만 있음), 카드 등록도 필요 없습니다.
+      처음이라면 Gemini로 시작하세요.</div>
+  </div>
+
+  <!-- 엔진 선택 서브탭 -->
+  <div class="etabs">
+    <button class="etab free on" id="et-gemini" onclick="showEngine('gemini')">Gemini<span class="badge">무료 · 추천</span></button>
+    <button class="etab paid" id="et-claude" onclick="showEngine('claude')">Claude<span class="badge">유료 · 문장력</span></button>
+    <button class="etab paid" id="et-openai" onclick="showEngine('openai')">GPT<span class="badge">유료 · 범용</span></button>
+    <button class="etab free" id="et-groq" onclick="showEngine('groq')">Groq<span class="badge">무료 · 빠름</span></button>
+  </div>
+
+  <!-- ── Gemini ── -->
+  <div class="epane on" id="ep-gemini">
+    <h2 class="sec">Gemini <span class="pill free">무료</span></h2>
+    <p class="lead">Google AI Studio에서 발급. 카드 등록 불필요, 월 제한 없음(하루 요청 한도만).</p>
+    <div class="step"><div class="num">1</div><div class="body">
+      <h3>AI Studio 접속</h3>
+      <p>Google 계정으로 로그인 후 아래 페이지로 이동합니다.</p>
+      <a class="alink" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">🔗 aistudio.google.com/apikey 열기</a>
+    </div></div>
+    <div class="step"><div class="num">2</div><div class="body">
+      <h3>API 키 만들기</h3>
+      <p><span class="kbd">API 키 만들기</span> 클릭 → <b>새 프로젝트에서 생성</b>을 권장합니다.</p>
+    </div></div>
+    <div class="step"><div class="num">3</div><div class="body">
+      <h3>키 복사</h3>
+      <p>발급된 키를 복사합니다. 형식 예: <span class="kbd">AIza...</span> 또는 <span class="kbd">AQ.Ab8...</span></p>
+      <div class="note warn"><span class="ico">⚠️</span><div>호출 시 <b>limit: 0</b> 오류가 뜨면 그 프로젝트는 무료 할당이 막힌 것입니다.
+        <b>새 프로젝트</b>로 키를 다시 발급하세요.</div></div>
+    </div></div>
+  </div>
+
+  <!-- ── Claude ── -->
+  <div class="epane" id="ep-claude">
+    <h2 class="sec">Claude <span class="pill paid">유료</span></h2>
+    <p class="lead">Anthropic Console에서 발급. 문장 품질이 가장 좋지만 크레딧 충전(결제)이 필요합니다.</p>
+    <div class="step"><div class="num">1</div><div class="body">
+      <h3>Anthropic Console 가입</h3>
+      <a class="alink" href="https://console.anthropic.com" target="_blank" rel="noopener">🔗 console.anthropic.com 열기</a>
+    </div></div>
+    <div class="step"><div class="num">2</div><div class="body">
+      <h3>결제 등록</h3>
+      <p><b>Billing</b> 메뉴에서 결제 수단 등록 후 크레딧을 충전합니다(최소 $5).</p>
+    </div></div>
+    <div class="step"><div class="num">3</div><div class="body">
+      <h3>키 생성·복사</h3>
+      <p><span class="kbd">Settings</span> <span class="path-arrow">›</span> <span class="kbd">API Keys</span> <span class="path-arrow">›</span> <span class="kbd">Create Key</span>.
+        형식: <span class="kbd">sk-ant-...</span></p>
+      <div class="note info"><span class="ico">🔒</span><div>키는 생성 직후 한 번만 표시됩니다. 즉시 복사해 두세요.</div></div>
+    </div></div>
+  </div>
+
+  <!-- ── GPT (OpenAI) ── -->
+  <div class="epane" id="ep-openai">
+    <h2 class="sec">GPT (OpenAI) <span class="pill paid">유료</span></h2>
+    <p class="lead">OpenAI Platform에서 발급. 범용 품질. 결제 등록 필요.</p>
+    <div class="step"><div class="num">1</div><div class="body">
+      <h3>OpenAI Platform 접속</h3>
+      <a class="alink" href="https://platform.openai.com/api-keys" target="_blank" rel="noopener">🔗 platform.openai.com/api-keys 열기</a>
+    </div></div>
+    <div class="step"><div class="num">2</div><div class="body">
+      <h3>결제 등록</h3>
+      <p><b>Billing</b>에서 결제 수단 등록 후 크레딧을 충전합니다.</p>
+    </div></div>
+    <div class="step"><div class="num">3</div><div class="body">
+      <h3>키 생성·복사</h3>
+      <p><span class="kbd">Create new secret key</span> 클릭 → 복사. 형식: <span class="kbd">sk-...</span></p>
+      <div class="note info"><span class="ico">🔒</span><div>키는 생성 직후 한 번만 표시됩니다. 즉시 복사해 두세요.</div></div>
+    </div></div>
+  </div>
+
+  <!-- ── Groq ── -->
+  <div class="epane" id="ep-groq">
+    <h2 class="sec">Groq <span class="pill free">무료</span></h2>
+    <p class="lead">Groq Console에서 발급. 무료·매우 빠름. 분당 요청수(RPM) 제한이 있어 연속 생성 시 대기가 걸릴 수 있습니다.</p>
+    <div class="step"><div class="num">1</div><div class="body">
+      <h3>Groq Console 가입</h3>
+      <a class="alink" href="https://console.groq.com/keys" target="_blank" rel="noopener">🔗 console.groq.com/keys 열기</a>
+    </div></div>
+    <div class="step"><div class="num">2</div><div class="body">
+      <h3>키 생성·복사</h3>
+      <p><span class="kbd">Create API Key</span> 클릭 → 복사. 형식: <span class="kbd">gsk_...</span></p>
+    </div></div>
+  </div>
+
+  <!-- ── 공통: 앱에 키 등록 ── -->
+  <h2 class="sec">발급한 키를 앱에 등록하기</h2>
+  <p class="lead">PC 전송 클라이언트(Windows) 기준입니다. 어떤 엔진이든 등록 방법은 같습니다.</p>
+  <div class="step"><div class="num">1</div><div class="body">
+    <h3>설정 열기</h3>
+    <p>PC 앱에서 <span class="nav-chip">⚙️ 설정</span> <span class="path-arrow">›</span> <b>🤖 AI 특이사항 생성 엔진 설정</b> 항목으로 이동합니다.</p>
+  </div></div>
+  <div class="step"><div class="num">2</div><div class="body">
+    <h3>엔진 선택</h3>
+    <p><b>AI 엔진 종류</b> 드롭다운에서 발급한 엔진을 고릅니다 — <span class="kbd">gemini</span> / <span class="kbd">claude</span> / <span class="kbd">openai</span> / <span class="kbd">groq</span>.</p>
+    <div class="note tip"><span class="ico">💡</span><div>엔진별로 키가 <b>따로 저장</b>됩니다. 엔진을 바꾸면 그 엔진에 저장해 둔 키가 자동으로 채워집니다. 여러 엔진 키를 미리 등록해 두고 전환할 수 있습니다.</div></div>
+  </div></div>
+  <div class="step"><div class="num">3</div><div class="body">
+    <h3>API Key 붙여넣기 → 저장</h3>
+    <p><b>API Key</b> 칸에 복사한 키를 붙여넣고(👁 버튼으로 확인 가능), 하단 <span class="kbd">저장</span> 을 누릅니다.</p>
+  </div></div>
+  <div class="step"><div class="num">✓</div><div class="body">
+    <h3>동작 확인</h3>
+    <p>수업 입력 후 학생 카드의 <span class="kbd">✨ AI생성</span> 버튼을 눌러 문장이 생성되면 정상입니다.
+      <span class="kbd">429</span> 또는 한도 안내가 뜨면 잠시 후 재시도하세요.</p>
+  </div></div>
+
+  <h2 class="sec">엔진 한눈에 비교</h2>
+  <table class="ftab">
+    <tr><th>엔진</th><th style="width:62px">비용</th><th>특징</th></tr>
+    <tr><td>Gemini</td><td>무료</td><td>월 제한 없음(일당 한도만). 카드 불필요. <b>추천</b>.</td></tr>
+    <tr><td>Claude</td><td>유료</td><td>문장력·감성 최상. 크레딧 충전 필요.</td></tr>
+    <tr><td>GPT</td><td>유료</td><td>범용. 크레딧 충전 필요.</td></tr>
+    <tr><td>Groq</td><td>무료</td><td>매우 빠름. 분당 요청 제한 있음.</td></tr>
+  </table>
+
 </section>
 
 <!-- ════════════════════ 운용 가이드 ════════════════════ -->
@@ -515,12 +657,18 @@
 
 <script>
   function showPane(name){
-    document.getElementById('pane-install').classList.toggle('on', name==='install');
-    document.getElementById('pane-operate').classList.toggle('on', name==='operate');
-    document.getElementById('tab-install').classList.toggle('on', name==='install');
-    document.getElementById('tab-operate').classList.toggle('on', name==='operate');
+    ['install','operate'].forEach(function(n){
+      document.getElementById('pane-'+n).classList.toggle('on', n===name);
+      document.getElementById('tab-'+n).classList.toggle('on', n===name);
+    });
     if(location.hash.slice(1)!==name) history.replaceState(null,'','#'+name);
     window.scrollTo({top:0,behavior:'smooth'});
+  }
+  function showEngine(name){
+    ['gemini','claude','openai','groq'].forEach(function(n){
+      document.getElementById('ep-'+n).classList.toggle('on', n===name);
+      document.getElementById('et-'+n).classList.toggle('on', n===name);
+    });
   }
   function cp(id,btn){
     var t=document.getElementById(id).textContent.trim();

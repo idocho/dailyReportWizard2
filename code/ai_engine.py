@@ -11,7 +11,8 @@ import urllib.error
 # 외부(main.py)에서 주입 가능한 디버그 플래그 (기본: 비활성)
 DEBUG_AI_PROMPT: bool = False
 
-from constants import APP_VERSION, AI_COOLDOWN_GROQ, AI_COOLDOWN_PAID, TAGS
+from constants import (APP_VERSION, AI_COOLDOWNS, AI_COOLDOWN_PAID,
+                       AI_ENGINE_LABELS, GEMINI_MODEL, TAGS)
 from firebase import fetch_tags_today, today_key
 from storage import save_daily_cache
 
@@ -285,6 +286,7 @@ def _call_ai_hub(engine_type, api_key, prompt, max_tokens=300, temperature=0.5, 
         headers = {
             "X-API-Key":         api_key,
             "Anthropic-Version": "2023-06-01",
+            "Anthropic-Beta":    "prompt-caching-2024-07-31",
             "Content-Type":      "application/json"
         }
         body = {
@@ -294,7 +296,9 @@ def _call_ai_hub(engine_type, api_key, prompt, max_tokens=300, temperature=0.5, 
             "messages":    [{"role": "user", "content": prompt}]
         }
         if system:
-            body["system"] = system
+            body["system"] = [
+                {"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}
+            ]
 
     elif engine_type == "openai":
         url = "https://api.openai.com/v1/chat/completions"
@@ -312,6 +316,23 @@ def _call_ai_hub(engine_type, api_key, prompt, max_tokens=300, temperature=0.5, 
             "max_tokens":  max_tokens,
             "temperature": temperature
         }
+
+    elif engine_type == "gemini":
+        # 무료 티어. key는 헤더 아닌 쿼리파람. thinkingBudget=0 필수(출력 잘림 방지).
+        url = (f"https://generativelanguage.googleapis.com/v1beta/models/"
+               f"{GEMINI_MODEL}:generateContent?key={api_key}")
+        headers = {"Content-Type": "application/json"}
+        body = {
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {
+                "maxOutputTokens": max_tokens,
+                "temperature":     temperature,
+                "thinkingConfig":  {"thinkingBudget": 0},
+            },
+        }
+        if system:
+            body["system_instruction"] = {"parts": [{"text": system}]}
+
     else:
         raise ValueError(f"지원하지 않는 엔진 선택 유형: {engine_type}")
     
@@ -334,6 +355,12 @@ def _call_ai_hub(engine_type, api_key, prompt, max_tokens=300, temperature=0.5, 
     # 엔진별 리턴 데이터 매핑 구조 분기 파싱
     if engine_type == "claude":
         return resp['content'][0]['text'].strip()
+    elif engine_type == "gemini":
+        cands = resp.get('candidates', [])
+        if not cands:
+            # safety filter 등으로 후보 없음
+            raise RuntimeError(f"Gemini 빈 응답: {json.dumps(resp, ensure_ascii=False)[:300]}")
+        return cands[0]['content']['parts'][0]['text'].strip()
     else:
         return resp['choices'][0]['message']['content'].strip()
 
@@ -346,7 +373,7 @@ class AiEngine:
 
     def _check_cooldown(self):
         engine_type = self.app.config.get('ai_engine_type', 'groq').strip().lower()
-        cooldown = AI_COOLDOWN_GROQ if engine_type == 'groq' else AI_COOLDOWN_PAID
+        cooldown = AI_COOLDOWNS.get(engine_type, AI_COOLDOWN_PAID)
         remaining = max(0, cooldown - (time.time() - self._last_call))
         if remaining > 0:
             from tkinter import messagebox
@@ -362,15 +389,14 @@ class AiEngine:
         (설정 키 명칭은 사용 중인 app.cfg 규격에 부합하게 맞추어 조율하세요)
         """
         engine_type = self.app.config.get('ai_engine_type', 'groq').strip().lower()
-        
-        # UI에서 설정한 단일 통합 키 혹은 개별 키 저장값 연동
+
+        # 엔진별 고유 키만 사용 (공유 ai_api_key 폴백 제거 — 엔진 간 키 오염 방지)
         api_key = self.app.config.get(f'{engine_type}_api_key', '').strip()
-        if not api_key:
-            api_key = self.app.config.get('ai_api_key', '').strip()
 
         if not api_key:
             from tkinter import messagebox
-            messagebox.showwarning("알림", f"설정에서 선택하신 {engine_type.upper()} API Key를 입력해 주세요.")
+            label = AI_ENGINE_LABELS.get(engine_type, engine_type.upper())
+            messagebox.showwarning("알림", f"설정에서 선택하신 {label} API Key를 입력해 주세요.")
         
         return engine_type, api_key
 
@@ -510,7 +536,7 @@ class AiEngine:
 
         if not messagebox.askyesno(
             "전체 일괄 생성",
-            f"선택한 엔진: {engine_type.upper()}\n대 상 인 원: {len(targets)}명\n\n특이사항을 일괄 생성하시겠습니까?"
+            f"선택한 엔진: {AI_ENGINE_LABELS.get(engine_type, engine_type.upper())}\n대 상 인 원: {len(targets)}명\n\n특이사항을 일괄 생성하시겠습니까?"
         ):
             return
 
@@ -519,7 +545,7 @@ class AiEngine:
         def _call():
             try:
                 raw = _call_ai_hub(engine_type, api_key, prompt,
-                                   max_tokens=4096, temperature=0.5,
+                                   max_tokens=8192, temperature=0.5,
                                    system="")
                 clean = raw.replace('```json', '').replace('```', '').strip()
                 parsed = json.loads(clean)
@@ -565,8 +591,8 @@ class AiEngine:
                 if not btn.winfo_exists():
                     return
                 engine_type = self.app.config.get('ai_engine_type', 'groq').strip().lower()
-                cooldown = AI_COOLDOWN_GROQ if engine_type == 'groq' else AI_COOLDOWN_PAID
-                remaining = max(0, cooldown - (time.time() - self._last_call))        
+                cooldown = AI_COOLDOWNS.get(engine_type, AI_COOLDOWN_PAID)
+                remaining = max(0, cooldown - (time.time() - self._last_call))
                 if remaining > 0:
                     btn.config(state='disabled', text=f"⏳ {int(remaining)}s")
                     self.app.root.after(1000, _tick)

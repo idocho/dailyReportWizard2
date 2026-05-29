@@ -1,7 +1,7 @@
 # DailyReportWizard — 요구사항 명세서
 
 **Crafted by IDO(idocho@kakao.com) · Powered by Claude AI**  
-**문서 버전**: 6.4 · **앱 버전**: v2.0.3 · **최종 수정**: 2026-05-29
+**문서 버전**: 6.6 · **앱 버전**: v2.0.3 · **최종 수정**: 2026-05-30
 
 > Firebase 스키마 전체 명세: [ClassManager/documents/DB_SCHEMA.md](../../ClassManager/documents/DB_SCHEMA.md)
 
@@ -44,6 +44,8 @@
 | 6.0 | 2026-05-27 | **DB 구조 전면 재설계** — 반 중심 → 학생 중심. 변수명 일괄 변경 (`sheet`→`group`, `cls`→`classId`, `tb`→`subject`, `cfg`→`config`, `okey` 제거 등). Firebase 경로 전면 변경. scores 노드 weekly/achievement 분리. 교재 등록 권한 강사로 명확화. 성적 입력 권한 분리 (반별=담당강사, 학년단위=담임). |
 | 6.1 | 2026-05-28 | **nameKey = 출결번호** — 이름 기반 키 + 동명이인 suffix 로직 폐기. 출결번호(불변 고유번호)를 Firebase 학생 키로 사용. ClassManager에서 발부 및 CSV 관리. |
 | 6.4 | 2026-05-29 | **전체 AI 생성 버그픽스** — `gen_all`이 `system=_base_conditions()` 전달 시 규칙 #10("JSON 금지")이 배치 JSON 응답 요구와 충돌 → 파싱 실패. 배치 호출은 `system=""` 로 변경 (`build_batch_prompt` 자체에 지침 내장) |
+| 6.5 | 2026-05-30 | **무료 AI 엔진 Gemini 탑재** — `_call_ai_hub`에 `gemini` 분기 추가(`gemini-2.5-flash`, 무료 티어, 월 제한 없음·일당 RPD만). key=URL 쿼리파람, `system_instruction` 사용, **`thinkingConfig.thinkingBudget=0` 필수**(미설정 시 출력 잘림). 모델 `GEMINI_MODEL` 상수화. `AI_FREE_ENGINES=('groq','gemini')` 신설 — 쿨다운 무료군 판정 일원화(3곳: `_check_cooldown`/`_start_cooldown_tick`/app.py 버튼 초기화). 설정 combobox에 `gemini` 추가, `gemini_api_key` 저장키 추가. 배치 `max_tokens` 4096→8192 상향(학생당 ~68토큰 실측, 40명 잘림 없음 검증) |
+| 6.6 | 2026-05-30 | **엔진별 API Key 격리 버그픽스** — `ai_api_key` 공유 폴백이 엔진 전환 시 타 엔진 키를 노출·저장하던 문제. `_get_engine_settings`/`_key_for_engine`/`_save_all` 모두 엔진별 슬롯(`{engine}_api_key`) 전용으로 변경, `ai_api_key` read/write 제거(deprecated). **설정 엔진 목록 순서 재조정**: `gemini → claude → openai → groq`(무료·추천 우선). **가이드 문서**(`public/guide.html`) AI 키 발급 가이드를 설치 가이드 내 "4부 · AI 엔진 키 발급"으로 편입(별도 최상위 탭 제거), 엔진별 서브탭으로 발급 가이드 + 앱 등록 절차 + 비교표 제공. **엔진 표시 명칭 공식 영문 통일**(웹 가이드 + PC 클라이언트 공통): `AI_ENGINE_LABELS = {gemini:'Gemini', claude:'Claude', openai:'GPT (OpenAI)', groq:'Groq'}`, `AI_ENGINE_ORDER`로 표시 순서 관리. PC 설정 드롭다운은 표시명을 보이고 내부 id로 매핑(저장값·API 분기·키 슬롯은 기존 소문자 id 유지). 일괄생성 확인창·키 미입력 경고도 표시명 사용. **엔진별 쿨다운 분리** — `AI_COOLDOWNS={groq:30, gemini:7}`(그 외 PAID 3초)로 전환, 기존 `AI_FREE_ENGINES` 일괄 30초 판정 폐기(Gemini free RPM~10 → 7초로 완화, 3곳 동일 적용). Firebase Hosting 배포 |
 | 6.3 | 2026-05-29 | **부담임 필터링 버그픽스** — `_is_sub_teacher()` 가 `cls` 키만 검사해 `classId` 키 assignment에서 role 못 읽던 문제. `a.get('cls') or a.get('classId','')` 로 수정 — 카톡 전송·AI 일괄생성 대상에서 부담임 반 올바르게 제외 |
 | 6.2 | 2026-05-28 | **소형 화면 차단 기준 완화 후 임시 비활성** — 기준 11인치급(1024px) → 9인치급(840px, `max-width:1023px`→`839px`, 1024×9/11≈838→840) 계산. 이후 **전면 개방**: 차단 미디어쿼리 주석 처리(`@media(max-width:839px)`)로 모든 해상도 접근 허용. 복구 시 839px 기준 재적용. index.html 안내 문구·헤더 주석 동기화. 추가로 `#scr-mask` div 자체 주석 처리(`file://` 크롬 css 캐시로 css 주석만으론 미반영되던 문제 회피). 빈 화면 원인 추적용 임시 JS 에러 표시기(`window.onerror`/`unhandledrejection` → 화면 빨간 박스) 삽입 — 해결 후 제거 예정 |
 | 5.9 | 2026-05-25 | Claude 프롬프트 캐싱 적용. `Anthropic-Beta: prompt-caching-2024-07-31` 헤더 추가. system 필드를 배열+`cache_control: ephemeral` 구조로 변경 — 전체 AI생성 시 학생 수만큼 반복 호출되는 `_base_conditions()` 캐시 히트로 input 토큰 ~90% 절감 |
@@ -71,7 +73,7 @@ v2.0부터는 DailyReportAnalyzer가 월간 학부모 리포트를 생성할 수
 | `constants.py` | 전역 상수, 색상, 폰트, TAGS, DEFAULT_CONFIG | 태그·상수 추가 시 |
 | `storage.py` | 경로, config, cache I/O | 저장 구조 변경 시 |
 | `firebase.py` | Firebase REST CRUD, 태그 로드(`fetch_tags`) | 노드 추가 시 |
-| `ai_engine.py` | AI 생성, 태그 프롬프트 주입, 멀티 엔진(Groq/Claude/GPT) | 엔진 추가·프롬프트 튜닝 시 |
+| `ai_engine.py` | AI 생성, 태그 프롬프트 주입, 멀티 엔진(Groq/Gemini/Claude/GPT) | 엔진 추가·프롬프트 튜닝 시 |
 | `message.py` | 카카오톡 메시지 조립 | 포맷 변경 시 |
 | `app.py` | UI 전체 (App 클래스) | UI 수정 시 |
 | `drw_icon.ico` | PC 앱 아이콘 — 256×256 레이어 필수 | — |
@@ -93,7 +95,7 @@ v2.0부터는 DailyReportAnalyzer가 월간 학부모 리포트를 생성할 수
 교재 등록/관리 (curriculum 지정)       학생별 데이터 열람
 반 공통 진도/과제 입력                 특이사항 직접 편집
 학생별 입력:                           AI 특이사항 초안 생성
-  - 과제수행도 (assign_grade)          (Groq / Claude / GPT 선택)
+  - 과제수행도 (assign_grade)          (Groq / Gemini / Claude / GPT 선택)
   - 수업 관찰 태그 (obs/)              카카오톡 메시지 전송 (담임)
   - 성적 입력 (scores/)
 프리셋 관리
@@ -262,16 +264,17 @@ DRW 2.0이 저장하는 수업 관찰 데이터(`obs/`)와 성적 데이터(`sco
 | 기본 매크로 설정 | 카카오톡 전송 딜레이(초), 톡방 접두사 |
 | Firebase 연결 | DB URL, DB 경로, ⚡ 연결 테스트 (`config` 노드 조회 + null 여부 검증) |
 | 내 강사 계정 | 이름 입력 → 조회/신규등록, 🔄 학급명단 동기화 |
-| AI 엔진 설정 | 엔진 종류 선택(groq/openai/claude) + API Key + 👁 토글 |
+| AI 엔진 설정 | 엔진 종류 선택(표시명 Gemini/Claude/GPT (OpenAI)/Groq, 내부 id gemini/claude/openai/groq) + API Key + 👁 토글 |
 | 학급·학생·교재·프리셋 | 웹 PWA 전담 안내 |
 
 **AI 엔진 설정 저장 키**
 
 | 키 | 내용 |
 |----|------|
-| `ai_engine_type` | `"groq"` \| `"openai"` \| `"claude"` |
+| `ai_engine_type` | `"groq"` \| `"gemini"` \| `"openai"` \| `"claude"` |
 | `ai_api_key` | 마지막 저장 Key (폴백용) |
 | `groq_api_key` | Groq 전용 Key |
+| `gemini_api_key` | Gemini 전용 Key |
 | `openai_api_key` | OpenAI 전용 Key |
 | `claude_api_key` | Claude 전용 Key |
 
@@ -344,10 +347,19 @@ def _my_classes(self, sheet) -> list:
 | 엔진 | 모델 | 용도 |
 |------|------|------|
 | `groq` | `qwen/qwen3-32b` | 무료, 속도 최적화 |
+| `gemini` | `gemini-2.5-flash` | 무료, 월 제한 없음(일당 RPD만) |
 | `claude` | `claude-sonnet-4-6` | 문장력·감성 우선 |
 | `openai` | `gpt-4o-mini` | 범용 |
 
-**API Key 로드 순서**: `ai_api_key` → (groq 선택 시) `groq_api_key` 폴백
+**Gemini 규격 특이사항**:
+- key는 헤더가 아닌 URL 쿼리파람(`?key=`)으로 전달
+- endpoint: `…/v1beta/models/{GEMINI_MODEL}:generateContent`
+- body: `contents[].parts[].text` + `system_instruction.parts[].text`
+- **`thinkingConfig.thinkingBudget=0` 필수** — 2.5-flash는 thinking 모델이라 미설정 시 출력 토큰이 thinking에 소모돼 응답 잘림
+- 응답 파싱: `candidates[0].content.parts[0].text` (후보 없으면 safety filter로 간주, 예외)
+- 모델은 `constants.GEMINI_MODEL` 상수로 분리 (교체 시 한 줄)
+
+**API Key 저장/로드**: 엔진별 고유 슬롯(`{engine}_api_key`)에만 저장·조회한다. 공유 `ai_api_key` 폴백은 **제거**(엔진 전환 시 타 엔진 키가 노출·오염되던 버그 수정). 엔진을 바꾸면 그 엔진에 저장된 키만 자동 로드되며, 키가 없으면 빈칸이다. `ai_api_key`는 deprecated(미사용).
 
 ### 3.2 단건 생성 (`gen_single`)
 
@@ -355,14 +367,15 @@ def _my_classes(self, sheet) -> list:
 - AI 호출 직전 현재 특이사항 `Text` 위젯 값을 `note_data`에 저장한 뒤 프롬프트를 생성한다. 따라서 FocusOut 전 작성한 메모도 `[직접 작성 메모 — 반드시 반영]`에 반영된다.
 - 직접 작성 메모는 참고 자료가 아니라 교사가 직접 입력한 핵심 전달 사항으로 취급하며, 최종 문장에 자연스럽게 포함해야 한다.
 - `max_tokens=400`, `temperature=0.75` (자연스러운 문체)
-- system prompt: `_base_conditions()` 전달 (Claude: system 필드, Groq/OpenAI: system role 메시지)
+- system prompt: `_base_conditions()` 전달 (Claude: system 필드, Groq/OpenAI: system role 메시지, Gemini: `system_instruction`)
 - 완료 후 쿨다운 틱 시작
 
 ### 3.3 일괄 생성 (`gen_all`)
 
 - 현재 시트의 `STATUS_READY` 학생 전원 단일 API 호출
 - 부담임 반 자동 제외
-- 배치 프롬프트: 학생 데이터 JSON 배열 → JSON 배열 응답 (`max_tokens=4096`, `temperature=0.5`)
+- 배치 프롬프트: 학생 데이터 JSON 배열 → JSON 배열 응답 (`max_tokens=8192`, `temperature=0.5`)
+  - 학생당 출력 ~68토큰 실측 → 8192는 ~100명까지 여유. (4096→8192 상향: 메모/하이라이트 포함 시 마진 확보)
 - system prompt: `_base_conditions()` 전달 (JSON 안정성 위해 temperature 0.5 유지)
 - 응답 파싱: `json.loads()` 전 ` ```json ``` ` 펜스 제거
 
@@ -812,8 +825,11 @@ cfg.sheets.M.classes.중1A.tb_grade  = { "최상위수학": "중1-1", "우공비
 | 항목 | 값 | 위치 |
 |------|-----|------|
 | AI 쿨다운 (Groq) | 30초 | `AI_COOLDOWN_GROQ` |
+| AI 쿨다운 (Gemini) | 7초 | `AI_COOLDOWN_GEMINI` (free RPM~10) |
 | AI 쿨다운 (유료) | 3초 | `AI_COOLDOWN_PAID` |
+| 엔진별 쿨다운 맵 | `{groq:30, gemini:7}`, 그 외 PAID | `AI_COOLDOWNS` |
 | Groq 모델 | `qwen/qwen3-32b` | ai_engine.py |
+| Gemini 모델 | `gemini-2.5-flash` | `GEMINI_MODEL` (constants.py) |
 | Claude 모델 | `claude-sonnet-4-6` | ai_engine.py |
 | OpenAI 모델 | `gpt-4o-mini` | ai_engine.py |
 

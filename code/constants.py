@@ -9,8 +9,27 @@ APP_TITLE   = "Daily Report Wizard"
 APP_VERSION = "v2.0.3"
 APP_CREDIT  = "Crafted by IDO(idocho@kakao.com)  ·  Powered by Claude AI"
 
-AI_COOLDOWN_GROQ = 30  # Groq 무료 플랜 RPM 제한 대응
-AI_COOLDOWN_PAID = 3   # 유료 엔진 (Claude/OpenAI) 중복 클릭 방지 최소치
+AI_COOLDOWN_GROQ   = 30  # Groq 무료 플랜 RPM 제한 대응 (보수적)
+AI_COOLDOWN_GEMINI = 7   # Gemini 무료 RPM ~10(=6s) 대응, 마진 포함
+AI_COOLDOWN_PAID   = 3   # 유료 엔진 (Claude/OpenAI) 중복 클릭 방지 최소치
+
+# 엔진별 단건 쿨다운(초). 미지정 엔진은 AI_COOLDOWN_PAID 적용.
+AI_COOLDOWNS = {'groq': AI_COOLDOWN_GROQ, 'gemini': AI_COOLDOWN_GEMINI}
+
+# 무료 티어 엔진군 (참고용 — RPD/일당 한도 안내 등)
+AI_FREE_ENGINES = ('groq', 'gemini')
+
+# 엔진 내부 id ↔ 표시 명칭(공식 표기). 설정 드롭다운·안내문구에서 일관 사용.
+AI_ENGINE_ORDER  = ('gemini', 'claude', 'openai', 'groq')  # 표시 순서 (무료·추천 우선)
+AI_ENGINE_LABELS = {
+    'gemini': 'Gemini',
+    'claude': 'Claude',
+    'openai': 'GPT (OpenAI)',
+    'groq':   'Groq',
+}
+
+# Gemini 기본 모델 (무료·stable). 교체 시 이 한 줄만 수정.
+GEMINI_MODEL = "gemini-2.5-flash"
 
 # ── 색상 ─────────────────────────────────────────────────────────────
 BG       = "#F5F6FA"
@@ -113,10 +132,10 @@ DEFAULT_CONFIG = {
     "firebase_url":   "",
     "firebase_path":  "",
     "ai_engine_type":  "groq",
-    "ai_api_key":      "",
     "groq_api_key":    "",
     "openai_api_key":  "",
     "claude_api_key":  "",
+    "gemini_api_key":  "",
     "instructor_id":   "",
     "sheets": {
         "M": {"classes": {}},

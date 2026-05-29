@@ -44,7 +44,8 @@ def make_scroll_frame(parent, bg=None):
 
 
 from constants import (
-    APP_TITLE, APP_VERSION, APP_CREDIT, AI_COOLDOWN_GROQ, AI_COOLDOWN_PAID,
+    APP_TITLE, APP_VERSION, APP_CREDIT, AI_COOLDOWNS, AI_COOLDOWN_PAID,
+    AI_ENGINE_ORDER, AI_ENGINE_LABELS,
     BG, PANEL, DARK, DARK2, ACCENT, INDIGO, INDIGO_L,
     GREEN, YELLOW, GRAY, BORDER, TEXT, SUBTEXT, BLUE,
     STATUS_EMPTY, STATUS_PARTIAL, STATUS_READY, DOT_COLOR,
@@ -484,7 +485,7 @@ class App:
         else:
             # 쿨다운 잔여 시간에 따라 초기 상태 설정
             _engine = self.config.get('ai_engine_type', 'groq').strip().lower()
-            _cooldown = AI_COOLDOWN_GROQ if _engine == 'groq' else AI_COOLDOWN_PAID
+            _cooldown = AI_COOLDOWNS.get(_engine, AI_COOLDOWN_PAID)
             _rem = max(0, _cooldown - (time.time() - self._ai_last_call))
             if _rem > 0:
                 ai_btn.config(state='disabled', text=f"⏳ {int(_rem)}s")
@@ -1307,29 +1308,34 @@ class App:
         ai_grid.pack(fill='x', padx=16, pady=(0,10))
         ai_grid.columnconfigure(1, weight=1)
 
-        # 깔끔하게 groq, openai, claude 3가지 항목만 선택하는 드롭다운
+        # 엔진 드롭다운 — 표시명(공식 표기)을 보여주고 내부 id로 매핑
+        _label2id = {AI_ENGINE_LABELS[i]: i for i in AI_ENGINE_ORDER}
+        _cur_id = self.config.get('ai_engine_type', 'gemini').strip().lower()
+        if _cur_id not in AI_ENGINE_LABELS:
+            _cur_id = 'gemini'
         tk.Label(ai_grid, text="AI 엔진 종류", font=FS, bg=BG, fg=SUBTEXT).grid(row=0, column=0, sticky='w', pady=6, padx=(0,8))
-        engine_var = tk.StringVar(value=self.config.get('ai_engine_type', 'groq'))
+        engine_var = tk.StringVar(value=AI_ENGINE_LABELS[_cur_id])
         cmb_engine = ttk.Combobox(ai_grid, textvariable=engine_var, state="readonly", font=FS)
-        cmb_engine['values'] = ('groq', 'openai', 'claude')
+        cmb_engine['values'] = tuple(AI_ENGINE_LABELS[i] for i in AI_ENGINE_ORDER)
         cmb_engine.grid(row=0, column=1, sticky='ew', pady=6)
 
         # API Key 입력 폼
         tk.Label(ai_grid, text="API Key", font=FS, bg=BG, fg=SUBTEXT).grid(row=1, column=0, sticky='w', pady=3, padx=(0,8))
-        
-        def _key_for_engine(eng):
-            k = self.config.get(f'{eng}_api_key', '').strip()
-            if not k:
-                k = self.config.get('ai_api_key', '').strip()
-            return k
 
-        default_key = _key_for_engine(engine_var.get())
+        def _selected_engine_id():
+            return _label2id.get(engine_var.get(), 'gemini')
+
+        def _key_for_engine(eng):
+            # 엔진별 고유 키만 반환 (공유 ai_api_key 폴백 제거 — 엔진 전환 시 타 엔진 키 노출 방지)
+            return self.config.get(f'{eng}_api_key', '').strip()
+
+        default_key = _key_for_engine(_cur_id)
         ai_key_var = tk.StringVar(value=default_key)
         ai_entry = tk.Entry(ai_grid, textvariable=ai_key_var, font=FS, show='*', relief='flat', bg="#F8FAFC", highlightbackground=BORDER, highlightthickness=1)
         ai_entry.grid(row=1, column=1, sticky='ew', ipady=3)
 
         def _on_engine_change(event=None):
-            ai_key_var.set(_key_for_engine(engine_var.get()))
+            ai_key_var.set(_key_for_engine(_selected_engine_id()))
         cmb_engine.bind('<<ComboboxSelected>>', _on_engine_change)
 
         def _toggle_ai_vis():
@@ -1350,12 +1356,11 @@ class App:
                 self.config['firebase_url'] = fb_url_var.get().strip()
                 self.config['firebase_path'] = fb_path_var.get().strip()
 
-                # 엔진 다중화 세팅 주입
-                chosen_engine = engine_var.get().strip().lower()
+                # 엔진 다중화 세팅 주입 — 키는 엔진별 슬롯에만 저장 (공유 ai_api_key 미사용)
+                chosen_engine = _selected_engine_id()
                 chosen_key = ai_key_var.get().strip()
 
                 self.config['ai_engine_type'] = chosen_engine
-                self.config['ai_api_key'] = chosen_key
                 self.config[f'{chosen_engine}_api_key'] = chosen_key
 
                 save_config(self.config)
