@@ -270,11 +270,9 @@ function buildClsAccordion(classId,clsD,myRole){
   const stuChips=students.map(s=>`<span class="chip" onclick="rmStu('${esc(classId)}','${esc(s.nameKey)}')">${esc(s.name||s.nameKey)} <span>×</span></span>`).join('');
   const courseChips=subjects.map(subj=>{
     const course=courses[subj]||{};
-    const tb=course.textbook||'';
-    // 교재명이 있으면 "교재명 (과목)", 없으면 "과목"만 표시
-    const mainLabel=tb||subj;
-    const subLabel=tb?`<span style="color:var(--indigo);font-size:9px;font-weight:700;margin-right:3px">${esc(subj)}</span>`:'';
-    return`<span class="chip" onclick="rmCourse('${esc(classId)}','${esc(subj)}')">${subLabel}${esc(mainLabel)} <span style="display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;margin-left:4px;border-radius:50%;background:#FEE2E2;color:#B91C1C;font-size:10px;font-weight:700;line-height:1">×</span></span>`;}).join('');
+    const curriculum=course.curriculum||'';
+    const subLabel=curriculum?`<span style="color:var(--indigo);font-size:9px;font-weight:700;margin-right:3px">${esc(curriculum)}</span>`:'';
+    return`<span class="chip" onclick="rmCourse('${esc(classId)}','${esc(subj)}')">${subLabel}${esc(subj)} <span style="display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;margin-left:4px;border-radius:50%;background:#FEE2E2;color:#B91C1C;font-size:10px;font-weight:700;line-height:1">×</span></span>`;}).join('');
   return `<div style="border-bottom:1px solid var(--border)">
     <div class="acc-hdr" onclick="toggleAcc(this)">
       <span class="acc-arr" style="font-size:10px;color:var(--gray);width:14px;flex-shrink:0">▶</span>
