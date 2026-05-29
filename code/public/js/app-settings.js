@@ -429,10 +429,9 @@ function refreshCourseChips(classId){
   const courses=config?.classes?.[classId]?.courses||{};
   const courseChips=Object.keys(courses).map(subj=>{
     const course=courses[subj]||{};
-    const tb=course.textbook||'';
-    const mainLabel=tb||subj;
-    const subLabel=tb?`<span style="color:var(--indigo);font-size:9px;font-weight:700;margin-right:3px">${esc(subj)}</span>`:'';
-    return`<span class="chip" onclick="rmCourse('${esc(classId)}','${esc(subj)}')">${subLabel}${esc(mainLabel)} <span style="display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;margin-left:4px;border-radius:50%;background:#FEE2E2;color:#B91C1C;font-size:10px;font-weight:700;line-height:1">×</span></span>`;
+    const curriculum=course.curriculum||'';
+    const subLabel=curriculum?`<span style="color:var(--indigo);font-size:9px;font-weight:700;margin-right:3px">${esc(curriculum)}</span>`:'';
+    return`<span class="chip" onclick="rmCourse('${esc(classId)}','${esc(subj)}')">${subLabel}${esc(subj)} <span style="display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;margin-left:4px;border-radius:50%;background:#FEE2E2;color:#B91C1C;font-size:10px;font-weight:700;line-height:1">×</span></span>`;
   }).join('');
   el.innerHTML=courseChips+`<span class="chip" style="background:var(--indigo-l);border-color:var(--indigo);color:var(--indigo);cursor:pointer" onclick="addCourseInline('${esc(classId)}',this)">+ 과목 추가</span>`;
 }
