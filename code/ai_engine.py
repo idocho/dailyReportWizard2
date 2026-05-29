@@ -520,7 +520,7 @@ class AiEngine:
             try:
                 raw = _call_ai_hub(engine_type, api_key, prompt,
                                    max_tokens=4096, temperature=0.5,
-                                   system=_base_conditions())
+                                   system="")
                 clean = raw.replace('```json', '').replace('```', '').strip()
                 parsed = json.loads(clean)
 
