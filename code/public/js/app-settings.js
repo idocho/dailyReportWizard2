@@ -269,9 +269,12 @@ function buildClsAccordion(classId,clsD,myRole){
   const subBadge=isSub?`<span style="font-size:9px;background:#FEF3C7;color:#92400E;border-radius:8px;padding:1px 6px;font-weight:700;flex-shrink:0">부담임</span>`:'';
   const stuChips=students.map(s=>`<span class="chip" onclick="rmStu('${esc(classId)}','${esc(s.nameKey)}')">${esc(s.name||s.nameKey)} <span>×</span></span>`).join('');
   const courseChips=subjects.map(subj=>{
-    const curriculum=courses[subj]?.curriculum||'';
-    const gsLabel=curriculum?(GRADE_SEM_LIST.find(g=>g.val===curriculum)?.label||curriculum):'';
-    return`<span class="chip" onclick="rmCourse('${esc(classId)}','${esc(subj)}')">${gsLabel?`<span style="color:var(--indigo);font-size:9px;font-weight:700;margin-right:3px">${esc(gsLabel)}</span>`:`<span style="color:var(--red);font-size:9px;margin-right:3px">미설정</span>`}${esc(subj)} <span style="display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;margin-left:4px;border-radius:50%;background:#FEE2E2;color:#B91C1C;font-size:10px;font-weight:700;line-height:1">×</span></span>`;}).join('');
+    const course=courses[subj]||{};
+    const tb=course.textbook||'';
+    // 교재명이 있으면 "교재명 (과목)", 없으면 "과목"만 표시
+    const mainLabel=tb||subj;
+    const subLabel=tb?`<span style="color:var(--indigo);font-size:9px;font-weight:700;margin-right:3px">${esc(subj)}</span>`:'';
+    return`<span class="chip" onclick="rmCourse('${esc(classId)}','${esc(subj)}')">${subLabel}${esc(mainLabel)} <span style="display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;margin-left:4px;border-radius:50%;background:#FEE2E2;color:#B91C1C;font-size:10px;font-weight:700;line-height:1">×</span></span>`;}).join('');
   return `<div style="border-bottom:1px solid var(--border)">
     <div class="acc-hdr" onclick="toggleAcc(this)">
       <span class="acc-arr" style="font-size:10px;color:var(--gray);width:14px;flex-shrink:0">▶</span>
@@ -432,9 +435,11 @@ function refreshCourseChips(classId){
   if(!el)return;
   const courses=config?.classes?.[classId]?.courses||{};
   const courseChips=Object.keys(courses).map(subj=>{
-    const curriculum=courses[subj]?.curriculum||'';
-    const gsLabel=curriculum?(GRADE_SEM_LIST.find(g=>g.val===curriculum)?.label||curriculum):'';
-    return`<span class="chip" onclick="rmCourse('${esc(classId)}','${esc(subj)}')">${gsLabel?`<span style="color:var(--indigo);font-size:9px;font-weight:700;margin-right:3px">${esc(gsLabel)}</span>`:`<span style="color:var(--red);font-size:9px;margin-right:3px">미설정</span>`}${esc(subj)} <span style="display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;margin-left:4px;border-radius:50%;background:#FEE2E2;color:#B91C1C;font-size:10px;font-weight:700;line-height:1">×</span></span>`;
+    const course=courses[subj]||{};
+    const tb=course.textbook||'';
+    const mainLabel=tb||subj;
+    const subLabel=tb?`<span style="color:var(--indigo);font-size:9px;font-weight:700;margin-right:3px">${esc(subj)}</span>`:'';
+    return`<span class="chip" onclick="rmCourse('${esc(classId)}','${esc(subj)}')">${subLabel}${esc(mainLabel)} <span style="display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;margin-left:4px;border-radius:50%;background:#FEE2E2;color:#B91C1C;font-size:10px;font-weight:700;line-height:1">×</span></span>`;
   }).join('');
   el.innerHTML=courseChips+`<span class="chip" style="background:var(--indigo-l);border-color:var(--indigo);color:var(--indigo);cursor:pointer" onclick="addCourseInline('${esc(classId)}',this)">+ 과목 추가</span>`;
 }
