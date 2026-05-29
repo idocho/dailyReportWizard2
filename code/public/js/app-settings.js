@@ -271,8 +271,9 @@ function buildClsAccordion(classId,clsD,myRole){
   const courseChips=subjects.map(subj=>{
     const course=courses[subj]||{};
     const curriculum=course.curriculum||'';
+    const tbLabel=course.textbook||subj;
     const subLabel=curriculum?`<span style="color:var(--indigo);font-size:9px;font-weight:700;margin-right:3px">${esc(curriculum)}</span>`:'';
-    return`<span class="chip" onclick="rmCourse('${esc(classId)}','${esc(subj)}')">${subLabel}${esc(subj)} <span style="display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;margin-left:4px;border-radius:50%;background:#FEE2E2;color:#B91C1C;font-size:10px;font-weight:700;line-height:1">×</span></span>`;}).join('');
+    return`<span class="chip" onclick="rmCourse('${esc(classId)}','${esc(subj)}')">${subLabel}${esc(tbLabel)} <span style="display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;margin-left:4px;border-radius:50%;background:#FEE2E2;color:#B91C1C;font-size:10px;font-weight:700;line-height:1">×</span></span>`;}).join('');
   return `<div style="border-bottom:1px solid var(--border)">
     <div class="acc-hdr" onclick="toggleAcc(this)">
       <span class="acc-arr" style="font-size:10px;color:var(--gray);width:14px;flex-shrink:0">▶</span>
@@ -396,10 +397,10 @@ function addCourseInline(classId,btnEl){
     const textbook=tbInp.value.trim();
     if(!curriculum){toast('과정을 선택해 주세요.');return;}
     if(!textbook){toast('교재명을 입력해 주세요.');return;}
-    // subject key = 교재명 (동일 과정도 교재가 다르면 별도 과목으로 추가 가능)
-    const subject=textbook;
+    // subject key = "과정 교재" 조합 (과정·교재 둘 다 같을 때만 중복으로 간주)
+    const subject=`${curriculum} ${textbook}`;
     const existingCourses=config?.classes?.[classId]?.courses||{};
-    if(existingCourses[subject]){toast('이미 추가된 교재입니다.');return;}
+    if(existingCourses[subject]){toast('이미 추가된 과목입니다 (같은 과정·교재).');return;}
     if(!config.classes)config.classes={};
     if(!config.classes[classId])config.classes[classId]={group:'',courses:{}};
     if(!config.classes[classId].courses)config.classes[classId].courses={};
@@ -430,8 +431,9 @@ function refreshCourseChips(classId){
   const courseChips=Object.keys(courses).map(subj=>{
     const course=courses[subj]||{};
     const curriculum=course.curriculum||'';
+    const tbLabel=course.textbook||subj;
     const subLabel=curriculum?`<span style="color:var(--indigo);font-size:9px;font-weight:700;margin-right:3px">${esc(curriculum)}</span>`:'';
-    return`<span class="chip" onclick="rmCourse('${esc(classId)}','${esc(subj)}')">${subLabel}${esc(subj)} <span style="display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;margin-left:4px;border-radius:50%;background:#FEE2E2;color:#B91C1C;font-size:10px;font-weight:700;line-height:1">×</span></span>`;
+    return`<span class="chip" onclick="rmCourse('${esc(classId)}','${esc(subj)}')">${subLabel}${esc(tbLabel)} <span style="display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;margin-left:4px;border-radius:50%;background:#FEE2E2;color:#B91C1C;font-size:10px;font-weight:700;line-height:1">×</span></span>`;
   }).join('');
   el.innerHTML=courseChips+`<span class="chip" style="background:var(--indigo-l);border-color:var(--indigo);color:var(--indigo);cursor:pointer" onclick="addCourseInline('${esc(classId)}',this)">+ 과목 추가</span>`;
 }
