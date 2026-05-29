@@ -363,13 +363,13 @@ function addCourseInline(classId,btnEl){
   wrapper.className='course-inline-wrap';
   wrapper.style.cssText='display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-top:5px;padding:6px 8px;background:var(--indigo-l);border:1px solid var(--indigo);border-radius:8px;';
 
-  // 커리큘럼 = 과목 식별자 (별도 과목명 없음)
+  // 커리큘럼 드롭다운
   const gsSel=document.createElement('select');
   gsSel.style.cssText='font-size:11px;padding:3px 5px;border:1px solid var(--indigo);border-radius:5px;font-family:inherit;background:#fff;';
-  gsSel.innerHTML='<option value="">과목 선택</option>'+
+  gsSel.innerHTML='<option value="">과정 선택</option>'+
     GRADE_SEM_LIST.map(g=>`<option value="${esc(g.val)}">${esc(g.label)}</option>`).join('');
 
-  // 교재명 — 기존 교재 목록에서 선택하거나 직접 입력
+  // 교재명 — 기존 교재 목록에서 선택하거나 직접 입력 (subject key로 사용)
   const tbDlId='tb-dl-'+classId.replace(/[^a-z0-9]/gi,'_');
   const tbDl=document.createElement('datalist');
   tbDl.id=tbDlId;
@@ -394,15 +394,18 @@ function addCourseInline(classId,btnEl){
   cancel.onclick=()=>wrapper.remove();
 
   async function doAdd(){
-    const subject=gsSel.value;
+    const curriculum=gsSel.value;
     const textbook=tbInp.value.trim();
-    if(!subject){toast('과목을 선택해 주세요.');return;}
+    if(!curriculum){toast('과정을 선택해 주세요.');return;}
+    if(!textbook){toast('교재명을 입력해 주세요.');return;}
+    // subject key = 교재명 (동일 과정도 교재가 다르면 별도 과목으로 추가 가능)
+    const subject=textbook;
     const existingCourses=config?.classes?.[classId]?.courses||{};
-    if(existingCourses[subject]){toast('이미 추가된 과목입니다.');return;}
+    if(existingCourses[subject]){toast('이미 추가된 교재입니다.');return;}
     if(!config.classes)config.classes={};
     if(!config.classes[classId])config.classes[classId]={group:'',courses:{}};
     if(!config.classes[classId].courses)config.classes[classId].courses={};
-    const courseData={textbook,curriculum:subject};
+    const courseData={textbook,curriculum};
     config.classes[classId].courses[subject]=courseData;
     wrapper.remove();
     try{refreshCourseChips(classId);}catch(e){renderMain();}
