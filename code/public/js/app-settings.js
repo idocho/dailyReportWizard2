@@ -251,22 +251,22 @@ function renderClsMgmtClass(classId){
   if(!config)return '';
   _ensureConfigShape();
   const clsD=config.classes?.[classId]||{courses:{}};
-  const myRole=(instructor?.assignments||[]).find(a=>a.classId===classId)?.role||null;
+  // 드릴인 상세 화면: 아코디언 없이 본문을 바로 펼쳐 보여줌 (이중 클릭 제거)
   return `<div class="card">
     <div class="sh" style="display:flex;align-items:center;gap:8px;padding:7px 10px 7px 14px">
       <button class="btn bsm" onclick="clsDrillSh=null;renderMain()" style="flex-shrink:0;font-size:11px">← 뒤로</button>
       <span style="flex:1">🏫 ${esc(classId)} 학급 관리</span>
+      <button class="btn br bsm" onclick="rmCls('${esc(classId)}')" style="padding:2px 7px;font-size:11px;flex-shrink:0">학급 삭제</button>
     </div>
-    ${buildClsAccordion(classId,clsD,myRole)}
+    <div style="padding:12px 14px">${_clsSectionsHtml(classId,clsD)}</div>
   </div>`;
 }
 
-function buildClsAccordion(classId,clsD,myRole){
+// 학급의 학생/과목 칩 섹션 (아코디언 본문과 드릴인 상세에서 공용)
+function _clsSectionsHtml(classId,clsD){
   const students=(config?._classStudents||{})[classId]||[];
   const courses=clsD.courses||{};
   const subjects=Object.keys(courses);
-  const isSub=myRole==='부담임';
-  const subBadge=isSub?`<span style="font-size:9px;background:#FEF3C7;color:#92400E;border-radius:8px;padding:1px 6px;font-weight:700;flex-shrink:0">부담임</span>`:'';
   const stuChips=students.map(s=>`<span class="chip" onclick="rmStu('${esc(classId)}','${esc(s.nameKey)}')">${esc(s.name||s.nameKey)} <span>×</span></span>`).join('');
   const courseChips=subjects.map(subj=>{
     const course=courses[subj]||{};
@@ -274,6 +274,17 @@ function buildClsAccordion(classId,clsD,myRole){
     const tbLabel=course.textbook||subj;
     const subLabel=curriculum?`<span style="color:var(--indigo);font-size:9px;font-weight:700;margin-right:3px">${esc(curriculum)}</span>`:'';
     return`<span class="chip" onclick="rmCourse('${esc(classId)}','${esc(subj)}')">${subLabel}${esc(tbLabel)} <span style="display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;margin-left:4px;border-radius:50%;background:#FEE2E2;color:#B91C1C;font-size:10px;font-weight:700;line-height:1">×</span></span>`;}).join('');
+  return `<div class="sl">학생</div>
+      <div class="chips" data-classid="${esc(classId)}" data-chip-type="stu">${stuChips}<span class="chip" style="background:var(--indigo-l);border-color:var(--indigo);color:var(--indigo);cursor:pointer" onclick="addStuInline('${esc(classId)}',this)">+ 추가</span></div>
+      <div class="sl" style="margin-top:10px">과목</div>
+      <div class="chips" data-classid="${esc(classId)}" data-chip-type="course">${courseChips}<span class="chip" style="background:var(--indigo-l);border-color:var(--indigo);color:var(--indigo);cursor:pointer" onclick="addCourseInline('${esc(classId)}',this)">+ 과목 추가</span></div>`;
+}
+
+function buildClsAccordion(classId,clsD,myRole){
+  const students=(config?._classStudents||{})[classId]||[];
+  const subjects=Object.keys(clsD.courses||{});
+  const isSub=myRole==='부담임';
+  const subBadge=isSub?`<span style="font-size:9px;background:#FEF3C7;color:#92400E;border-radius:8px;padding:1px 6px;font-weight:700;flex-shrink:0">부담임</span>`:'';
   return `<div style="border-bottom:1px solid var(--border)">
     <div class="acc-hdr" onclick="toggleAcc(this)">
       <span class="acc-arr" style="font-size:10px;color:var(--gray);width:14px;flex-shrink:0">▶</span>
@@ -282,12 +293,7 @@ function buildClsAccordion(classId,clsD,myRole){
       <span style="font-size:10px;color:var(--gray);margin:0 6px;white-space:nowrap">학생 ${students.length} · 과목 ${subjects.length}</span>
       <button class="btn br bsm" onclick="rmCls('${esc(classId)}');event.stopPropagation()" style="padding:2px 7px;font-size:11px;flex-shrink:0">✕</button>
     </div>
-    <div class="acc-body">
-      <div class="sl">학생</div>
-      <div class="chips" data-classid="${esc(classId)}" data-chip-type="stu">${stuChips}<span class="chip" style="background:var(--indigo-l);border-color:var(--indigo);color:var(--indigo);cursor:pointer" onclick="addStuInline('${esc(classId)}',this)">+ 추가</span></div>
-      <div class="sl" style="margin-top:10px">과목</div>
-      <div class="chips" data-classid="${esc(classId)}" data-chip-type="course">${courseChips}<span class="chip" style="background:var(--indigo-l);border-color:var(--indigo);color:var(--indigo);cursor:pointer" onclick="addCourseInline('${esc(classId)}',this)">+ 과목 추가</span></div>
-    </div>
+    <div class="acc-body">${_clsSectionsHtml(classId,clsD)}</div>
   </div>`;
 }
 
@@ -480,7 +486,9 @@ async function lookupInstr(){
   if(!dbUrl||!dbPath){toast('Firebase 연결 정보를 먼저 저장하세요.');return;}
   try{
     const d=await fbGet(`config/instructors/${encodeURIComponent(name)}`);
-    if(d&&d.name){
+    if(d){
+      // 기존 엔트리에 name 필드가 없으면(구 데이터) id로 백필
+      if(!d.name){d.name=name;fbPatch(`config/instructors/${encodeURIComponent(name)}`,{name}).catch(()=>{});}
       instructor={id:name,...d};saveLocal();curAI=0;renderSb();renderMain();
       toast(`${name} 계정으로 로그인됨 ✅`);
     } else {
@@ -863,12 +871,13 @@ async function loadInstrsSection(){
   try{const d=await fbGet('config/instructors');if(d)instrs=Object.entries(d).map(([id,v])=>({id,...v})).sort((a,b)=>(a.name||'').localeCompare(b.name||'','ko'));}catch(e){}
   const list=instrs.map(ins=>{
     const isCur=instructor?.id===ins.id;
+    const dispName=ins.name||ins.id||'?';
     return `<div style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid var(--border)">
-      <div class="avatar" style="width:32px;height:32px;font-size:10px;flex-shrink:0">${esc((ins.name||'?').slice(0,3))}</div>
-      <div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:700">${esc(ins.name||'?')}</div><div style="font-size:10px;color:var(--sub)">${(ins.assignments||[]).length}개 수업</div></div>
+      <div class="avatar" style="width:32px;height:32px;font-size:10px;flex-shrink:0">${esc(dispName.slice(0,3))}</div>
+      <div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:700">${esc(dispName)}</div><div style="font-size:10px;color:var(--sub)">${(ins.assignments||[]).length}개 수업</div></div>
       <div style="display:flex;gap:4px;flex-shrink:0">
         ${isCur?'<span class="badge b-g">현재</span>':`<button class="btn bsm" onclick="switchInstr('${esc(ins.id)}')">전환</button>`}
-        <button class="btn bsm" style="color:var(--red)" onclick="rmInstr('${esc(ins.id)}','${esc(ins.name||'')}')">삭제</button>
+        <button class="btn bsm" style="color:var(--red)" onclick="rmInstr('${esc(ins.id)}','${esc(dispName)}')">삭제</button>
       </div>
     </div>`;
   }).join('');

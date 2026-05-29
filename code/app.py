@@ -361,7 +361,7 @@ class App:
         cls_data  = self.all_classes.get(classId, {})
         courses   = cls_data.get('courses', {})
         subjects  = list(courses.keys())
-        tb_grade  = {subj: courses[subj].get('grade', '') for subj in subjects}
+        tb_grade  = {subj: courses[subj].get('curriculum', '') for subj in subjects}
         display_name = self.all_students.get(nameKey, {}).get('name', nameKey)
         room      = get_room(self.config, display_name)
 
@@ -659,7 +659,7 @@ class App:
         cls_data  = self.all_classes.get(classId, {})
         courses   = cls_data.get('courses', {})
         subjects  = list(courses.keys())
-        tb_grade  = {subj: courses[subj].get('grade', '') for subj in subjects}
+        tb_grade  = {subj: courses[subj].get('curriculum', '') for subj in subjects}
         display_name = self.all_students.get(nameKey, {}).get('name', nameKey)
         room      = get_room(self.config, display_name)
         class_info = {subj: self.progress_data.get((classId, subj), {'progress':'','homework':''})
@@ -741,7 +741,7 @@ class App:
                 continue
             courses    = cls_data.get('courses', {})
             subjects   = list(courses.keys())
-            tb_grade   = {subj: courses[subj].get('grade', '') for subj in subjects}
+            tb_grade   = {subj: courses[subj].get('curriculum', '') for subj in subjects}
             class_info = {subj: self.progress_data.get((classId, subj), {'progress':'','homework':''})
                           for subj in subjects}
             class_student_keys = [k for k, v in self.all_students.items()
