@@ -410,14 +410,6 @@ function addCourseInline(classId,btnEl){
     if(dbUrl&&dbPath){
       try{
         await fbPatch(`classes/${classId}/courses/${subject}`,courseData);
-        if(instructor?.id){
-          const already=(instructor.assignments||[]).some(a=>a.classId===classId&&a.subject===subject);
-          if(!already){
-            instructor.assignments=[...(instructor.assignments||[]),{classId,subject,role:'담임'}];
-            saveLocal();
-            fbPatch(`config/instructors/${encodeURIComponent(instructor.id)}`,{assignments:instructor.assignments}).catch(()=>{});
-          }
-        }
         toast('과목 추가됨 ✅');
       }catch(e){toast('저장 실패: '+e);}
     }
