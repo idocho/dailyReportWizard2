@@ -95,8 +95,8 @@ def save_daily_cache(progress_data, student_data=None, note_data=None, force_dat
     _ensure_parent(CACHE_PATH)
     data = {"class_data": {}, "student_data": {}, "note_data": {}, "force_data": {}}
 
-    for (sheet, cls, tb), v in progress_data.items():
-        data["class_data"][f"{sheet}|{cls}|{tb}"] = {
+    for key, v in progress_data.items():
+        data["class_data"]["|".join(key)] = {
             "progress": v.get("progress", ""),
             "homework": v.get("homework", ""),
         }
@@ -133,8 +133,8 @@ def load_daily_cache():
 
         progress_data = {}
         for k, v in data.get("class_data", {}).items():
-            parts = k.split("|", 2)
-            if len(parts) == 3:
+            parts = k.split("|")
+            if len(parts) >= 2:
                 progress_data[tuple(parts)] = v
 
         student_data = {}
