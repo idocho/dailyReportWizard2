@@ -31,7 +31,7 @@
 ## 아키텍처 핵심 원칙
 
 - `grade_sem` → 교재(`cfg.textbooks[tbName]`) 종속. 학급 종속 아님
-- `pkey` 형식: `{sheet}|{cls}|{tb}` (예: `M|중1A|최상위수학`)
+- `pkey` 형식: `{classId}|{subject}` (예: `중1A|수학`) — `session/class_data/{pkey}` 키. web write + PC read 모두 2-part
 - Firebase 쓰기: 웹 전용. PC 앱은 `lastSent/` + 강사 등록만 허용
 - 관리자 기능: `adminOn === true` 시만 렌더링
 
