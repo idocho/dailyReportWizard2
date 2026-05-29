@@ -155,6 +155,15 @@
   details.faq .ans{padding:0 0 14px 18px; font-size:13.5px; color:var(--sub)}
   details.faq .ans p{margin:6px 0}
 
+  /* download button */
+  .dlbtn{
+    display:inline-block; background:var(--indigo); color:#fff; text-decoration:none;
+    font-size:15px; font-weight:800; padding:12px 22px; border-radius:12px;
+    box-shadow:0 2px 8px rgba(67,56,202,.25); transition:background .15s,transform .1s;
+  }
+  .dlbtn:hover{background:var(--indigo-d)}
+  .dlbtn:active{transform:translateY(1px)}
+
   footer{text-align:center; font-size:12px; color:var(--gray); padding:30px 20px 50px}
   footer a{font-weight:600}
 </style>
@@ -181,8 +190,10 @@
 <section class="pane on" id="pane-install">
 
   <p class="lead">
-    이 앱은 설치 파일이 따로 없는 <b>웹 앱(PWA)</b>입니다. 브라우저로 접속만 하면 바로 쓸 수 있고,
-    원하면 바탕화면/홈 화면에 일반 앱처럼 추가할 수 있습니다. 아래 순서를 그대로 따라 하세요.
+    DailyReportWizard는 두 부분으로 이루어집니다.
+    <b>① 웹 앱</b> — 태블릿/PC 브라우저에서 매일의 수업·성적을 입력합니다.
+    <b>② PC 전송 클라이언트</b> — 입력된 내용을 받아 AI 특이사항을 만들고 카카오톡으로 전송합니다.
+    먼저 1~2부에서 웹 앱을 설정하고, 전송 담당자는 <b>3부</b>에서 PC 클라이언트를 내려받아 설치하세요.
   </p>
 
   <div class="note info">
@@ -194,7 +205,7 @@
     </div>
   </div>
 
-  <h2 class="sec">1부 · 접속과 설치</h2>
+  <h2 class="sec">1부 · 웹 앱 접속</h2>
 
   <div class="step">
     <div class="num">1</div>
@@ -218,25 +229,11 @@
     </div>
   </div>
 
+  <h2 class="sec">2부 · 최초 1회 설정</h2>
+  <p class="lead">아래 3~6단계는 <b>처음 한 번만</b> 하면 됩니다. 설정은 이 기기에 저장되어 다음부터는 바로 사용 화면이 뜹니다.</p>
+
   <div class="step">
     <div class="num">3</div>
-    <div class="body">
-      <h3>앱으로 설치 (선택, 권장)</h3>
-      <p>매번 주소를 치지 않으려면 앱으로 추가하세요. 전체화면으로 떠서 더 편합니다.</p>
-      <ul>
-        <li><b>PC (Chrome / Edge)</b> — 주소창 오른쪽 끝의 <span class="kbd">⤓ 설치</span> 아이콘 클릭 → <b>설치</b>. (메뉴 ⋮ → <b>앱 설치</b> 로도 가능)</li>
-        <li><b>iPad (Safari)</b> — 공유 버튼 <span class="kbd">⬆︎</span> → <b>홈 화면에 추가</b>.</li>
-        <li><b>Android 태블릿 (Chrome)</b> — 메뉴 ⋮ → <b>앱 설치</b> 또는 <b>홈 화면에 추가</b>.</li>
-      </ul>
-      <div class="note tip"><span class="ico">💡</span><div>설치하지 않고 즐겨찾기(북마크)만 해도 됩니다. 기능 차이는 없습니다.</div></div>
-    </div>
-  </div>
-
-  <h2 class="sec">2부 · 최초 1회 설정</h2>
-  <p class="lead">아래 4~7단계는 <b>처음 한 번만</b> 하면 됩니다. 설정은 이 기기에 저장되어 다음부터는 바로 사용 화면이 뜹니다.</p>
-
-  <div class="step">
-    <div class="num">4</div>
     <div class="body">
       <h3>Firebase 연결</h3>
       <p>왼쪽 사이드바에서 <span class="nav-chip">⚙️ 설정</span> 을 누른 뒤 맨 위 <span class="nav-chip">🔥 Firebase 연결</span> 항목을 펼칩니다.</p>
@@ -251,7 +248,7 @@
   </div>
 
   <div class="step">
-    <div class="num">5</div>
+    <div class="num">4</div>
     <div class="body">
       <h3>학생 명단 불러오기</h3>
       <p>같은 <span class="nav-chip">🔥 Firebase 연결</span> 항목 안의 <span class="kbd">📥 학생 명단 불러오기</span> 버튼을 클릭합니다.</p>
@@ -262,7 +259,7 @@
   </div>
 
   <div class="step">
-    <div class="num">6</div>
+    <div class="num">5</div>
     <div class="body">
       <h3>강사 계정 만들기 (이름 등록)</h3>
       <p><span class="nav-chip">🔑 내 계정</span> 항목을 펼치고, 입력칸에 <b>본인 이름</b>을 적은 뒤 <span class="kbd">조회</span> 를 누릅니다.</p>
@@ -276,7 +273,7 @@
   </div>
 
   <div class="step">
-    <div class="num">7</div>
+    <div class="num">6</div>
     <div class="body">
       <h3>담당 수업 추가</h3>
       <p><span class="nav-chip">📚 내 담당 수업</span> 항목을 펼친 뒤 <b>수업 추가</b>에서:</p>
@@ -292,10 +289,69 @@
   <div class="step">
     <div class="num">✓</div>
     <div class="body">
-      <h3>설치 완료 — 동작 확인</h3>
-      <p>사이드바 <span class="nav-chip">✏️ 수업 입력</span> 을 눌렀을 때 담당 반의 학생 목록이 보이면 모든 준비가 끝났습니다.
-        이제 <b>운용 가이드</b> 탭으로 넘어가 매일 사용법을 확인하세요.</p>
+      <h3>웹 앱 설정 완료 — 동작 확인</h3>
+      <p>사이드바 <span class="nav-chip">✏️ 수업 입력</span> 을 눌렀을 때 담당 반의 학생 목록이 보이면 웹 앱 준비가 끝났습니다.
+        매일 사용법은 <b>운용 가이드</b> 탭에서 확인하세요.
+        카카오톡 전송을 담당한다면 아래 <b>3부</b>로 이어집니다.</p>
       <p style="margin-top:10px"><button class="tab" style="display:inline-block;flex:none;border:1px solid var(--indigo);border-radius:8px;padding:8px 16px;color:var(--indigo)" onclick="showPane('operate')">📖 운용 가이드 보기 →</button></p>
+    </div>
+  </div>
+
+  <h2 class="sec">3부 · PC 전송 클라이언트 (카카오톡 발송)</h2>
+  <p class="lead">웹 앱에 입력된 수업·성적 데이터를 받아 <b>AI 특이사항을 생성</b>하고 학부모에게 <b>카카오톡으로 일괄 전송</b>하는
+    Windows 전용 프로그램입니다. 전송을 담당하는 PC에만 설치하면 됩니다.</p>
+
+  <div class="note info">
+    <span class="ico">💻</span>
+    <div><b>설치 조건.</b> Windows 10/11 PC + 카카오톡 PC 버전이 <b>설치·로그인</b>되어 있어야 합니다.
+      전송은 카카오톡 PC 창을 자동 제어하는 방식이라, 실행 중 PC를 다른 작업에 쓰지 마세요.</div>
+  </div>
+
+  <div class="step">
+    <div class="num">1</div>
+    <div class="body">
+      <h3>프로그램 다운로드</h3>
+      <p>아래 버튼으로 최신 실행 파일을 내려받습니다. (약 23MB, 설치 과정 없는 단일 실행 파일)</p>
+      <p style="margin:10px 0">
+        <a class="dlbtn" href="https://github.com/idocho/dailyReportWizard2/releases/latest/download/DailyReportWizard.exe">⬇ DailyReportWizard.exe 다운로드</a>
+      </p>
+      <p style="font-size:12.5px;color:var(--gray)">전체 릴리즈 목록:
+        <a href="https://github.com/idocho/dailyReportWizard2/releases/latest" target="_blank" rel="noopener">github.com/idocho/dailyReportWizard2/releases</a></p>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="num">2</div>
+    <div class="body">
+      <h3>실행 &amp; 보안 경고 통과</h3>
+      <p>받은 <span class="kbd">DailyReportWizard.exe</span> 를 더블클릭합니다.</p>
+      <p>서명되지 않은 프로그램이라 <b>"Windows의 PC 보호"</b> 파란 창이 뜰 수 있습니다 →
+        <b>추가 정보</b> 클릭 → <b>실행</b> 을 누르면 정상 실행됩니다.</p>
+      <div class="note warn"><span class="ico">⚠️</span><div>백신이 차단하면 <b>허용/신뢰</b> 처리하세요. 사내 배포용 자체 제작 프로그램이라 안전합니다.</div></div>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="num">3</div>
+    <div class="body">
+      <h3>Firebase 연결 (웹 앱과 동일)</h3>
+      <p>처음 실행하면 설정 화면에서 <b>DB URL</b>과 <b>경로</b>를 입력합니다. 웹 앱과 <b>같은 값</b>을 씁니다.</p>
+      <div class="copybox"><span class="lbl">DB URL</span><code id="v-url2">https://dailyreportwizard-default-rtdb.firebaseio.com</code><button onclick="cp('v-url2',this)">복사</button></div>
+      <div class="copybox"><span class="lbl">경로</span><code id="v-path2">drw2_cbt</code><button onclick="cp('v-path2',this)">복사</button></div>
+      <div class="note tip"><span class="ico">💡</span><div>같은 폴더에 설정 파일이 자동 생성됩니다. exe를 <b>고정 폴더</b>(예: 바탕화면의 전용 폴더)에 두고 쓰세요.</div></div>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="num">4</div>
+    <div class="body">
+      <h3>데이터 가져오기 → AI 생성 → 전송</h3>
+      <ul>
+        <li><b>📥 데이터 가져오기</b> — 웹 앱에 입력된 오늘 수업·성적·관찰 태그를 불러옵니다.</li>
+        <li><b>✨ AI생성</b> — 학생별 특이사항 문장을 자동 작성합니다(단건/일괄).</li>
+        <li><b>전송</b> — 카카오톡 PC가 켜져 있는 상태에서 학부모 채팅방으로 메시지를 보냅니다.</li>
+      </ul>
+      <div class="note warn"><span class="ico">🖱️</span><div>전송 중에는 마우스·키보드를 건드리지 마세요. 카카오톡 창을 자동 조작하는 동안 방해되면 잘못된 방에 전송될 수 있습니다.</div></div>
     </div>
   </div>
 
