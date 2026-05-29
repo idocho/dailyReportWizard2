@@ -366,10 +366,21 @@ function addCourseInline(classId,btnEl){
   gsSel.innerHTML='<option value="">과목 선택</option>'+
     GRADE_SEM_LIST.map(g=>`<option value="${esc(g.val)}">${esc(g.label)}</option>`).join('');
 
-  // 교재명 입력
+  // 교재명 — 기존 교재 목록에서 선택하거나 직접 입력
+  const tbDlId='tb-dl-'+classId.replace(/[^a-z0-9]/gi,'_');
+  const tbDl=document.createElement('datalist');
+  tbDl.id=tbDlId;
+  const existingTbs=new Set();
+  for(const clsD of Object.values(config?.classes||{}))
+    for(const c of Object.values(clsD.courses||{}))
+      if(c.textbook)existingTbs.add(c.textbook);
+  existingTbs.forEach(t=>{const o=document.createElement('option');o.value=t;tbDl.appendChild(o);});
+  wrapper.appendChild(tbDl);
+
   const tbInp=document.createElement('input');
-  tbInp.placeholder='교재명 (선택)';
-  tbInp.style.cssText='font-size:11px;padding:3px 5px;border:1px solid var(--border);border-radius:5px;font-family:inherit;min-width:90px;';
+  tbInp.placeholder=existingTbs.size?'교재 선택 또는 직접 입력':'교재명';
+  tbInp.setAttribute('list',tbDlId);
+  tbInp.style.cssText='font-size:11px;padding:3px 5px;border:1px solid var(--border);border-radius:5px;font-family:inherit;min-width:110px;';
 
   const ok=document.createElement('span');
   ok.textContent='✓';
