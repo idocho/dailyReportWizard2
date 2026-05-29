@@ -17,25 +17,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#1A1D2E">
 <title>DailyReportWizard v2.0.0</title>
-<link rel="stylesheet" href="css/app.css">
-<!-- [임시 진단] 빈 화면 원인 추적 — uncaught 에러를 화면에 표시. 해결 후 제거 -->
-<script>
-(function(){
-  function show(msg){
-    var b=document.body||document.documentElement;
-    var d=document.createElement('div');
-    d.style.cssText='position:fixed;left:0;right:0;top:0;z-index:99999;background:#7f1d1d;color:#fff;font:12px/1.5 monospace;padding:10px;white-space:pre-wrap;word-break:break-all;max-height:60vh;overflow:auto';
-    d.textContent='[JS ERROR] '+msg;
-    b.appendChild(d);
-  }
-  window.addEventListener('error',function(e){
-    show((e.message||e.error)+'\n@ '+(e.filename||'')+':'+(e.lineno||'')+':'+(e.colno||''));
-  });
-  window.addEventListener('unhandledrejection',function(e){
-    show('PROMISE: '+(e.reason&&(e.reason.stack||e.reason.message||e.reason)));
-  });
-})();
-</script>
+<link rel="stylesheet" href="css/app.css?v=202605290655">
 </head>
 <body>
 <!-- [임시 비활성] 소형 화면 마스킹 div 제거 — 전면 개방. 복구 시 아래 블록 주석 해제 + app.css @media(max-width:839px) 복구
@@ -53,11 +35,11 @@
   <main class="main" id="mc"></main>
   <div class="toast" id="toast"></div>
 </div>
-<script src="data/curriculum.js"></script>
+<script src="data/curriculum.js?v=202605290655"></script>
 <script>const APP_VERSION='v2.0.0';</script>
-<script src="js/app-core.js"></script>
-<script src="js/app-input.js"></script>
-<script src="js/app-settings.js"></script>
-<script src="js/app-scores.js"></script>
+<script src="js/app-core.js?v=202605290655"></script>
+<script src="js/app-input.js?v=202605290655"></script>
+<script src="js/app-settings.js?v=202605290655"></script>
+<script src="js/app-scores.js?v=202605290655"></script>
 </body>
 </html>
