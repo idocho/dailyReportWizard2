@@ -559,8 +559,7 @@ async function pushCfg(){
   saveLocal();
   if(!dbUrl||!dbPath)return;
   try{
-    // 학급은 최상위 classes/ 노드에 저장 (정본 스키마). PUT으로 삭제분까지 반영.
-    await fbPut('classes',config.classes||{});
+    await fbPatch('config',{classes:config.classes||{}});
     setSync(true);toast('저장됨 ✅');
   }catch(e){setSync(false);toast('저장 실패: '+e);}
 }
@@ -647,8 +646,7 @@ async function loadCfg(){
   const mc=document.getElementById('mc');
   mc.innerHTML=`<div class="loading"><div class="spin"></div>불러오는 중...</div>`;
   try{
-    // 신규: config(instructors) + 최상위 classes/ + students/ 전체 로드
-    // 학급은 최상위 classes/ 노드가 정본 (ClassManager·데스크톱 wizard2와 동일 스키마)
+    // classes는 최상위 classes/ 노드가 정본 (config/classes 아님)
     const [cfgData,clsData,stuData]=await Promise.all([
       fbGet('config').catch(()=>null),
       fbGet('classes').catch(()=>null),
