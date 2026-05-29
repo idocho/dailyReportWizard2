@@ -678,7 +678,8 @@ class App:
     def _is_sub_teacher(self, classId):
         """현재 강사가 해당 classId에서 부담임인지 확인"""
         for a in self.config.get("instructor_assignments", []):
-            if a.get('cls') == classId:
+            cid = a.get('cls') or a.get('classId', '')
+            if cid == classId:
                 return a.get('role') == '부담임'
         return False
 
