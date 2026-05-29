@@ -407,8 +407,13 @@ function addCourseInline(classId,btnEl){
         await fbPatch(`classes/${classId}/courses/${subject}`,courseData);
         // instructor assignments에도 추가 (이 강사가 담당)
         if(instructor?.id){
-          const asgKey=`${classId}|${subject}`;
-          await fbPatch(`config/instructors/${encodeURIComponent(instructor.id)}/assignments`,{[asgKey]:true}).catch(()=>{});
+          // assignments는 배열 구조 유지 — 맵으로 쓰면 데스크톱 앱과 스키마 충돌
+          const already=(instructor.assignments||[]).some(a=>a.classId===classId&&a.subject===subject);
+          if(!already){
+            instructor.assignments=[...(instructor.assignments||[]),{classId,subject,role:'담임'}];
+            saveLocal();
+            fbPatch(`config/instructors/${encodeURIComponent(instructor.id)}`,{assignments:instructor.assignments}).catch(()=>{});
+          }
         }
         toast('과목 추가됨 ✅');
       }catch(e){toast('저장 실패: '+e);}
@@ -559,7 +564,7 @@ async function pushCfg(){
   saveLocal();
   if(!dbUrl||!dbPath)return;
   try{
-    await fbPatch('config',{classes:config.classes||{}});
+    await fbPut('classes',config.classes||{});
     setSync(true);toast('저장됨 ✅');
   }catch(e){setSync(false);toast('저장 실패: '+e);}
 }
