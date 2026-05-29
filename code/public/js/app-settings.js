@@ -258,9 +258,6 @@ function renderClsMgmtClass(classId){
       <span style="flex:1">🏫 ${esc(classId)} 학급 관리</span>
     </div>
     ${buildClsAccordion(classId,clsD,myRole)}
-    <div style="padding:10px 12px;border-top:1px solid var(--border)">
-      <button class="btn bsm" onclick="addCourse('${esc(classId)}')">+ 과목 추가</button>
-    </div>
   </div>`;
 }
 
@@ -369,10 +366,11 @@ function addCourseInline(classId,btnEl){
   gsSel.innerHTML='<option value="">커리큘럼(선택)</option>'+
     GRADE_SEM_LIST.map(g=>`<option value="${esc(g.val)}">${esc(g.label)}</option>`).join('');
 
-  // 과목명 입력
+  // 과목명 입력 (커리큘럼 선택 시 자동 입력, 수정 가능)
   const subjectInp=document.createElement('input');
-  subjectInp.placeholder='과목명 (예: 3-1)';
-  subjectInp.style.cssText='font-size:11px;padding:3px 5px;border:1px solid var(--indigo);border-radius:5px;font-family:inherit;min-width:100px;';
+  subjectInp.placeholder='과목명';
+  subjectInp.style.cssText='font-size:11px;padding:3px 5px;border:1px solid var(--indigo);border-radius:5px;font-family:inherit;min-width:80px;';
+  gsSel.addEventListener('change',()=>{if(!subjectInp.value.trim())subjectInp.value=gsSel.value;});
 
   // 교재명 입력
   const tbInp=document.createElement('input');
