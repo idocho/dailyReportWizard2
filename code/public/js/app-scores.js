@@ -385,32 +385,35 @@ function init(){
     return;
   }
   if(dbUrl&&dbPath){
-    // 신규: config(classes+instructors), students/ 전체, input, session, obs, scores 로드
+    // 신규: config(instructors), 최상위 classes/, students/ 전체, input, session, obs, scores 로드
     Promise.all([
       fbGet('config').catch(()=>null),
+      fbGet('classes').catch(()=>null),
       fbGet('students').catch(()=>null),
       fbGet('input').catch(()=>null),
       fbGet('session').catch(()=>null),
       fbGet('obs').catch(()=>null),
       fbGet('scores').catch(()=>null),
     ])
-    .then(([cfgD,stuD,inpD,sessD,obsD,scD])=>{
-      if(cfgD){
-        config=cfgD;
-        // students를 classId별로 캐싱
-        if(stuD&&typeof stuD==='object'){
-          const classStudents={};
-          for(const[nameKey,v] of Object.entries(stuD)){
-            const cid=v?.class;
-            if(cid){
-              if(!classStudents[cid])classStudents[cid]=[];
-              classStudents[cid].push({nameKey,...v});
-            }
+    .then(([cfgD,clsD,stuD,inpD,sessD,obsD,scD])=>{
+      // config 노드가 없어도(null) 최상위 classes/·students/만으로 명단 구성
+      config=cfgD||config||{classes:{},instructors:{}};
+      if(clsD&&typeof clsD==='object')config.classes=clsD;
+      if(!config.classes)config.classes={};
+      if(!config.instructors)config.instructors={};
+      // students를 classId별로 캐싱
+      if(stuD&&typeof stuD==='object'){
+        const classStudents={};
+        for(const[nameKey,v] of Object.entries(stuD)){
+          const cid=v?.class;
+          if(cid){
+            if(!classStudents[cid])classStudents[cid]=[];
+            classStudents[cid].push({nameKey,...v});
           }
-          config._classStudents=classStudents;
         }
-        saveLocal();setSync(true);
+        config._classStudents=classStudents;
       }
+      saveLocal();setSync(true);
       if(inpD)Object.assign(inputData,inpD);
       if(sessD?.class_data)for(const[k,v]of Object.entries(sessD.class_data))if(!progressData[k])progressData[k]=v;
       if(obsD)Object.assign(tagData,obsD);

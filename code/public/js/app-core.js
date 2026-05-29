@@ -151,7 +151,11 @@ function saveLocal(){
   if(config)SS('drw_config',JSON.stringify(config));
 }
 
-function fbE(n){return `${dbUrl.replace(/\/$/,'')}/${dbPath.replace(/^\/|\/$/g,'')}/${n}.json`;}
+function fbE(n){
+  // 단일 경로 강제: 설정이 없으면 잘못된 URL을 만들지 않고 명시적으로 오류.
+  if(!dbUrl||!dbPath)throw new Error('Firebase 경로가 설정되지 않았습니다. 설정에서 URL·경로를 입력하세요.');
+  return `${dbUrl.replace(/\/$/,'')}/${dbPath.replace(/^\/|\/$/g,'')}/${n}.json`;
+}
 async function fbGet(n){const r=await fetch(fbE(n));if(!r.ok)throw n+':'+r.status;return r.json();}
 async function fbPut(n,d){const r=await fetch(fbE(n),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)});if(!r.ok)throw n+':'+r.status;return r.json();}
 async function fbPatch(n,d){const r=await fetch(fbE(n),{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)});if(!r.ok)throw n+':'+r.status;return r.json();}

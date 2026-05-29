@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#1A1D2E">
+<title>DailyReportWizard · 설치 &amp; 운용 가이드 (Closed Beta)</title>
+<style>
+  :root{
+    --indigo:#4338CA; --indigo-l:#EEF2FF; --indigo-d:#3730A3;
+    --bg:#F1F3F8; --panel:#fff; --text:#1E293B; --sub:#475569; --gray:#94A3B8;
+    --border:#E2E8F0; --green:#16A34A; --amber:#D97706; --red:#DC2626;
+    --dark:#1A1D2E; --dark2:#252A40;
+    --code-bg:#0F172A;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+    background:var(--bg); color:var(--text); line-height:1.65; font-size:15px;
+  }
+  a{color:var(--indigo)}
+
+  /* ── header ── */
+  header{
+    background:linear-gradient(135deg,#1A1D2E 0%,#2D2F52 100%); color:#fff;
+    padding:30px 22px 26px; text-align:center;
+  }
+  header .logo{font-size:30px}
+  header h1{margin:8px 0 4px; font-size:22px; font-weight:800; letter-spacing:-.02em}
+  header .sub{font-size:13px; color:#A5B4FC}
+  .beta{
+    display:inline-block; margin-top:12px; background:#4338CA; color:#fff;
+    font-size:11px; font-weight:700; padding:4px 12px; border-radius:20px; letter-spacing:.05em;
+    border:1px solid #6366F1;
+  }
+  .backlink{
+    display:inline-block; margin-top:14px; font-size:12px; color:#C7D2FE;
+    text-decoration:none; border:1px solid rgba(255,255,255,.2); border-radius:8px; padding:5px 12px;
+  }
+  .backlink:hover{background:rgba(255,255,255,.08)}
+
+  /* ── tabs ── */
+  .tabs{
+    position:sticky; top:0; z-index:50; display:flex; background:var(--panel);
+    border-bottom:1px solid var(--border); box-shadow:0 2px 8px rgba(0,0,0,.04);
+  }
+  .tab{
+    flex:1; padding:15px 8px; border:none; background:none; cursor:pointer;
+    font-family:inherit; font-size:14px; font-weight:700; color:var(--gray);
+    border-bottom:3px solid transparent; transition:color .15s,border-color .15s;
+  }
+  .tab.on{color:var(--indigo); border-bottom-color:var(--indigo)}
+  .tab:hover{color:var(--indigo-d)}
+
+  /* ── layout ── */
+  main{max-width:860px; margin:0 auto; padding:24px 18px 80px}
+  .pane{display:none}
+  .pane.on{display:block; animation:fade .25s ease}
+  @keyframes fade{from{opacity:0; transform:translateY(6px)}to{opacity:1; transform:none}}
+
+  h2.sec{
+    font-size:13px; font-weight:800; color:var(--indigo); letter-spacing:.06em;
+    text-transform:uppercase; margin:34px 0 4px; padding-bottom:6px;
+    border-bottom:2px solid var(--indigo-l);
+  }
+  .lead{font-size:14px; color:var(--sub); margin:6px 0 18px}
+
+  /* ── step cards ── */
+  .step{
+    display:flex; gap:14px; background:var(--panel); border:1px solid var(--border);
+    border-radius:14px; padding:16px 16px 14px; margin-bottom:12px;
+    box-shadow:0 1px 3px rgba(15,23,42,.04);
+  }
+  .step .num{
+    flex-shrink:0; width:30px; height:30px; border-radius:50%;
+    background:var(--indigo); color:#fff; font-weight:800; font-size:14px;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .step .body{flex:1; min-width:0}
+  .step h3{margin:3px 0 6px; font-size:15.5px; font-weight:800}
+  .step p{margin:6px 0; font-size:14px; color:var(--sub)}
+  .step ul{margin:6px 0; padding-left:20px; font-size:14px; color:var(--sub)}
+  .step li{margin:3px 0}
+  .step .body > :first-child{margin-top:0}
+
+  /* inline UI chips that mirror the app */
+  .nav-chip,.kbd{
+    display:inline-block; font-size:12.5px; font-weight:700; padding:2px 8px; border-radius:7px;
+    background:var(--indigo-l); color:var(--indigo-d); border:1px solid #C7D2FE;
+    white-space:nowrap; line-height:1.7;
+  }
+  .kbd{background:#fff; color:var(--text); border:1px solid var(--gray); font-family:ui-monospace,Menlo,monospace; font-weight:600}
+  .path-arrow{color:var(--gray); margin:0 4px; font-weight:700}
+
+  /* copy field */
+  .copybox{
+    display:flex; align-items:stretch; margin:8px 0; border:1px solid var(--border);
+    border-radius:10px; overflow:hidden; background:var(--code-bg);
+  }
+  .copybox .lbl{
+    background:#1E293B; color:#94A3B8; font-size:11px; font-weight:700; padding:0 12px;
+    display:flex; align-items:center; white-space:nowrap; border-right:1px solid #334155;
+  }
+  .copybox code{
+    flex:1; min-width:0; padding:11px 12px; color:#E2E8F0; font-size:13px;
+    font-family:ui-monospace,Menlo,monospace; overflow-x:auto; white-space:nowrap;
+  }
+  .copybox button{
+    border:none; background:#4338CA; color:#fff; font-family:inherit; font-size:12px;
+    font-weight:700; padding:0 14px; cursor:pointer; white-space:nowrap; transition:background .15s;
+  }
+  .copybox button:hover{background:#3730A3}
+  .copybox button.done{background:var(--green)}
+
+  /* callouts */
+  .note{
+    border-radius:12px; padding:12px 14px; margin:14px 0; font-size:13.5px; line-height:1.6;
+    border:1px solid; display:flex; gap:10px;
+  }
+  .note .ico{flex-shrink:0; font-size:16px; line-height:1.5}
+  .note.tip{background:#F0FDF4; border-color:#BBF7D0; color:#166534}
+  .note.warn{background:#FFFBEB; border-color:#FDE68A; color:#92400E}
+  .note.info{background:var(--indigo-l); border-color:#C7D2FE; color:var(--indigo-d)}
+  .note b{font-weight:800}
+
+  /* legend / dot meaning */
+  .legend{display:flex; flex-wrap:wrap; gap:10px; margin:10px 0}
+  .legend .item{
+    display:flex; align-items:center; gap:7px; background:var(--panel);
+    border:1px solid var(--border); border-radius:10px; padding:7px 12px; font-size:13px;
+  }
+  .dot{width:11px; height:11px; border-radius:50%; flex-shrink:0}
+  .dot.g{background:var(--green)} .dot.y{background:#EAB308} .dot.e{background:#CBD5E1}
+
+  /* field reference table */
+  .ftab{width:100%; border-collapse:collapse; margin:10px 0; font-size:13.5px; background:var(--panel);
+    border:1px solid var(--border); border-radius:12px; overflow:hidden}
+  .ftab th{background:#F8FAFC; text-align:left; padding:9px 12px; font-size:12px; color:var(--sub); font-weight:800}
+  .ftab td{padding:9px 12px; border-top:1px solid var(--border); vertical-align:top}
+  .ftab td:first-child{font-weight:700; white-space:nowrap; color:var(--indigo-d)}
+
+  /* FAQ */
+  details.faq{
+    background:var(--panel); border:1px solid var(--border); border-radius:12px;
+    padding:0 14px; margin-bottom:10px;
+  }
+  details.faq summary{
+    cursor:pointer; padding:13px 0; font-weight:700; font-size:14px; list-style:none;
+    display:flex; align-items:center; gap:8px;
+  }
+  details.faq summary::-webkit-details-marker{display:none}
+  details.faq summary::before{content:'▸'; color:var(--indigo); font-size:12px; transition:transform .15s}
+  details.faq[open] summary::before{transform:rotate(90deg)}
+  details.faq .ans{padding:0 0 14px 18px; font-size:13.5px; color:var(--sub)}
+  details.faq .ans p{margin:6px 0}
+
+  footer{text-align:center; font-size:12px; color:var(--gray); padding:30px 20px 50px}
+  footer a{font-weight:600}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">📘</div>
+  <h1>DailyReportWizard</h1>
+  <div class="sub">설치 &amp; 운용 가이드 — 클로즈드 베타 테스터용</div>
+  <div class="beta">CLOSED BETA</div>
+  <br>
+  <a class="backlink" href="./index.html">← 앱으로 돌아가기</a>
+</header>
+
+<nav class="tabs">
+  <button class="tab on" id="tab-install" onclick="showPane('install')">📦 설치 가이드</button>
+  <button class="tab" id="tab-operate" onclick="showPane('operate')">📖 운용 가이드</button>
+</nav>
+
+<main>
+
+<!-- ════════════════════ 설치 가이드 ════════════════════ -->
+<section class="pane on" id="pane-install">
+
+  <p class="lead">
+    이 앱은 설치 파일이 따로 없는 <b>웹 앱(PWA)</b>입니다. 브라우저로 접속만 하면 바로 쓸 수 있고,
+    원하면 바탕화면/홈 화면에 일반 앱처럼 추가할 수 있습니다. 아래 순서를 그대로 따라 하세요.
+  </p>
+
+  <div class="note info">
+    <span class="ico">🔑</span>
+    <div><b>먼저 알아둘 2가지 고정값.</b> Firebase 연결 단계(4단계)에서 아래 두 값을 그대로 입력하면 됩니다.
+      베타 기간 동안 변경되지 않습니다.
+      <div class="copybox"><span class="lbl">DB URL</span><code id="v-url">https://dailyreportwizard-default-rtdb.firebaseio.com</code><button onclick="cp('v-url',this)">복사</button></div>
+      <div class="copybox"><span class="lbl">경로</span><code id="v-path">drw2_cbt</code><button onclick="cp('v-path',this)">복사</button></div>
+    </div>
+  </div>
+
+  <h2 class="sec">1부 · 접속과 설치</h2>
+
+  <div class="step">
+    <div class="num">1</div>
+    <div class="body">
+      <h3>준비물 확인</h3>
+      <ul>
+        <li><b>PC 또는 태블릿</b> — 데스크톱/노트북, 또는 9인치급 이상 태블릿(가로 모드 권장).</li>
+        <li><b>브라우저</b> — <b>Chrome</b> 또는 <b>Edge</b> 최신 버전 권장 (Safari도 동작).</li>
+        <li><b>인터넷 연결</b> — 데이터는 클라우드(Firebase)에 저장되므로 접속이 필요합니다.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="num">2</div>
+    <div class="body">
+      <h3>앱 주소로 접속</h3>
+      <p>브라우저 주소창에 아래 주소를 입력합니다.</p>
+      <div class="copybox"><span class="lbl">앱 주소</span><code id="v-app">https://dailyreportwizard.web.app</code><button onclick="cp('v-app',this)">복사</button></div>
+      <p>로그인 화면이 아니라 곧바로 앱 화면(왼쪽 사이드바 + 본문)이 뜨면 정상입니다.</p>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="num">3</div>
+    <div class="body">
+      <h3>앱으로 설치 (선택, 권장)</h3>
+      <p>매번 주소를 치지 않으려면 앱으로 추가하세요. 전체화면으로 떠서 더 편합니다.</p>
+      <ul>
+        <li><b>PC (Chrome / Edge)</b> — 주소창 오른쪽 끝의 <span class="kbd">⤓ 설치</span> 아이콘 클릭 → <b>설치</b>. (메뉴 ⋮ → <b>앱 설치</b> 로도 가능)</li>
+        <li><b>iPad (Safari)</b> — 공유 버튼 <span class="kbd">⬆︎</span> → <b>홈 화면에 추가</b>.</li>
+        <li><b>Android 태블릿 (Chrome)</b> — 메뉴 ⋮ → <b>앱 설치</b> 또는 <b>홈 화면에 추가</b>.</li>
+      </ul>
+      <div class="note tip"><span class="ico">💡</span><div>설치하지 않고 즐겨찾기(북마크)만 해도 됩니다. 기능 차이는 없습니다.</div></div>
+    </div>
+  </div>
+
+  <h2 class="sec">2부 · 최초 1회 설정</h2>
+  <p class="lead">아래 4~7단계는 <b>처음 한 번만</b> 하면 됩니다. 설정은 이 기기에 저장되어 다음부터는 바로 사용 화면이 뜹니다.</p>
+
+  <div class="step">
+    <div class="num">4</div>
+    <div class="body">
+      <h3>Firebase 연결</h3>
+      <p>왼쪽 사이드바에서 <span class="nav-chip">⚙️ 설정</span> 을 누른 뒤 맨 위 <span class="nav-chip">🔥 Firebase 연결</span> 항목을 펼칩니다.</p>
+      <ul>
+        <li><b>DB URL</b> 칸에 위 고정값 <span class="kbd">https://dailyreportwizard-default-rtdb.firebaseio.com</span> 입력</li>
+        <li><b>경로 (Secret Path)</b> 칸에 <span class="kbd">drw2_cbt</span> 입력</li>
+        <li><span class="kbd">💾 저장</span> 클릭 → "Firebase 설정 저장됨 ✅" 토스트 확인</li>
+      </ul>
+      <div class="note warn"><span class="ico">⚠️</span><div>두 값의 <b>철자·대소문자가 정확</b>해야 합니다. 복사 버튼을 쓰면 오타를 막을 수 있습니다.
+        머리(<code>https://</code>)나 끝 슬래시(<code>/</code>)를 임의로 더하거나 빼지 마세요.</div></div>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="num">5</div>
+    <div class="body">
+      <h3>학생 명단 불러오기</h3>
+      <p>같은 <span class="nav-chip">🔥 Firebase 연결</span> 항목 안의 <span class="kbd">📥 학생 명단 불러오기</span> 버튼을 클릭합니다.</p>
+      <p>"학생 명단 불러옴 ✅" 토스트가 뜨면 학급·학생·과목 데이터가 이 기기로 내려온 것입니다.
+        Firebase 연결 항목의 상태가 <b>연결됨 ✓</b> 로 바뀝니다.</p>
+      <div class="note info"><span class="ico">ℹ️</span><div>명단이 비어 있어도 정상입니다. 이후 단계에서 직접 학급/학생을 추가할 수 있습니다.</div></div>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="num">6</div>
+    <div class="body">
+      <h3>강사 계정 만들기 (이름 등록)</h3>
+      <p><span class="nav-chip">🔑 내 계정</span> 항목을 펼치고, 입력칸에 <b>본인 이름</b>을 적은 뒤 <span class="kbd">조회</span> 를 누릅니다.</p>
+      <ul>
+        <li>이미 등록돼 있으면 → 바로 로그인됩니다.</li>
+        <li>없는 이름이면 → "신규 등록하시겠습니까?" 창에서 <b>확인</b> → 새 계정이 만들어집니다.</li>
+      </ul>
+      <p>등록 후 왼쪽 위 강사 뱃지에 본인 이름이 표시되면 성공입니다.</p>
+      <div class="note tip"><span class="ico">💡</span><div>입력한 이름이 그대로 계정 키가 됩니다. 동료와 <b>표기를 통일</b>하세요(예: "홍길동" vs "홍길동T").</div></div>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="num">7</div>
+    <div class="body">
+      <h3>담당 수업 추가</h3>
+      <p><span class="nav-chip">📚 내 담당 수업</span> 항목을 펼친 뒤 <b>수업 추가</b>에서:</p>
+      <ul>
+        <li><b>반</b> 선택 → <b>과목</b> 선택 → <b>역할</b>(담임/부담임) 선택</li>
+        <li><span class="kbd">+ 추가</span> 클릭</li>
+      </ul>
+      <p>추가한 수업은 왼쪽 사이드바 <b>내 담당 수업</b> 목록에 나타나고, 여기서 클릭해 전환합니다.</p>
+      <div class="note info"><span class="ico">ℹ️</span><div>찾는 반/과목이 없다면 <span class="nav-chip">🏫 학급 &amp; 학생 관리</span> 에서 먼저 학급·과목·학생을 만들 수 있습니다(운용 가이드 참고).</div></div>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="num">✓</div>
+    <div class="body">
+      <h3>설치 완료 — 동작 확인</h3>
+      <p>사이드바 <span class="nav-chip">✏️ 수업 입력</span> 을 눌렀을 때 담당 반의 학생 목록이 보이면 모든 준비가 끝났습니다.
+        이제 <b>운용 가이드</b> 탭으로 넘어가 매일 사용법을 확인하세요.</p>
+      <p style="margin-top:10px"><button class="tab" style="display:inline-block;flex:none;border:1px solid var(--indigo);border-radius:8px;padding:8px 16px;color:var(--indigo)" onclick="showPane('operate')">📖 운용 가이드 보기 →</button></p>
+    </div>
+  </div>
+
+</section>
+
+<!-- ════════════════════ 운용 가이드 ════════════════════ -->
+<section class="pane" id="pane-operate">
+
+  <p class="lead">매일의 작업은 크게 <b>① 수업 입력</b>, <b>② 성적 입력</b> 두 가지입니다.
+    입력한 내용은 자동으로 클라우드에 저장되어 리포트 생성에 쓰입니다.</p>
+
+  <h2 class="sec">화면 구성</h2>
+  <table class="ftab">
+    <tr><th style="width:170px">영역</th><th>설명</th></tr>
+    <tr><td>왼쪽 강사 뱃지</td><td>현재 로그인한 강사 / 담당 수업 개수. 클릭하면 계정 설정으로 이동.</td></tr>
+    <tr><td>사이드바 메뉴</td><td><span class="nav-chip">✏️ 수업 입력</span> <span class="nav-chip">📊 성적 입력</span> <span class="nav-chip">⚙️ 설정</span> 3개 탭.</td></tr>
+    <tr><td>내 담당 수업</td><td>그룹별로 묶인 담당 반 목록. 클릭해 입력 대상 반을 전환.</td></tr>
+    <tr><td>사이드바 하단</td><td><span class="nav-chip">📖 설치 · 운용 가이드</span> (이 문서) 링크.</td></tr>
+  </table>
+
+  <h2 class="sec">① 매일 수업 입력</h2>
+  <p class="lead">사이드바 <span class="nav-chip">✏️ 수업 입력</span> 탭. 상단에서 <b>오늘 수업의 진도·과제</b>를, 아래에서 <b>학생별 평가</b>를 기록합니다.</p>
+
+  <div class="step">
+    <div class="num">1</div>
+    <div class="body">
+      <h3>대상 반 선택</h3>
+      <p>담당 수업이 여러 개면 상단 탭(또는 그룹 탭)에서 입력할 반·과목을 고릅니다. 화면 제목에 <b>반 · 학년학기 · 과목</b>과 오늘 날짜가 표시됩니다.</p>
+      <div class="note info"><span class="ico">🔧</span><div>제목 우측의 <b>날짜 변경</b> 버튼은 테스트용으로 다른 날짜의 데이터를 입력/확인할 때 씁니다. 평소엔 건드리지 않아도 됩니다.</div></div>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="num">2</div>
+    <div class="body">
+      <h3>진도 입력</h3>
+      <p>상단 <b>진도</b> 칸에서 <b>대단원 → 소단원</b> 순으로 선택합니다(커리큘럼이 연결돼 있으면 목록이 자동으로 뜸).
+        단원 목록이 없거나 직접 적고 싶으면 <span class="kbd">✏️ 직접 입력</span> 을 고르세요. 아래 미리보기로 최종 표기를 확인합니다.</p>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="num">3</div>
+    <div class="body">
+      <h3>과제 입력</h3>
+      <p><b>과제</b> 칸에서 형식을 고릅니다: <span class="kbd">p. 페이지</span> / <span class="kbd"># 번호</span> / <span class="kbd">직접 입력</span>.
+        페이지·번호는 <b>시작~끝</b>을 적으면 <code>p.12~p.20</code> 처럼 자동 정리됩니다.</p>
+      <div class="note tip"><span class="ico">💡</span><div>진도·과제는 <b>반 전체 공통</b>이라 한 번만 입력하면 됩니다. 입력 즉시 자동 저장됩니다.</div></div>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="num">4</div>
+    <div class="body">
+      <h3>학생별 평가 입력</h3>
+      <p>아래 <b>👥 학생별 입력</b>에서 학생마다 카드 한 장씩 채웁니다. 각 줄의 의미:</p>
+      <table class="ftab">
+        <tr><th style="width:90px">항목</th><th>입력 방식</th></tr>
+        <tr><td>과제</td><td>수행 등급 1개 선택(택1) + 필요 시 자주 쓰는 문구(복수 선택).</td></tr>
+        <tr><td>컨디션</td><td>상태 1개 선택(화살표 아이콘).</td></tr>
+        <tr><td>이해도</td><td>이해 수준 1개 + 세부 태그(복수) + 하이라이트.</td></tr>
+        <tr><td>참여</td><td>수업 참여 태그(복수 선택).</td></tr>
+        <tr><td>기타</td><td>특이/주의 태그(복수 선택).</td></tr>
+        <tr><td>메모</td><td>자유 서술 특이사항(한 줄).</td></tr>
+      </table>
+      <p>모든 입력은 <b>누를 때마다 즉시 저장</b>됩니다. 별도 저장 버튼이 없습니다.</p>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="num">5</div>
+    <div class="body">
+      <h3>완료 표시(점) 읽기</h3>
+      <p>학생 이름 옆 점과 상단 <b>n/n명 완료</b> 카운터로 진행 상황을 봅니다.</p>
+      <div class="legend">
+        <div class="item"><span class="dot g"></span> 과제 평가 + 진도/과제 입력 완료</div>
+        <div class="item"><span class="dot y"></span> 과제 평가는 했으나 진도/과제 미입력</div>
+        <div class="item"><span class="dot e"></span> 아직 과제 평가 안 함</div>
+      </div>
+      <p>모든 학생이 초록색이 되도록 채우는 것이 목표입니다.</p>
+    </div>
+  </div>
+
+  <h2 class="sec">② 성적 입력</h2>
+  <p class="lead">사이드바 <span class="nav-chip">📊 성적 입력</span> 탭. 좌측에서 반·과목을 고른 뒤 시험을 추가하고 <b>원점수</b>를 입력합니다.</p>
+
+  <div class="step">
+    <div class="num">1</div>
+    <div class="body">
+      <h3>새 시험 추가</h3>
+      <p><span class="kbd">+ 새 시험 추가</span> 클릭 → <b>시험 유형</b>, <b>회차</b>(선택), <b>날짜</b>, <b>만점</b>, <b>메모</b>(시험 범위 등)를 설정합니다.</p>
+    </div>
+  </div>
+  <div class="step">
+    <div class="num">2</div>
+    <div class="body">
+      <h3>점수 입력 &amp; 저장</h3>
+      <p>학생별 <b>점수</b> 칸에 원점수를 입력합니다. 평균 등 통계가 자동 계산됩니다. 입력 후 <span class="kbd">저장</span> 하세요.</p>
+      <div class="note warn"><span class="ico">⚠️</span><div><b>입력 권한.</b> 주간/단원 시험은 <b>해당 과목 담당 강사</b>만, 학년단위 시험은 <b>담임</b>만 입력할 수 있습니다.
+        권한이 없으면 저장 시 안내 토스트가 뜹니다.</div></div>
+    </div>
+  </div>
+
+  <h2 class="sec">⚙️ 설정 상세</h2>
+  <table class="ftab">
+    <tr><th style="width:160px">항목</th><th>용도</th></tr>
+    <tr><td>🔥 Firebase 연결</td><td>DB URL·경로 저장, 학생 명단 수동 갱신.</td></tr>
+    <tr><td>🔑 내 계정</td><td>강사 이름 조회/등록, 다른 계정으로 전환.</td></tr>
+    <tr><td>🎯 자주 쓰는 문구</td><td>과제 평가에 쓰는 문구(프리셋) 추가·수정·삭제. 내 계정에만 적용.</td></tr>
+    <tr><td>📚 내 담당 수업</td><td>담당 반·과목·역할 추가/삭제.</td></tr>
+    <tr><td>🏫 학급 &amp; 학생 관리</td><td>학급·과목·학생 추가/삭제. 과목엔 커리큘럼(학년학기)·교재명 연결.</td></tr>
+    <tr><td>🗑 초기화</td><td>항목을 골라 선택 초기화. 카드를 탭해 다중 선택 후 실행.</td></tr>
+    <tr><td>🔒 관리자 모드</td><td>암호 입력 시 활성. 강사 관리·전체 데이터 초기화 등 고위험 기능 노출.</td></tr>
+  </table>
+
+  <div class="note warn"><span class="ico">🛑</span><div><b>초기화는 되돌릴 수 없습니다.</b> 특히 👑 관리자 전용 항목(전체 입력/진도 삭제, 명단 &amp; 설정 삭제)은
+    모든 강사 데이터에 영향을 줍니다. 베타 중에는 꼭 필요할 때만, 두 번 확인하고 실행하세요.</div></div>
+
+  <h2 class="sec">데이터 동기화 주의</h2>
+  <div class="note info"><span class="ico">🔄</span><div>
+    내가 입력한 내용은 자동 저장되지만, <b>다른 기기/다른 강사가 입력한 변경</b>은 실시간으로 따라오지 않습니다.
+    최신 명단·데이터를 보려면 <span class="nav-chip">⚙️ 설정</span> <span class="path-arrow">›</span> <span class="nav-chip">🔥 Firebase 연결</span> <span class="path-arrow">›</span> <span class="kbd">📥 학생 명단 불러오기</span> 로 수동 갱신하세요.
+  </div></div>
+
+  <h2 class="sec">문제 해결 (FAQ)</h2>
+
+  <details class="faq"><summary>화면이 비어 있거나 학생이 안 보여요</summary>
+    <div class="ans"><p>① <span class="nav-chip">⚙️ 설정</span>에서 Firebase 연결이 <b>연결됨 ✓</b> 인지 확인 → 아니면 4단계 재진행.
+      ② <span class="kbd">📥 학생 명단 불러오기</span> 클릭. ③ 담당 수업이 등록돼 있는지 확인(7단계).</p></div>
+  </details>
+  <details class="faq"><summary>"연결 실패" 토스트가 떠요</summary>
+    <div class="ans"><p>DB URL 또는 경로 오타일 가능성이 큽니다. 설치 가이드 상단의 <b>복사 버튼</b>으로 두 값을 다시 붙여넣고 저장하세요.
+      인터넷 연결도 확인하세요.</p></div>
+  </details>
+  <details class="faq"><summary>입력했는데 다른 기기에서 안 보여요</summary>
+    <div class="ans"><p>정상입니다. 다른 기기에서 <span class="kbd">📥 학생 명단 불러오기</span> 로 수동 갱신하면 보입니다(위 '데이터 동기화 주의' 참고).</p></div>
+  </details>
+  <details class="faq"><summary>성적 저장이 안 돼요</summary>
+    <div class="ans"><p>입력 권한 문제일 수 있습니다. 주간/단원 시험은 과목 담당, 학년단위 시험은 담임만 저장 가능합니다.
+      본인 역할(담임/부담임)을 <span class="nav-chip">📚 내 담당 수업</span> 에서 확인하세요.</p></div>
+  </details>
+  <details class="faq"><summary>화면이 작다고 차단되나요?</summary>
+    <div class="ans"><p>베타 기간에는 소형 화면 차단을 해제해 두었습니다. 다만 9인치급 이상 태블릿(가로) 또는 PC가 가장 편합니다.
+      좁으면 브라우저 배율을 줄여보세요.</p></div>
+  </details>
+
+  <h2 class="sec">피드백</h2>
+  <div class="note tip"><span class="ico">📮</span><div>버그·불편·아이디어는 무엇이든 환영합니다.
+    재현 방법, 사용 기기/브라우저, 화면 캡처를 함께 보내주시면 큰 도움이 됩니다.
+    <br>연락: <a href="mailto:idocho@kakao.com">idocho@kakao.com</a></div></div>
+
+</section>
+
+</main>
+
+<footer>
+  DailyReportWizard · Closed Beta &nbsp;·&nbsp; Crafted by IDO · Powered by Claude AI<br>
+  <a href="./index.html">앱으로 돌아가기 →</a>
+</footer>
+
+<script>
+  function showPane(name){
+    document.getElementById('pane-install').classList.toggle('on', name==='install');
+    document.getElementById('pane-operate').classList.toggle('on', name==='operate');
+    document.getElementById('tab-install').classList.toggle('on', name==='install');
+    document.getElementById('tab-operate').classList.toggle('on', name==='operate');
+    if(location.hash.slice(1)!==name) history.replaceState(null,'','#'+name);
+    window.scrollTo({top:0,behavior:'smooth'});
+  }
+  function cp(id,btn){
+    var t=document.getElementById(id).textContent.trim();
+    navigator.clipboard.writeText(t).then(function(){
+      var o=btn.textContent; btn.textContent='복사됨 ✓'; btn.classList.add('done');
+      setTimeout(function(){btn.textContent=o; btn.classList.remove('done');},1400);
+    }).catch(function(){
+      var r=document.createRange(); r.selectNodeContents(document.getElementById(id));
+      var s=getSelection(); s.removeAllRanges(); s.addRange(r);
+    });
+  }
+  if(location.hash.slice(1)==='operate') showPane('operate');
+</script>
+
+</body>
+</html>
