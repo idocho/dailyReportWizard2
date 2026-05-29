@@ -241,12 +241,19 @@ class App:
 
         # instructor_assignments 기반 담당 반 필터
         assignments = self.config.get("instructor_assignments", [])
-        assigned_cls = {a['cls'] for a in assignments if a.get('sheet') == group}
+        # cls/classId 둘 다 허용, sheet 없으면 classes에서 group으로 판단
+        def _asgn_cls(a): return a.get('cls') or a.get('classId', '')
+        def _asgn_matches_group(a):
+            s = a.get('sheet')
+            if s: return s == group
+            cid = _asgn_cls(a)
+            return self.all_classes.get(cid, {}).get('group') == group
+        assigned_cls = {_asgn_cls(a) for a in assignments if _asgn_matches_group(a)}
         # 강사 계정 미설정 시만 전체 표시; 계정 있고 담당 없으면 빈 목록
         show_all = not self.config.get("instructor_id") and not assignments
 
         # 부담임 판단용 맵 (classId → role)
-        asgn_role_map = {a.get('cls', ''): a.get('role', '') for a in assignments}
+        asgn_role_map = {_asgn_cls(a): a.get('role', '') for a in assignments}
 
         for classId, cls_data in self.all_classes.items():
             # group 필터
@@ -689,7 +696,13 @@ class App:
             if not self.config.get("instructor_id"):
                 return list(group_classes.items())  # 계정 미설정 → 전체 표시
             return []  # 계정 있고 담당 없음 → 빈 목록
-        assigned_cls = {a['cls'] for a in assignments if a.get('sheet') == group}
+        # cls/classId 둘 다 허용, sheet 없으면 classes group으로 판단
+        def _cid(a): return a.get('cls') or a.get('classId', '')
+        def _grp_ok(a):
+            s = a.get('sheet')
+            if s: return s == group
+            return self.all_classes.get(_cid(a), {}).get('group') == group
+        assigned_cls = {_cid(a) for a in assignments if _grp_ok(a)}
         return [(cid, cd) for cid, cd in group_classes.items() if cid in assigned_cls]
 
     def _student_status(self, classId, nameKey):
