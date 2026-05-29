@@ -6,4 +6,11 @@ __pycache__/
 code/config.json
 code/config_backup.json
 code/daily_cache.json
-code/daily_cache.json
+
+# PyInstaller 빌드 산출물
+code/build/
+code/dist/
+code/*.spec
+
+# Firebase 로컬 캐시
+.firebase/
