@@ -102,21 +102,21 @@ def save_daily_cache(progress_data, student_data=None, note_data=None, force_dat
         }
 
     if student_data:
-        for (sheet, cls, name, tb), v in student_data.items():
+        for key, v in student_data.items():
             val = v.get("value", "")
             if val:
-                data["student_data"][f"{sheet}|{cls}|{name}|{tb}"] = val
+                data["student_data"]["|".join(key)] = val
 
     if note_data:
-        for (sheet, cls, name), v in note_data.items():
+        for key, v in note_data.items():
             val = v.get("value", "")
             if val:
-                data["note_data"][f"{sheet}|{cls}|{name}"] = val
+                data["note_data"]["|".join(key)] = val
 
     if force_data:
-        for (sheet, cls, name), v in force_data.items():
+        for key, v in force_data.items():
             if v:
-                data["force_data"][f"{sheet}|{cls}|{name}"] = True
+                data["force_data"]["|".join(key)] = True
 
     with open(CACHE_PATH, 'w', encoding='utf-8') as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
@@ -139,20 +139,20 @@ def load_daily_cache():
 
         student_data = {}
         for k, val in data.get("student_data", {}).items():
-            parts = k.split("|", 3)
-            if len(parts) == 4:
+            parts = k.split("|")
+            if len(parts) >= 2:
                 student_data[tuple(parts)] = {'value': val}
 
         note_data = {}
         for k, val in data.get("note_data", {}).items():
-            parts = k.split("|", 2)
-            if len(parts) == 3:
+            parts = k.split("|")
+            if len(parts) >= 1:
                 note_data[tuple(parts)] = {'value': val}
 
         force_data = {}
         for k, v in data.get("force_data", {}).items():
-            parts = k.split("|", 2)
-            if len(parts) == 3 and v:
+            parts = k.split("|")
+            if len(parts) >= 1 and v:
                 force_data[tuple(parts)] = True
 
         return progress_data, student_data, note_data, force_data
