@@ -90,6 +90,7 @@ class App:
         self.activeGroup = 'M'
         self.cur_cls   = None   # classId
         self.cur_name  = None   # nameKey
+        self._send_cancel = None       # 순차 전송 취소 플래그 (threading.Event)
         self._ai_last_call = 0.0       # 하위 호환용 (AiEngine이 갱신)
         self.ai = AiEngine(self)       # AI 생성 엔진
 
@@ -1416,19 +1417,109 @@ class App:
         ready_names = [r['name'] for r in ready]
         skipped = [n for n in all_names if n not in ready_names]
 
-        confirm_msg = f"전송 대상: {len(ready)}명\n" + ", ".join(ready_names)
-        if skipped:
-            confirm_msg += f"\n\n제외 (미입력): {len(skipped)}명\n" + ", ".join(skipped)
-        confirm_msg += "\n\n카카오톡 창 활성화 후 [예]를 누르세요. (3초 후 시작)"
+        # 대상자 선택 다이얼로그 (체크 해제 = 이번 전송만 제외)
+        sel = self._open_send_dialog(ready, skipped)
+        if sel is None:
+            return  # 취소
+        if not sel:
+            messagebox.showinfo("알림", "선택된 전송 대상이 없습니다."); return
 
-        if not messagebox.askyesno("전송 확인", confirm_msg): return
-        threading.Thread(target=self._do_send, args=(ready,), daemon=True).start()
+        self._send_cancel = threading.Event()
+        self._set_send_btn_cancel(True)
+        threading.Thread(target=self._do_send, args=(sel,), daemon=True).start()
+
+    def _open_send_dialog(self, ready, skipped):
+        """전송 대상 체크박스 선택 다이얼로그.
+        반환: 선택된 ready 항목 리스트 / 취소 시 None"""
+        win = tk.Toplevel(self.root)
+        win.title("카카오톡 전송 대상 선택")
+        win.geometry("390x540")
+        win.configure(bg=BG)
+        win.grab_set()
+        result = {'sel': None}
+
+        tk.Label(win, text=f"전송 대상 {len(ready)}명 — 제외할 학생은 체크 해제하세요",
+                 font=FT, bg=BG, fg=TEXT, wraplength=350, justify='left'
+                 ).pack(pady=(14, 6), padx=16, anchor='w')
+
+        top = tk.Frame(win, bg=BG); top.pack(fill='x', padx=16)
+        vars_ = []
+        def _set_all(val):
+            for v, _ in vars_: v.set(val)
+        tk.Button(top, text="전체 선택", font=FS, bg=PANEL, fg=INDIGO, relief='flat',
+                  cursor='hand2', command=lambda: _set_all(True)).pack(side='left')
+        tk.Button(top, text="전체 해제", font=FS, bg=PANEL, fg=GRAY, relief='flat',
+                  cursor='hand2', command=lambda: _set_all(False)).pack(side='left', padx=6)
+
+        body = tk.Frame(win, bg=BG); body.pack(fill='both', expand=True, padx=16, pady=8)
+        canvas = tk.Canvas(body, bg=PANEL, highlightthickness=0)
+        sb = ttk.Scrollbar(body, orient='vertical', command=canvas.yview)
+        lst = tk.Frame(canvas, bg=PANEL)
+        lst.bind('<Configure>', lambda e: canvas.configure(scrollregion=canvas.bbox('all')))
+        canvas.create_window((0, 0), window=lst, anchor='nw')
+        canvas.configure(yscrollcommand=sb.set)
+        canvas.pack(side='left', fill='both', expand=True)
+        sb.pack(side='right', fill='y')
+
+        for r in ready:
+            v = tk.BooleanVar(value=True)
+            tk.Checkbutton(lst, text=r['name'], variable=v, font=FS,
+                           bg=PANEL, fg=TEXT, anchor='w', selectcolor='white',
+                           activebackground=PANEL, padx=6, pady=2
+                           ).pack(fill='x')
+            vars_.append((v, r))
+
+        if skipped:
+            tk.Label(win, text=f"미입력 제외 {len(skipped)}명: " + ", ".join(skipped),
+                     font=FS, bg=BG, fg=GRAY, wraplength=350, justify='left'
+                     ).pack(padx=16, pady=(0, 4), anchor='w')
+
+        tk.Label(win, text="카카오톡 창 활성화 후 [전송 시작]을 누르세요. (3초 후 시작)",
+                 font=FS, bg=BG, fg=SUBTEXT, wraplength=350, justify='left'
+                 ).pack(padx=16, pady=(4, 8), anchor='w')
+
+        foot = tk.Frame(win, bg=BG); foot.pack(fill='x', padx=16, pady=(0, 14))
+        def _ok():
+            result['sel'] = [r for v, r in vars_ if v.get()]
+            win.destroy()
+        def _cancel():
+            result['sel'] = None
+            win.destroy()
+        tk.Button(foot, text="전송 시작", font=("맑은 고딕", 10, "bold"),
+                  bg=ACCENT, fg="#1A1D2E", relief='flat', cursor='hand2',
+                  padx=14, pady=7, command=_ok).pack(side='right')
+        tk.Button(foot, text="취소", font=FS, bg=PANEL, fg=SUBTEXT, relief='flat',
+                  cursor='hand2', padx=12, pady=7, command=_cancel).pack(side='right', padx=6)
+
+        win.wait_window()
+        return result['sel']
+
+    def _set_send_btn_cancel(self, on):
+        """전송 중 send_btn → 취소 버튼 토글."""
+        if on:
+            self.send_btn.config(text="⏹  전송 취소", bg="#FEE2E2", fg="#DC2626",
+                                 command=self._cancel_send)
+        else:
+            self.send_btn.config(command=self._send)
+            self._refresh_send_btn()
+
+    def _cancel_send(self):
+        """순차 전송 취소 요청 — 현재 학생 완료 후 중단."""
+        if self._send_cancel:
+            self._send_cancel.set()
+        self.send_status.config(text="⏹  취소 중... (현재 학생 완료 후 중단)")
 
     def _do_send(self, msgs):
-        wait  = self.config.get('wait_time', 0.5)
-        total = len(msgs)
-        time.sleep(3)
+        cancel = self._send_cancel
+        wait   = self.config.get('wait_time', 0.5)
+        total  = len(msgs)
+        # 3초 카운트다운 — 취소 가능
+        for _ in range(30):
+            if cancel.is_set(): break
+            time.sleep(0.1)
+        sent = 0
         for i, m in enumerate(msgs):
+            if cancel.is_set(): break
             self.root.after(0, lambda t=f"전송 중... ({i+1}/{total})  {m['name']}":
                             self.send_status.config(text=t))
             try:
@@ -1444,12 +1535,21 @@ class App:
                 pyautogui.press('esc')
             except Exception as e:
                 print(f"오류 [{m['name']}]: {e}")
+            sent += 1
             time.sleep(0.8)
 
+        cancelled = cancel.is_set()
         def _on_done():
-            self.send_status.config(text=f"✅ 전송 완료 — {total}명")
-            self._reset_after_send()
-            messagebox.showinfo("완료", f"{total}명 전송 완료!")
+            self._set_send_btn_cancel(False)
+            if cancelled:
+                self.send_status.config(text=f"⏹ {sent}/{total}명 전송 후 취소 — 나머지 유지")
+                messagebox.showinfo("전송 취소",
+                    f"{sent}명 전송 후 취소했습니다.\n"
+                    "전송되지 않은 학생 데이터는 유지됩니다.")
+            else:
+                self.send_status.config(text=f"✅ 전송 완료 — {sent}명")
+                self._reset_after_send()
+                messagebox.showinfo("완료", f"{sent}명 전송 완료!")
         self.root.after(0, _on_done)
 
     def _reset_after_send(self):

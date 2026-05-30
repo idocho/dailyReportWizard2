@@ -1,7 +1,7 @@
 # DailyReportWizard — 요구사항 명세서
 
 **Crafted by IDO(idocho@kakao.com) · Powered by Claude AI**  
-**문서 버전**: 6.7 · **앱 버전**: v2.0.4 · **최종 수정**: 2026-05-30
+**문서 버전**: 6.8 · **앱 버전**: v2.0.5 · **최종 수정**: 2026-05-30
 
 > Firebase 스키마 전체 명세: [ClassManager/documents/DB_SCHEMA.md](../../ClassManager/documents/DB_SCHEMA.md)
 
@@ -45,6 +45,7 @@
 | 6.1 | 2026-05-28 | **nameKey = 출결번호** — 이름 기반 키 + 동명이인 suffix 로직 폐기. 출결번호(불변 고유번호)를 Firebase 학생 키로 사용. ClassManager에서 발부 및 CSV 관리. |
 | 6.4 | 2026-05-29 | **전체 AI 생성 버그픽스** — `gen_all`이 `system=_base_conditions()` 전달 시 규칙 #10("JSON 금지")이 배치 JSON 응답 요구와 충돌 → 파싱 실패. 배치 호출은 `system=""` 로 변경 (`build_batch_prompt` 자체에 지침 내장) |
 | 6.5 | 2026-05-30 | **무료 AI 엔진 Gemini 탑재** — `_call_ai_hub`에 `gemini` 분기 추가(`gemini-2.5-flash`, 무료 티어, 월 제한 없음·일당 RPD만). key=URL 쿼리파람, `system_instruction` 사용, **`thinkingConfig.thinkingBudget=0` 필수**(미설정 시 출력 잘림). 모델 `GEMINI_MODEL` 상수화. `AI_FREE_ENGINES=('groq','gemini')` 신설 — 쿨다운 무료군 판정 일원화(3곳: `_check_cooldown`/`_start_cooldown_tick`/app.py 버튼 초기화). 설정 combobox에 `gemini` 추가, `gemini_api_key` 저장키 추가. 배치 `max_tokens` 4096→8192 상향(학생당 ~68토큰 실측, 40명 잘림 없음 검증) |
+| 6.8 | 2026-05-30 | **카톡 전송 개선 (PC 클라이언트)** — ① **대상자 개별 제외**: 🚀 전송 시 기존 `askyesno` 텍스트 확인 → `_open_send_dialog()` 체크박스 모달로 교체. 준비 완료 학생 전체 기본 체크, 체크 해제 = 이번 전송만 제외(상태 미변경), [전체 선택]/[전체 해제] 버튼, 선택 0명 차단. ② **순차 전송 취소**: `self._send_cancel`(`threading.Event`) 신설. 전송 시작 후 `send_btn` → "⏹ 전송 취소" 토글(`_set_send_btn_cancel`/`_cancel_send`). 3초 카운트다운(0.1s×30)·전송 루프 매 학생 진입 시 검사 → 현재 학생 완료 후 중단. 취소 시 전송된 N명만 발송하고 **로컬 초기화 생략**(미전송분 유지), 완료 시에만 기존 초기화+`lastSent/` push. §2.8 갱신. ③ 웹 변경분 델타 가져오기 — 차기 과제로 보류 |
 | 6.7 | 2026-05-30 | **과정명 중복 표시 버그픽스 (PC 클라이언트)** — subject 키가 신 포맷(`{과정} {교재}`, 예 `중3-1 라이트쎈`)인 과목에서 PC 화면·카톡 메시지·AI 프롬프트가 과정명을 한 번 더 prepend해 `중3-1 중3-1 라이트쎈`으로 중복되던 문제. 원인: subject 키 포맷이 구(키=교재명, curriculum 별도)·신(키=`과정 교재` 조합) 두 가지 공존(`app-settings.js`). `constants.grade_label(grade_sem, subject)` 헬퍼 신설 — 키가 이미 `"{과정} "`로 시작하면 과정명 prepend 생략. `app.py`(진도/과목 라벨 2곳)·`message.py`(`tb_label`)·`ai_engine.py`(단건 프롬프트·배치 student·progress 3곳) 총 6곳을 헬퍼로 일원화. 구 포맷 과목은 기존과 동일 표시 |
 | 6.6 | 2026-05-30 | **엔진별 API Key 격리 버그픽스** — `ai_api_key` 공유 폴백이 엔진 전환 시 타 엔진 키를 노출·저장하던 문제. `_get_engine_settings`/`_key_for_engine`/`_save_all` 모두 엔진별 슬롯(`{engine}_api_key`) 전용으로 변경, `ai_api_key` read/write 제거(deprecated). **설정 엔진 목록 순서 재조정**: `gemini → claude → openai → groq`(무료·추천 우선). **가이드 문서**(`public/guide.html`) AI 키 발급 가이드를 설치 가이드 내 "4부 · AI 엔진 키 발급"으로 편입(별도 최상위 탭 제거), 엔진별 서브탭으로 발급 가이드 + 앱 등록 절차 + 비교표 제공. **엔진 표시 명칭 공식 영문 통일**(웹 가이드 + PC 클라이언트 공통): `AI_ENGINE_LABELS = {gemini:'Gemini', claude:'Claude', openai:'GPT (OpenAI)', groq:'Groq'}`, `AI_ENGINE_ORDER`로 표시 순서 관리. PC 설정 드롭다운은 표시명을 보이고 내부 id로 매핑(저장값·API 분기·키 슬롯은 기존 소문자 id 유지). 일괄생성 확인창·키 미입력 경고도 표시명 사용. **엔진별 쿨다운 분리** — `AI_COOLDOWNS={groq:30, gemini:7}`(그 외 PAID 3초)로 전환, 기존 `AI_FREE_ENGINES` 일괄 30초 판정 폐기(Gemini free RPM~10 → 7초로 완화, 3곳 동일 적용). Firebase Hosting 배포 |
 | 6.3 | 2026-05-29 | **부담임 필터링 버그픽스** — `_is_sub_teacher()` 가 `cls` 키만 검사해 `classId` 키 assignment에서 role 못 읽던 문제. `a.get('cls') or a.get('classId','')` 로 수정 — 카톡 전송·AI 일괄생성 대상에서 부담임 반 올바르게 제외 |
@@ -254,8 +255,10 @@ DRW 2.0이 저장하는 수업 관찰 데이터(`obs/`)와 성적 데이터(`sco
 
 - **전송 대상**: `STATUS_READY` 학생만, `_my_classes()` 화이트리스트 적용
 - **부담임 반 제외**: `assignments[cls].role == "부담임"` → 전송 제외. 폴백: `config/sheets/.../is_sub: true`
+- **대상자 선택 (개별 제외)**: 🚀 전송 클릭 시 `_open_send_dialog()` 체크박스 모달. 준비 완료 학생 전체 기본 체크, 체크 해제 = **이번 전송만 제외**(상태 미변경, 다음 전송엔 재포함). [전체 선택]/[전체 해제] 버튼. 선택 0명 시 전송 차단
+- **순차 전송 취소**: 전송 시작 후 `send_btn` → "⏹ 전송 취소" 토글. `self._send_cancel`(`threading.Event`) set → 3초 카운트다운 및 루프 매 학생 진입 시 검사, **현재 학생 완료 후 중단**. 취소 시 전송된 N명만 발송, **로컬 데이터 초기화 안 함**(미전송분 유지). 완료 시에만 기존 초기화 + `lastSent/` push
 - `pyautogui` 미설치 시: `AUTOMATION=False`, 전송 버튼 비활성화
-- 전송 완료 후: `student_data`, `note_data`, `force_data` 초기화 / `progress_data` 유지 / Firebase `lastSent/` push
+- 전송 **완료** 후: `student_data`, `note_data`, `force_data` 초기화 / `progress_data` 유지 / Firebase `lastSent/` push
 - **스레드 안전**: `_do_send`는 별도 스레드 실행. UI 업데이트 전체를 `root.after(0, ...)` 로 메인 스레드에 위임
 
 ### 2.9 설정 창
@@ -325,6 +328,8 @@ def _my_classes(self, sheet) -> list:
 | `_populate_student_list()` | 좌 패널 렌더링 |
 | `_collect_ready()` | 전송 대상 수집 |
 | `_send()` → `all_names` | 전송 확인 팝업 제외 목록 |
+| `_open_send_dialog()` | 대상자 체크박스 선택(개별 제외) 모달 |
+| `_set_send_btn_cancel()` / `_cancel_send()` | 전송 중 취소 버튼 토글·취소 요청 |
 | `_gen_ai_note_all()` | 전체 AI생성 대상 |
 
 **부담임 반 추가 제한**
