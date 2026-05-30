@@ -50,7 +50,7 @@ from constants import (
     GREEN, YELLOW, GRAY, BORDER, TEXT, SUBTEXT, BLUE,
     STATUS_EMPTY, STATUS_PARTIAL, STATUS_READY, DOT_COLOR,
     FT, FB, FS, FE, _MOD,
-    ASSIGN_GRADE_LABELS,
+    ASSIGN_GRADE_LABELS, grade_label,
 )
 from storage  import (load_config, save_config, has_students,
                       save_daily_cache, load_daily_cache, set_runtime_cwd, RUNTIME_DIR)
@@ -424,8 +424,7 @@ class App:
             for subject in subjects:
                 pd_val = self.progress_data.get((classId, subject), {})
                 if pd_val.get('progress') or pd_val.get('homework'):
-                    gs = tb_grade.get(subject, '')
-                    tb_lbl = f"{gs} {subject}".strip() if gs else subject
+                    tb_lbl = grade_label(tb_grade.get(subject, ''), subject)
                     tk.Label(pf, text=tb_lbl, font=("맑은 고딕", 8, "bold"),
                              bg="#F0FDF4", fg=INDIGO).pack(anchor='w', pady=(2,0))
                     if pd_val.get('progress'):
@@ -443,8 +442,7 @@ class App:
             val      = self.student_data.get(student_key, {}).get('value', '')
             filled   = bool(val.strip())
 
-            gs = tb_grade.get(subject, '')
-            tb_lbl = f"{gs} {subject}".strip() if gs else subject
+            tb_lbl = grade_label(tb_grade.get(subject, ''), subject)
             lf = tk.LabelFrame(pad, text=f"  {tb_lbl}  ",
                                font=("맑은 고딕", 9, "bold"),
                                fg=SUBTEXT, bg=PANEL, padx=10, pady=8)

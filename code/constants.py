@@ -77,6 +77,21 @@ ASSIGN_GRADE_LABELS = {
     "none":   "미수행",
 }
 
+
+def grade_label(grade_sem, subject):
+    """과정명(grade_sem)을 과목명 앞에 붙인 표시 라벨.
+
+    subject 키 포맷이 두 가지 공존한다:
+      - 구 포맷: 키="라이트쎈"            (curriculum 별도 저장)
+      - 신 포맷: 키="중3-1 라이트쎈"       (과정+교재 조합 — app-settings.js)
+    신 포맷은 키에 이미 과정명이 들어있으므로 다시 붙이면 "중3-1 중3-1 라이트쎈"
+    처럼 중복된다. 키가 이미 "{과정} " 로 시작하면 prepend 하지 않는다.
+    """
+    gs = (grade_sem or '').strip()
+    if gs and not subject.startswith(gs + ' '):
+        return f"{gs} {subject}".strip()
+    return subject
+
 # ── 관찰 태그 정의 (key=Firebase 저장값, label=표시) ──────────────────
 # key는 불변. label만 추후 수정 가능.
 TAGS = {

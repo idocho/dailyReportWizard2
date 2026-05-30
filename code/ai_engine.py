@@ -12,7 +12,7 @@ import urllib.error
 DEBUG_AI_PROMPT: bool = False
 
 from constants import (APP_VERSION, AI_COOLDOWNS, AI_COOLDOWN_PAID,
-                       AI_ENGINE_LABELS, GEMINI_MODEL, TAGS)
+                       AI_ENGINE_LABELS, GEMINI_MODEL, TAGS, grade_label)
 from firebase import fetch_tags_today, today_key
 from storage import save_daily_cache
 
@@ -172,8 +172,7 @@ def build_single_prompt(sheet, cls, name, textbooks, student_data, progress_data
         # v2.0: student_data 키 = (classId, nameKey, subject)
         val = student_data.get((cls, name, tb), {}).get('value', '')
         if val:
-            gs = _tg.get(tb, '')
-            tb_lbl = f"{gs} {tb}".strip() if gs else tb
+            tb_lbl = grade_label(_tg.get(tb, ''), tb)
             # v2.0: progress_data 키 = (classId, subject)
             pd_val = progress_data.get((cls, tb), {})
             lines.append(
@@ -504,8 +503,7 @@ class AiEngine:
                     # v2.0: student_data 키 = (classId, nameKey, subject)
                     val = app.student_data.get((cls, nameKey, tb), {}).get('value', '')
                     if val:
-                        gs = tb_grade.get(tb, '')
-                        key = f"{gs} {tb}".strip() if gs else tb
+                        key = grade_label(tb_grade.get(tb, ''), tb)
                         student_book_data[key] = val
 
                 tags = _merge_student_tags(app.tag_data, sheet, cls, nameKey, tbs)
@@ -513,8 +511,7 @@ class AiEngine:
                     print(f"[BATCH] {display_name}({cls})  tags={tags if tags else '(없음)'}")
                 progress_book_data = {}
                 for _tb in tbs:
-                    _gs = tb_grade.get(_tb, '')
-                    _key = f"{_gs} {_tb}".strip() if _gs else _tb
+                    _key = grade_label(tb_grade.get(_tb, ''), _tb)
                     # v2.0: progress_data 키 = (classId, subject)
                     _pd = app.progress_data.get((cls, _tb), {})
                     if _pd.get('progress') or _pd.get('homework'):

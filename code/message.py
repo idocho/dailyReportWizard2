@@ -4,6 +4,8 @@ Crafted by IDO(idocho@kakao.com) · Powered by Claude AI
 """
 import datetime
 
+from constants import grade_label
+
 
 def today_str():
     d = datetime.datetime.now()
@@ -43,8 +45,7 @@ def build_message(date_str, class_info, student_name, assign_map, note, tb_grade
         """교재 레이블: 멀티 교재 시 '중1-1 최상위수학', 단일 시 None."""
         if not multi:
             return None
-        gs = _tg.get(tb, '')
-        return f"{gs} {tb}".strip() if gs else tb
+        return grade_label(_tg.get(tb, ''), tb)
 
     def section(field):
         lines = []
