@@ -1,7 +1,7 @@
 # DailyReportWizard — 요구사항 명세서
 
 **Crafted by IDO(idocho@kakao.com) · Powered by Claude AI**  
-**문서 버전**: 6.6 · **앱 버전**: v2.0.3 · **최종 수정**: 2026-05-30
+**문서 버전**: 6.6 · **앱 버전**: v2.0.4 · **최종 수정**: 2026-05-30
 
 > Firebase 스키마 전체 명세: [ClassManager/documents/DB_SCHEMA.md](../../ClassManager/documents/DB_SCHEMA.md)
 
