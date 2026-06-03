@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>DRW 리뉴얼 — 수업 입력</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<div class="wrap">
+  <aside class="sb">
+    <div class="sb-brand">
+      <div class="sb-mark">📝</div>
+      <div class="sb-name">DailyReport<small>Wizard · v2.1.0</small></div>
+    </div>
+    <div class="sb-me">
+      <div class="sb-av">민수</div>
+      <div class="sb-me-info"><div class="sb-me-nm">김민수</div><div class="sb-me-rl">담임 · 1개 수업</div></div>
+      <div class="sb-cv">⌄</div>
+    </div>
+    <div class="sb-sec">워크스페이스</div>
+    <nav class="sb-nav">
+      <a class="sni on" href="index.html"><span class="i">✍️</span> 수업 입력</a>
+      <a class="sni" href="scores.html"><span class="i">📊</span> 성적 입력</a>
+      <a class="sni" href="settings.html"><span class="i">⚙️</span> 설정</a>
+    </nav>
+    <div class="sb-sec">오후반</div>
+    <div class="sb-classes">
+      <div class="sb-cls on"><span class="dot" style="background:#22C55E"></span><div><div class="sb-cls-nm">중3A</div><div class="sb-cls-sub">중3-1 개념원리</div></div></div>
+      <div class="sb-cls"><span class="dot" style="background:#CBD5E1"></span><div><div class="sb-cls-nm">중3B</div><div class="sb-cls-sub">중3-1 실전</div></div></div>
+    </div>
+    <div class="sb-foot"><a href="#">📖 <span>설치 · 운용 가이드</span></a></div>
+  </aside>
+
+  <div class="main">
+    <div class="topbar">
+      <div class="crumb">수업 입력 <span>/</span> <b>중3A</b></div>
+      <div class="tb-spacer"></div>
+      <span class="pill ok"><span class="dot" style="background:#22C55E"></span> 1 / 3명 작성</span>
+      <span class="tb-date">2026. 6. 3 (수)</span>
+      <div class="icon-btn">↻</div>
+    </div>
+    <div class="content">
+      <div class="ctx">
+        <div class="ctx-ic">✍️</div>
+        <div>
+          <div class="ctx-h1">중3A · 개념원리</div>
+          <div class="ctx-meta"><span class="tag-sm">중3-1</span> <span class="tag-sm">오후반</span> <span>학생 3명</span></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-h"><span class="i">📍</span><span class="t">오늘 수업 — 진도 · 과제</span><span class="r">반 공통</span></div>
+        <div class="card-b">
+          <div class="field">
+            <label class="lbl">진도</label>
+            <div class="selrow">
+              <select class="sel"><option>단원 선택…</option><option selected>이차함수</option></select>
+              <select class="sel"><option>소단원 선택…</option><option selected>이차함수의 그래프</option></select>
+            </div>
+          </div>
+          <div class="field">
+            <label class="lbl">과제</label>
+            <div class="selrow">
+              <div class="seg"><button class="on">p. 페이지</button><button># 번호</button><button>직접 입력</button></div>
+              <input class="inp" style="width:96px" placeholder="시작" value="48">
+              <span style="color:var(--muted)">–</span>
+              <input class="inp" style="width:96px" placeholder="끝" value="52">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-h"><span class="i">👥</span><span class="t">학생별 관찰 입력</span><span class="r">0 / 3명 완료</span></div>
+        <div class="stu">
+          <div class="stu-id">
+            <div class="stu-av">김철</div>
+            <div class="stu-nm">김철수</div>
+            <div class="stu-st"><span class="dot"></span> 작성됨</div>
+          </div>
+          <div class="stu-body">
+            <div class="trow"><div class="trow-l">과제</div><div class="chips">
+              <span class="chip on g">✅ 완료</span><span class="chip">🔵 대부분</span><span class="chip">🟡 절반</span><span class="chip">🟠 일부</span><span class="chip">✕ 미완</span>
+            </div></div>
+            <div class="trow"><div class="trow-l">컨디션</div><div class="chips">
+              <span class="chip on a">▲ 최상</span><span class="chip">↗ 좋음</span><span class="chip">▶ 보통</span><span class="chip">↘ 낮음</span><span class="chip">▼ 힘듦</span>
+            </div></div>
+            <div class="trow"><div class="trow-l">이해도</div><div class="chips">
+              <span class="chip on b">완벽</span><span class="chip">good</span><span class="chip">보통</span><span class="chip ghost">＋ 하이라이트</span>
+            </div></div>
+            <div class="trow"><div class="trow-l">메모</div><textarea class="note-in" rows="1" placeholder="특이사항 — 직접 작성 시 AI 생성에 반드시 반영됩니다">오답노트 꼼꼼히 작성. 응용 단계까지 도전.</textarea></div>
+          </div>
+        </div>
+        <div class="stu">
+          <div class="stu-id">
+            <div class="stu-av">이영</div>
+            <div class="stu-nm">이영희</div>
+            <div class="stu-st" style="color:var(--muted)"><span class="dot" style="background:#CBD5E1"></span> 미작성</div>
+          </div>
+          <div class="stu-body">
+            <div class="trow"><div class="trow-l">과제</div><div class="chips">
+              <span class="chip">✅ 완료</span><span class="chip">🔵 대부분</span><span class="chip">🟡 절반</span><span class="chip">🟠 일부</span><span class="chip">✕ 미완</span>
+            </div></div>
+            <div class="trow"><div class="trow-l">컨디션</div><div class="chips">
+              <span class="chip">▲ 최상</span><span class="chip">↗ 좋음</span><span class="chip">▶ 보통</span><span class="chip">↘ 낮음</span><span class="chip">▼ 힘듦</span>
+            </div></div>
+            <div class="trow"><div class="trow-l">메모</div><textarea class="note-in" rows="1" placeholder="특이사항…"></textarea></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button class="btn">초기화</button>
+        <button class="btn primary">✨ AI 특이사항 생성</button>
+      </div>
+      <div class="legend"><small>디자인 시안 · 미니멀·프로 · 분리 사이트(/redesign) — 프로덕션 index.html 미반영</small></div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

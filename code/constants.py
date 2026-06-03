@@ -6,7 +6,7 @@ import platform as _platform
 
 # ── 앱 메타 ───────────────────────────────────────────────────────────
 APP_TITLE   = "Daily Report Wizard"
-APP_VERSION = "v2.0.5"
+APP_VERSION = "v2.1.0"
 APP_CREDIT  = "Crafted by IDO(idocho@kakao.com)  ·  Powered by Claude AI"
 
 AI_COOLDOWN_GROQ   = 30  # Groq 무료 플랜 RPM 제한 대응 (보수적)
@@ -31,28 +31,32 @@ AI_ENGINE_LABELS = {
 # Gemini 기본 모델 (무료·stable). 교체 시 이 한 줄만 수정.
 GEMINI_MODEL = "gemini-2.5-flash"
 
-# ── 색상 ─────────────────────────────────────────────────────────────
-BG       = "#F5F6FA"
+# ── 색상 (미니멀·프로 디자인 시스템, v2.1.0 리뉴얼) ──────────────────
+BG       = "#FAFAFB"
 PANEL    = "#FFFFFF"
-DARK     = "#1A1D2E"
-DARK2    = "#252840"
-ACCENT   = "#FEE500"
-INDIGO   = "#4338CA"
-INDIGO_L = "#EEF2FF"
-GREEN    = "#22C55E"
-YELLOW   = "#F59E0B"
-GRAY     = "#94A3B8"
-BORDER   = "#E2E8F0"
-TEXT     = "#1E293B"
-SUBTEXT  = "#64748B"
-BLUE     = "#3B82F6"
+PANEL2   = "#F7F7F9"   # 보조 표면 (헤더·우패널 등)
+DARK     = "#0E1016"
+DARK2    = "#15171F"
+ACCENT   = "#FEE500"   # 카카오 브랜드 옐로 (유지)
+INDIGO   = "#4F46E5"
+INDIGO_INK = "#4338CA" # 진한 인디고 (텍스트·hover)
+INDIGO_L = "#EEF0FF"
+INDIGO_LINE = "#DDE1FF"
+GREEN    = "#16A34A"
+YELLOW   = "#D97706"
+GRAY     = "#9CA3AF"
+BORDER   = "#ECECEF"
+LINE_SOFT = "#F3F3F5"
+TEXT     = "#18181B"
+SUBTEXT  = "#5C6370"
+BLUE     = "#2563EB"
 
 # ── 학생 상태 ─────────────────────────────────────────────────────────
 STATUS_EMPTY   = "empty"
 STATUS_PARTIAL = "partial"
 STATUS_READY   = "ready"
 DOT_COLOR = {
-    STATUS_EMPTY:   "#374151",
+    STATUS_EMPTY:   "#CBD5E1",
     STATUS_PARTIAL: YELLOW,
     STATUS_READY:   GREEN,
 }

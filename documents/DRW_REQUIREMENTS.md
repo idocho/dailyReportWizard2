@@ -1,7 +1,7 @@
 # DailyReportWizard — 요구사항 명세서
 
 **Crafted by IDO(idocho@kakao.com) · Powered by Claude AI**  
-**문서 버전**: 6.8 · **앱 버전**: v2.0.5 · **최종 수정**: 2026-05-30
+**문서 버전**: 7.2 · **앱 버전**: v2.1.0 · **최종 수정**: 2026-06-03
 
 > Firebase 스키마 전체 명세: [ClassManager/documents/DB_SCHEMA.md](../../ClassManager/documents/DB_SCHEMA.md)
 
@@ -11,6 +11,9 @@
 
 | 문서 버전 | 날짜 | 주요 변경 |
 |-----------|------|-----------|
+| 7.2 | 2026-06-03 | **룩앤필 리뉴얼 — 미니멀·프로 디자인 시스템 (웹+PC)** — 통일된 디자인 토큰 도입: 중성 표면 3단(`--bg`/`--panel`/`--panel-2`), 잉크 위계(`--text`/`--sub`/`--gray`), 라인 2단, 절제된 인디고 액센트(`--indigo` #4F46E5 / `--indigo-ink` #4338CA), 반경 3단, 그림자 3단. **웹**: `app.css` `:root` 토큰 교체로 전 화면 일괄 리스킨(JS 무변경, 클래스명 유지) + 사이드바(다크 #0E1016·라운드 nav·계정 카드)·카드(부드러운 그림자)·버튼·입력(포커스 링)·관찰 태그칩(`.tg-radio`/`.tg-check` 통일, 색상 의미 보존)·학생 슬림카드·설정 아코디언(아이콘 타일)·성적 카드 폴리시. **PC**: `constants.py` 팔레트 교체 + `app.py` 하드코딩 hex 스윕(표면·시맨틱 톤 정렬). 시안은 분리 사이트 `code/public/redesign/`에서 선검증. 액센트는 인디고 유지 |
+| 7.1 | 2026-06-03 | **PC 클라이언트 최초 설치 위저드(온보딩) 신설** — 기존 단일 안내 messagebox(`_prompt_first_run`)를 3단계 순차 위저드로 교체(§2.9-B). **팝업 아닌 메인 창 오버레이** 방식 — 정상 UI 빌드를 `_build_main_ui`로 분리하고 최초 실행 시 메인 창에 위저드 오버레이(`_wz_root`)만 띄움 → 완료 시 오버레이 destroy + 정상 3-패널 빌드(웹 위저드와 동일한 단일 창 레이아웃 분기). 단계: ①🔥Firebase 연결(+⚡테스트) ②🔑강사 계정(조회/등록+동기화) ③🤖AI 엔진+API키(건너뛰기 가능) → 🎉완료(요약+웹 명단 안내). 웹 위저드(§4.8-C)와 동일 컨셉, **학생 명단·수업 배정 단계는 웹 전용이라 제외**하고 **AI 엔진 키 단계 추가**(PC 전용). **엔진별 키 발급 가이드 인라인화** — AI키 단계서 엔진 선택 시 발급처/단계/키형식/주의를 위저드 안에 직접 표시(`_WZ_GUIDE`, guide.html 4부 발췌, `webbrowser.open` 링크), "가이드 참고"로 떠넘기지 않음. 스텝 인디케이터는 `tk.Canvas` 원+연결선 직접 드로잉(`_wz_draw_steps`). 단계 가드(0:URL·경로, 1:instructor_id). 신규 함수 `_run_setup_wizard`/`_wz_*` 일괄(`app.py`), 기존 `make_scroll_frame`·팔레트·폰트 재사용 |
+| 7.0 | 2026-06-03 | **초기 설정 위저드(온보딩) 신설** (웹 PWA) — 강사 미설정 신규 사용자의 빈 화면+단일 버튼을 4단계 순차 가이드로 대체. `init()` `!instructor` 시 `wizardActive=true`로 위저드 발동, `renderMain()` 최상단 분기로 위저드 활성 중 탭 이탈 차단. 단계: ①🔥 Firebase 연결(`saveFb`) ②🔑 계정(`lookupInstr`) ③👥 명단(`loadCfg`) ④📚 담당 수업(`addA`). 입력 DOM ID를 기존 설정 화면과 동일하게 두어 기존 핸들러 무수정 재사용. **교재 미등록 케이스 처리(핵심)** — 수업 배정 단계서 선택 반에 등록된 과목 없으면 인라인 과목(교재) 등록 폼(`wzGs`/`wzTb` → `wzAddCourse()`, `subject="{과정} {교재}"`, `addCourseInline` 미러) 노출 후 즉시 배정 가능. 반(classId) 생성은 위저드 범위 외(기존 학급 관리). 단계 가드(0:Firebase 미저장, 1:강사 미등록 차단), 완료 요약 체크리스트(`wzFinish`), "나중에 할게요" 이탈(`wzSkip`→설정). 상태 변수 `wizardActive`/`wzStep`/`wzCls`(`app-core.js`), `renderWizard`/`_wzPane`/`wzNext`/`wzBack`/`wzSkip`/`wzFinish`/`wzSetCls`/`wzAddCourse`(`app-settings.js`), CSS `.wz-*`/`.stp*`(`app.css`). index.html 캐시버전 `202606031200` 갱신 |
 | 1.0 | 2026-05-19 | v0.9.0 통합 명세 작성 |
 | 1.1 | 2026-05-19 | v0.9.1 버그픽스 반영 |
 | 1.2 | 2026-05-19 | v0.9.2 담당 반 필터링·쓰기 권한 가드 |
@@ -45,6 +48,7 @@
 | 6.1 | 2026-05-28 | **nameKey = 출결번호** — 이름 기반 키 + 동명이인 suffix 로직 폐기. 출결번호(불변 고유번호)를 Firebase 학생 키로 사용. ClassManager에서 발부 및 CSV 관리. |
 | 6.4 | 2026-05-29 | **전체 AI 생성 버그픽스** — `gen_all`이 `system=_base_conditions()` 전달 시 규칙 #10("JSON 금지")이 배치 JSON 응답 요구와 충돌 → 파싱 실패. 배치 호출은 `system=""` 로 변경 (`build_batch_prompt` 자체에 지침 내장) |
 | 6.5 | 2026-05-30 | **무료 AI 엔진 Gemini 탑재** — `_call_ai_hub`에 `gemini` 분기 추가(`gemini-2.5-flash`, 무료 티어, 월 제한 없음·일당 RPD만). key=URL 쿼리파람, `system_instruction` 사용, **`thinkingConfig.thinkingBudget=0` 필수**(미설정 시 출력 잘림). 모델 `GEMINI_MODEL` 상수화. `AI_FREE_ENGINES=('groq','gemini')` 신설 — 쿨다운 무료군 판정 일원화(3곳: `_check_cooldown`/`_start_cooldown_tick`/app.py 버튼 초기화). 설정 combobox에 `gemini` 추가, `gemini_api_key` 저장키 추가. 배치 `max_tokens` 4096→8192 상향(학생당 ~68토큰 실측, 40명 잘림 없음 검증) |
+| 6.9 | 2026-05-30 | **학생 명단 이름순 렌더링 (PC 클라이언트)** — 모든 학생 명단(좌측 목록·전송 대상 다이얼로그·상태바·◀▶ 이동)을 이름 가나다 오름차순 표시. 기존엔 Firebase REST가 반환하는 nameKey(출결번호) 사전순. **최소 변경**: `_sync_shared_sheets_from_firebase`의 `all_students` 할당 1곳에서 `dict(sorted(...))` 정렬 → 5개 빌더 루프·네비게이션·다이얼로그가 모두 순서 상속, 개별 정렬 불필요(빌더 불일치 버그 원천 차단). **키 불변(표시 순서만)**, None-safe(`name` 폴백 `''`) + 동명이인 `nameKey` tiebreak. 반 정렬은 미적용. **웹도 동일 적용** — `app-core.js`에 공유 헬퍼 `sortStu(arr)`(가나다 `localeCompare(_,'ko')` + nameKey tiebreak) 신설, `_classStudents` 빌드 2곳(`app-settings.js`·`app-scores.js`) + 학생 추가 push 1곳(`app-settings.js`)에서 호출 → 웹 입력·성적·설정 명단 전부 이름순 |
 | 6.8 | 2026-05-30 | **카톡 전송 개선 (PC 클라이언트)** — ① **대상자 개별 제외**: 🚀 전송 시 기존 `askyesno` 텍스트 확인 → `_open_send_dialog()` 체크박스 모달로 교체. 준비 완료 학생 전체 기본 체크, 체크 해제 = 이번 전송만 제외(상태 미변경), [전체 선택]/[전체 해제] 버튼, 선택 0명 차단. ② **순차 전송 취소**: `self._send_cancel`(`threading.Event`) 신설. 전송 시작 후 `send_btn` → "⏹ 전송 취소" 토글(`_set_send_btn_cancel`/`_cancel_send`). 3초 카운트다운(0.1s×30)·전송 루프 매 학생 진입 시 검사 → 현재 학생 완료 후 중단. 취소 시 전송된 N명만 발송하고 **로컬 초기화 생략**(미전송분 유지), 완료 시에만 기존 초기화+`lastSent/` push. §2.8 갱신. ③ 웹 변경분 델타 가져오기 — 차기 과제로 보류 |
 | 6.7 | 2026-05-30 | **과정명 중복 표시 버그픽스 (PC 클라이언트)** — subject 키가 신 포맷(`{과정} {교재}`, 예 `중3-1 라이트쎈`)인 과목에서 PC 화면·카톡 메시지·AI 프롬프트가 과정명을 한 번 더 prepend해 `중3-1 중3-1 라이트쎈`으로 중복되던 문제. 원인: subject 키 포맷이 구(키=교재명, curriculum 별도)·신(키=`과정 교재` 조합) 두 가지 공존(`app-settings.js`). `constants.grade_label(grade_sem, subject)` 헬퍼 신설 — 키가 이미 `"{과정} "`로 시작하면 과정명 prepend 생략. `app.py`(진도/과목 라벨 2곳)·`message.py`(`tb_label`)·`ai_engine.py`(단건 프롬프트·배치 student·progress 3곳) 총 6곳을 헬퍼로 일원화. 구 포맷 과목은 기존과 동일 표시 |
 | 6.6 | 2026-05-30 | **엔진별 API Key 격리 버그픽스** — `ai_api_key` 공유 폴백이 엔진 전환 시 타 엔진 키를 노출·저장하던 문제. `_get_engine_settings`/`_key_for_engine`/`_save_all` 모두 엔진별 슬롯(`{engine}_api_key`) 전용으로 변경, `ai_api_key` read/write 제거(deprecated). **설정 엔진 목록 순서 재조정**: `gemini → claude → openai → groq`(무료·추천 우선). **가이드 문서**(`public/guide.html`) AI 키 발급 가이드를 설치 가이드 내 "4부 · AI 엔진 키 발급"으로 편입(별도 최상위 탭 제거), 엔진별 서브탭으로 발급 가이드 + 앱 등록 절차 + 비교표 제공. **엔진 표시 명칭 공식 영문 통일**(웹 가이드 + PC 클라이언트 공통): `AI_ENGINE_LABELS = {gemini:'Gemini', claude:'Claude', openai:'GPT (OpenAI)', groq:'Groq'}`, `AI_ENGINE_ORDER`로 표시 순서 관리. PC 설정 드롭다운은 표시명을 보이고 내부 id로 매핑(저장값·API 분기·키 슬롯은 기존 소문자 id 유지). 일괄생성 확인창·키 미입력 경고도 표시명 사용. **엔진별 쿨다운 분리** — `AI_COOLDOWNS={groq:30, gemini:7}`(그 외 PAID 3초)로 전환, 기존 `AI_FREE_ENGINES` 일괄 30초 판정 폐기(Gemini free RPM~10 → 7초로 완화, 3곳 동일 적용). Firebase Hosting 배포 |
@@ -253,6 +257,7 @@ DRW 2.0이 저장하는 수업 관찰 데이터(`obs/`)와 성적 데이터(`sco
 
 ### 2.8 전송 로직
 
+- **학생 표시 순서**: 모든 학생 명단(좌측 목록·전송 대상 다이얼로그·상태바·◀▶ 이동) **이름 가나다 오름차순**. `_sync_shared_sheets_from_firebase`에서 `all_students` dict 로드 시 1회 정렬(`key=(name 폴백'', nameKey)`) → 모든 `.items()` 순회가 상속, 빌더별 개별 정렬 불필요. **키(nameKey=출결번호)는 불변**, 표시 순서만 변경. None-safe + 동명이인 `nameKey` tiebreak. 웹 명단(입력·성적·설정)도 공유 헬퍼 `sortStu()`로 동일 이름순 적용
 - **전송 대상**: `STATUS_READY` 학생만, `_my_classes()` 화이트리스트 적용
 - **부담임 반 제외**: `assignments[cls].role == "부담임"` → 전송 제외. 폴백: `config/sheets/.../is_sub: true`
 - **대상자 선택 (개별 제외)**: 🚀 전송 클릭 시 `_open_send_dialog()` 체크박스 모달. 준비 완료 학생 전체 기본 체크, 체크 해제 = **이번 전송만 제외**(상태 미변경, 다음 전송엔 재포함). [전체 선택]/[전체 해제] 버튼. 선택 0명 시 전송 차단
@@ -285,6 +290,45 @@ DRW 2.0이 저장하는 수업 관찰 데이터(`obs/`)와 성적 데이터(`sco
 **학급명단 동기화 (`_fetch_class_data`)**
 
 `config/instructors/{id}/assignments` 노드 조회 (list). 반드시 강사 계정 조회 완료 후 실행.
+
+### 2.9-B 최초 설치 위저드 (온보딩)
+
+**목적**: 최초 실행(Firebase 미설정) 시 단일 안내 messagebox("설정 열기")를 3단계 순차 위저드로 대체. 웹 PWA 위저드(§4.8-C)와 동일 컨셉, PC 전용 항목 반영.
+
+**발동·컨테이너**: `__init__`에서 `firebase_url`/`firebase_path` 미설정 시 정상 3-패널 UI를 빌드하지 않고 `_run_setup_wizard()` 호출. **팝업(Toplevel) 아님** — 메인 창 전체를 덮는 오버레이 `tk.Frame`(`self._wz_root`, `place(relwidth=1,relheight=1)`)에 가운데 정렬 카드(560px)로 렌더. 완료/이탈 시 `_wz_exit()`가 오버레이를 destroy → 그 아래 정상 레이아웃 노출. 정상 UI 빌드는 `_build_main_ui()`로 분리(`_main_built` 플래그) — 최초 실행은 위저드 종료 후 빌드, 일반 실행은 즉시 빌드.
+
+**3단계** (`_WZ_STEPS`):
+
+| 단계 | 아이콘 | 내용 | 호출 함수 (기존 재사용) |
+|------|--------|------|------------------------|
+| 0 연결 | 🔥 | Firebase URL·경로 + ⚡연결 테스트 | `firebase_get(tmp,"config")` |
+| 1 계정 | 🔑 | 강사 이름 조회/신규등록 + 담당 동기화 | `firebase_get`/`firebase_put`, `_sync_shared_sheets_from_firebase` |
+| 2 AI키 | 🤖 | 엔진 드롭다운 + API키 (**건너뛰기 가능**) | `save_config` (커밋 시) |
+| 완료 | 🎉 | 실데이터 요약 + "웹서 명단 구성 후 📥가져오기" 안내 | `_wz_commit` |
+
+> 웹 위저드와 차이: **학생 명단·수업 배정 단계 없음**(웹 전용) → 완료 화면서 안내. **AI 엔진+API키 단계 추가**(PC 전용).
+
+**엔진별 키 발급 가이드 (`_WZ_GUIDE`)**: AI키 단계에서 선택한 엔진에 따라 발급 절차를 **인라인 상세 표시**(guide.html 4부 발췌). 엔진 변경(`_wz_on_engine`) 시 즉시 갱신 + 해당 엔진 저장 키 자동 로드.
+
+| 엔진 | 무료/유료 | 발급처 | 키 형식 |
+|------|-----------|--------|---------|
+| Gemini | 무료 | aistudio.google.com/apikey | `AIza...`/`AQ.Ab8...` (limit:0 → 새 프로젝트 재발급) |
+| Claude | 유료 | console.anthropic.com | `sk-ant-...` (Billing 충전 $5, 1회 표시) |
+| GPT (OpenAI) | 유료 | platform.openai.com/api-keys | `sk-...` (Billing 충전, 1회 표시) |
+| Groq | 무료 | console.groq.com/keys | `gsk_...` |
+
+각 가이드 박스: 무료/유료 배지 · 🔗발급처 링크(`webbrowser.open`) · 번호 단계 · 키 형식 · ⚠️주의. (설치·운용 가이드 링크로 떠넘기지 않고 위저드 내 직접 안내)
+
+**단계 가드** (`_wz_next`): 0=URL·경로 미입력 차단, 1=`instructor_id` 미설정 차단.
+
+**스텝 인디케이터**: `tk.Canvas`에 원 3개 + 연결선 직접 드로잉(`_wz_draw_steps`) — 완료=초록 ✓, 현재=인디고, 대기=회색.
+
+**이탈/커밋** (모두 `_wz_exit()` 경유 — 오버레이 destroy 후 `_main_built` 미빌드면 `_build_main_ui`, 빌드돼 있으면 `_populate_student_list`/`_refresh_student_view` 갱신):
+- "나중에"(`_wz_close`): 입력분 `save_config` 후 종료. 미설정 시 다음 실행 재발동.
+- "건너뛰기"(AI 단계, `_wz_skip_ai`): 키 비우고 완료 단계로.
+- "✅ 설정 완료"(`_wz_commit`): `ai_engine_type`+`{engine}_api_key`+`firebase_url/path` 저장 → `_wz_exit` → Firebase 설정 시 `_sync_shared_sheets_from_firebase`.
+
+**구현**: `app.py` `_run_setup_wizard`/`_wz_render`/`_wz_draw_steps`/`_wz_pane_*`/`_wz_build_guide`/`_wz_build_footer`/`_wz_next`/`_wz_back`/`_wz_skip_ai`/`_wz_close`/`_wz_commit`/`_wz_exit`/`_wz_lookup_instr`/`_wz_test_conn`/`_wz_on_engine`, 정상 UI 분리 `_build_main_ui`. 메인 창 한 곳에서 위저드↔정상 레이아웃 전환.
 
 ### 2.10 데이터 지속성
 
@@ -631,6 +675,47 @@ cfg.sheets.M.classes.중1A.tb_grade  = { "최상위수학": "중1-1", "우공비
 **GRADE_SEM_LIST 단축 표시**:
 - 중·초: `중3-1`, `초4-2` 형식
 - 고등: `공통수학1`, `대수`, `미적분I`, `확통`
+
+### 4.8-C 초기 설정 위저드 (온보딩)
+
+**목적**: 강사 미설정 신규 사용자를 빈 화면 + 단일 버튼으로 방치하던 기존 동작을, 4단계 순차 가이드로 대체. 설정 항목을 순서대로 따라 입력하게 유도.
+
+**발동 조건**: `init()`에서 `!instructor` 일 때 `wizardActive=true; wzStep=0` 설정 후 `renderMain()`. (기존 "⚙️ 설정으로 이동" 빈 화면 폐기)
+
+**렌더 분기**: `renderMain()` 최상단에서 `if(wizardActive){renderWizard(mc);return;}` — 위저드 활성 중에는 사이드바 탭(`goNav`)을 눌러도 탭 콘텐츠 대신 위저드가 계속 렌더됨(이탈 차단). 종료는 "나중에 할게요"(skip) 또는 "시작하기"(finish)로만.
+
+**상태 변수** (`app-core.js`):
+- `wizardActive` (bool) — 위저드 활성
+- `wzStep` (0~4) — 0:Firebase 1:계정 2:명단 3:수업 4:완료
+- `wzCls` — 수업 단계에서 선택된 반(classId)
+
+**4단계 구성** (`WZ_STEPS`):
+
+| 단계 | 아이콘 | 내용 | 호출 함수 (기존 재사용) | 입력 DOM ID |
+|------|--------|------|------------------------|-------------|
+| 0 연결 | 🔥 | Firebase URL·경로 저장 | `saveFb()` | `#sUrl` `#sPth` |
+| 1 계정 | 🔑 | 강사 이름 조회/신규등록 | `lookupInstr()` | `#acctName` |
+| 2 명단 | 👥 | 학생 명단 불러오기 | `loadCfg()` | – |
+| 3 수업 | 📚 | 담당 수업 배정 (+교재 등록) | `addA()` / `wzAddCourse()` | `#aCls` `#aTb` `#aRole` `#wzGs` `#wzTb` |
+
+> 입력 DOM ID를 기존 설정 화면과 동일하게 두어 `saveFb`/`lookupInstr`/`addA` 등 기존 핸들러를 수정 없이 재사용. 이들이 끝에 호출하는 `renderMain()`은 `wizardActive` 덕분에 위저드를 재렌더하므로 단계 상태가 보존됨.
+
+**교재 미등록 케이스 (핵심)**: 수업 단계에서 선택한 반(`wzCls`)에 등록된 과목(`config.classes[wzCls].courses`)이 없으면:
+- "⚠️ 이 반에 등록된 교재 없음" 표시 + "수업 추가" 버튼 비활성
+- 인라인 **과목(교재) 등록 폼** 노출: `[과정 ▼ (GRADE_SEM_LIST)] [교재명] [✓]` → `wzAddCourse()`
+- `wzAddCourse()`: `subject = "{과정} {교재}"` 조합으로 `config.classes[wzCls].courses[subject]={textbook,curriculum}` 추가 + `saveLocal()` + `renderMain()`, 이후 `fbPatch('classes/{wzCls}/courses/{subject}')` (실패 무시·toast). `addCourseInline` 로직 미러
+- 등록 즉시 과목 셀렉트(`#aTb`) 채워지고 "수업 추가" 활성
+- **반(classId) 자체는 위저드에서 생성하지 않음** — 반 없으면 "이전 단계에서 학생 명단을 먼저 불러오세요" 안내. 반 생성은 기존 학급 관리 화면에서.
+
+**단계 가드** (`wzNext()`):
+- 0단계: `!dbUrl || !dbPath` → toast 차단
+- 1단계: `!instructor` → toast 차단
+
+**완료(4단계)**: 실데이터 기반 요약 체크리스트(Firebase 연결/강사명/학급·학생 수/담당 수업 수) → "🚀 시작하기"(`wzFinish()`: `wizardActive=false; activeTab='input'`).
+
+**이탈**: "나중에 할게요"(`wzSkip()`: `wizardActive=false; activeTab='setting'`) → 기존 아코디언 설정 화면으로. 강사 미설정 상태면 다음 새로고침 시 위저드 재발동.
+
+**스텝 인디케이터**: 상단 진행바 — 완료=초록 ✓, 현재=인디고(글로우), 대기=회색. CSS `.wz-*` / `.stp*` (`app.css`).
 
 ### 4.9 쓰기 권한 가드
 

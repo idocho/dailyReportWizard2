@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>DRW 리뉴얼 — PC 설치 위저드</title>
+<link rel="stylesheet" href="app.css">
+<style>
+body{background:#5b6068;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:24px}
+.app{width:1080px;height:720px;background:var(--bg);border-radius:10px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.45);display:flex;flex-direction:column;border:1px solid #2a2d36;position:relative}
+.tbar{height:34px;background:var(--nav);display:flex;align-items:center;padding:0 12px;gap:9px;color:#fff;flex-shrink:0}
+.tbar .mk{width:18px;height:18px;border-radius:5px;background:linear-gradient(135deg,#6366F1,#4338CA);display:flex;align-items:center;justify-content:center;font-size:10px}
+.tbar .ti{font-size:11.5px;font-weight:700}
+.tbar .wbtn{margin-left:auto;display:flex;gap:7px}
+.tbar .wbtn span{width:11px;height:11px;border-radius:50%}
+/* 메인 창을 덮는 위저드 오버레이 (팝업 아님) */
+.ov{flex:1;display:flex;align-items:flex-start;justify-content:center;padding:30px 20px;overflow-y:auto}
+.wzc{width:560px}
+.wz-brand{text-align:center;margin-bottom:6px}
+.wz-brand .t{font-size:15px;font-weight:800;color:var(--accent-ink)}
+.wz-brand .s{font-size:11.5px;color:var(--muted);margin-top:3px}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="tbar">
+    <span class="mk">📝</span><span class="ti">DailyReportWizard v2.1.0 — 최초 설치 설정</span>
+    <span class="wbtn"><span style="background:#FBBF24"></span><span style="background:#34D399"></span><span style="background:#F87171"></span></span>
+  </div>
+  <div class="ov">
+    <div class="wzc">
+      <div class="wz-brand"><div class="t">처음 설치하셨네요 👋</div><div class="s">3단계로 PC 클라이언트를 설정합니다</div></div>
+      <div class="wz-steps">
+        <div class="stp done"><div class="stp-dot">✓</div><div class="stp-lbl">연결</div></div>
+        <div class="stp-bar fill"></div>
+        <div class="stp done"><div class="stp-dot">✓</div><div class="stp-lbl">계정</div></div>
+        <div class="stp-bar fill"></div>
+        <div class="stp active"><div class="stp-dot">3</div><div class="stp-lbl">AI 키</div></div>
+      </div>
+      <div class="wz-body">
+        <div class="wz-ic">🤖</div>
+        <div class="wz-ti">AI 엔진 · API 키</div>
+        <div class="wz-de">특이사항 자동 생성에 쓸 AI 엔진을 고르고 키를 입력하세요. 지금 건너뛰어도 됩니다.</div>
+        <div class="field"><label class="lbl">AI 엔진</label>
+          <select class="sel" style="width:100%"><option>Gemini (무료·추천)</option><option>Claude</option><option>GPT (OpenAI)</option><option>Groq (무료)</option></select>
+        </div>
+        <div class="eg">
+          <div class="eg-hd"><span class="eg-pill free">무료</span><span class="eg-lead">Google AI Studio · 카드 등록 불필요, 월 제한 없음(하루 요청 한도만).</span></div>
+          <a class="eg-link" href="#">🔗 aistudio.google.com/apikey 열기</a>
+          <div class="eg-steps">
+            <div class="gs"><div class="gs-n">1</div><div class="gs-t">Google 계정 로그인 후 위 링크 접속</div></div>
+            <div class="gs"><div class="gs-n">2</div><div class="gs-t">「API 키 만들기」 클릭 → 새 프로젝트에서 생성 권장</div></div>
+            <div class="gs"><div class="gs-n">3</div><div class="gs-t">발급된 키 복사</div></div>
+          </div>
+          <div class="eg-fmt">키 형식: <code>AIza... 또는 AQ.Ab8...</code></div>
+        </div>
+        <div class="field" style="margin-top:13px"><label class="lbl">API 키</label>
+          <input class="inp" type="password" value="" placeholder="위에서 발급한 키 붙여넣기"></div>
+      </div>
+      <div class="wz-foot">
+        <button class="btn sm">← 이전</button>
+        <div class="r">
+          <button class="wz-skip">건너뛰기</button>
+          <button class="btn primary sm">완료 →</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

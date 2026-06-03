@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>DRW 리뉴얼 — 설정</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<div class="wrap">
+  <aside class="sb">
+    <div class="sb-brand">
+      <div class="sb-mark">📝</div>
+      <div class="sb-name">DailyReport<small>Wizard · v2.1.0</small></div>
+    </div>
+    <div class="sb-me">
+      <div class="sb-av">민수</div>
+      <div class="sb-me-info"><div class="sb-me-nm">김민수</div><div class="sb-me-rl">담임 · 1개 수업</div></div>
+      <div class="sb-cv">⌄</div>
+    </div>
+    <div class="sb-sec">워크스페이스</div>
+    <nav class="sb-nav">
+      <a class="sni" href="index.html"><span class="i">✍️</span> 수업 입력</a>
+      <a class="sni" href="scores.html"><span class="i">📊</span> 성적 입력</a>
+      <a class="sni on" href="settings.html"><span class="i">⚙️</span> 설정</a>
+    </nav>
+    <div class="sb-foot"><a href="#">📖 <span>설치 · 운용 가이드</span></a></div>
+  </aside>
+
+  <div class="main">
+    <div class="topbar">
+      <div class="crumb">설정</div>
+      <div class="tb-spacer"></div>
+      <span class="pill ok"><span class="dot" style="background:#22C55E"></span> 연결됨</span>
+    </div>
+    <div class="content" style="max-width:680px">
+      <div class="ctx">
+        <div class="ctx-ic">⚙️</div>
+        <div>
+          <div class="ctx-h1">설정</div>
+          <div class="ctx-meta"><span>계정 · 연결 · 수업 관리</span></div>
+        </div>
+      </div>
+
+      <!-- Firebase (펼침) -->
+      <div class="acc open">
+        <div class="acc-h">
+          <div class="acc-ic">🔥</div>
+          <div><div class="acc-t">Firebase 연결</div><div class="acc-sub">데이터 저장·동기화</div></div>
+          <span class="acc-state ok">연결됨 ✓</span>
+          <span class="acc-cv">›</span>
+        </div>
+        <div class="acc-b">
+          <div class="field"><label class="lbl">DB URL</label><input class="inp" value="https://drw-prod.firebaseio.com"></div>
+          <div class="field"><label class="lbl">경로 (Secret Path)</label><input class="inp" value="drw_a7f3k9x2"></div>
+          <div class="actions" style="justify-content:flex-start">
+            <button class="btn primary sm">💾 저장</button>
+            <button class="btn sm">📥 학생 명단 불러오기</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 내 계정 -->
+      <div class="acc">
+        <div class="acc-h">
+          <div class="acc-ic">🔑</div>
+          <div><div class="acc-t">내 계정</div><div class="acc-sub">강사 조회 · 등록</div></div>
+          <span class="acc-state ok">김민수</span>
+          <span class="acc-cv">›</span>
+        </div>
+      </div>
+
+      <!-- 자주 쓰는 문구 -->
+      <div class="acc">
+        <div class="acc-h">
+          <div class="acc-ic">🎯</div>
+          <div><div class="acc-t">자주 쓰는 문구</div><div class="acc-sub">프리셋 관리</div></div>
+          <span class="acc-state" style="color:var(--muted)">3개</span>
+          <span class="acc-cv">›</span>
+        </div>
+      </div>
+
+      <!-- 담당 수업 -->
+      <div class="acc">
+        <div class="acc-h">
+          <div class="acc-ic">📚</div>
+          <div><div class="acc-t">내 담당 수업</div><div class="acc-sub">반 · 과목 · 역할</div></div>
+          <span class="acc-state" style="color:var(--muted)">1개</span>
+          <span class="acc-cv">›</span>
+        </div>
+      </div>
+
+      <!-- 학급 관리 -->
+      <div class="acc">
+        <div class="acc-h">
+          <div class="acc-ic">🏫</div>
+          <div><div class="acc-t">학급 &amp; 학생 관리</div><div class="acc-sub">드릴다운</div></div>
+          <span class="acc-state" style="color:var(--muted)">1개 학급</span>
+          <span class="acc-cv">›</span>
+        </div>
+      </div>
+
+      <!-- 교재 목록 (관리자) -->
+      <div class="acc">
+        <div class="acc-h">
+          <div class="acc-ic">📖</div>
+          <div><div class="acc-t">교재 목록 <span class="adm-tag">관리자</span></div><div class="acc-sub">전역 레지스트리</div></div>
+          <span class="acc-cv">›</span>
+        </div>
+      </div>
+
+      <!-- 초기화 -->
+      <div class="acc">
+        <div class="acc-h">
+          <div class="acc-ic">🗑️</div>
+          <div><div class="acc-t" style="color:var(--danger)">초기화</div><div class="acc-sub">데이터 삭제</div></div>
+          <span class="acc-cv">›</span>
+        </div>
+      </div>
+
+      <div class="legend"><small>디자인 시안 · 설정 · 분리 사이트(/redesign) — 프로덕션 미반영</small></div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

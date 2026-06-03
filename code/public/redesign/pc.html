@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>DRW 리뉴얼 — PC 클라이언트</title>
+<link rel="stylesheet" href="app.css">
+<style>
+/* PC 데스크톱 전용 — 밀도 높은 3-패널. tkinter 목표 룩(실제는 색·보더로 근사) */
+body{background:#5b6068;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:24px}
+.app{width:1080px;height:720px;background:var(--bg);border-radius:10px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.45);display:flex;flex-direction:column;border:1px solid #2a2d36}
+/* 타이틀바 */
+.tbar{height:34px;background:var(--nav);display:flex;align-items:center;padding:0 12px;gap:9px;color:#fff;flex-shrink:0}
+.tbar .mk{width:18px;height:18px;border-radius:5px;background:linear-gradient(135deg,#6366F1,#4338CA);display:flex;align-items:center;justify-content:center;font-size:10px}
+.tbar .ti{font-size:11.5px;font-weight:700}
+.tbar .ver{font-size:10px;color:var(--nav-sub)}
+.tbar .wbtn{margin-left:auto;display:flex;gap:7px}
+.tbar .wbtn span{width:11px;height:11px;border-radius:50%}
+/* 앱 헤더 (액션바) */
+.ahead{height:50px;background:var(--panel);border-bottom:1px solid var(--line);display:flex;align-items:center;padding:0 16px;gap:10px;flex-shrink:0}
+.seg2{display:inline-flex;background:var(--panel-2);border:1px solid var(--line);border-radius:8px;padding:3px;gap:2px}
+.seg2 button{border:none;background:transparent;font-family:inherit;font-size:11.5px;font-weight:600;color:var(--sub);padding:5px 14px;border-radius:6px;cursor:pointer}
+.seg2 button.on{background:var(--panel);color:var(--accent-ink);box-shadow:var(--sh-1)}
+.ahead .date{font-size:11.5px;color:var(--sub);font-weight:500}
+.ahead .sp{flex:1}
+/* 3-패널 */
+.panes{flex:1;display:flex;min-height:0}
+.pleft{width:236px;background:var(--panel);border-right:1px solid var(--line);display:flex;flex-direction:column;flex-shrink:0}
+.pl-h{padding:11px 14px;font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid var(--line-soft)}
+.cls-grp{padding:8px 10px}
+.cls-grp-h{display:flex;align-items:center;gap:7px;padding:6px 8px;font-size:11px;font-weight:700;color:var(--sub);cursor:pointer}
+.cls-grp-h .cv{font-size:10px;color:var(--muted)}
+.sli{display:flex;align-items:center;gap:9px;padding:7px 10px;border-radius:8px;cursor:pointer;margin:1px 4px}
+.sli:hover{background:var(--panel-2)}
+.sli.on{background:var(--accent-soft)}
+.sli-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.sli-nm{font-size:12px;font-weight:600;flex:1}
+.sli-st{font-size:9.5px;color:var(--muted)}
+.pcenter{flex:1;overflow-y:auto;padding:16px 18px;min-width:0}
+.pright{width:280px;background:var(--panel-2);border-left:1px solid var(--line);display:flex;flex-direction:column;flex-shrink:0}
+.pr-h{padding:11px 14px;font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid var(--line-soft);display:flex;align-items:center}
+.pr-h .cnt{margin-left:auto;font-weight:600;color:var(--sub)}
+.msg{margin:12px;background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:13px 14px;font-size:12px;line-height:1.6;color:var(--ink);box-shadow:var(--sh-1);flex:1;white-space:pre-wrap}
+.msg .nm{font-weight:700;color:var(--accent-ink)}
+/* 상태바 */
+.sbar{height:34px;background:var(--panel);border-top:1px solid var(--line);display:flex;align-items:center;padding:0 16px;gap:14px;flex-shrink:0;font-size:11px}
+.scnt{display:inline-flex;align-items:center;gap:6px;font-weight:600;color:var(--sub)}
+.scnt .d{width:8px;height:8px;border-radius:50%}
+/* 푸터 액션 */
+.foot{height:60px;background:var(--panel);border-top:1px solid var(--line);display:flex;align-items:center;justify-content:flex-end;gap:10px;padding:0 18px;flex-shrink:0}
+/* 중앙 학생 상세 */
+.det-h{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.det-av{width:42px;height:42px;border-radius:11px;background:var(--accent-soft);border:1px solid var(--accent-line);color:var(--accent-ink);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700}
+.det-nm{font-size:16px;font-weight:700;letter-spacing:-.02em}
+.det-meta{font-size:11.5px;color:var(--sub);margin-top:1px}
+.dcard{background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:var(--sh-1);margin-bottom:12px;overflow:hidden}
+.dcard-h{padding:9px 14px;font-size:11px;font-weight:700;color:var(--sub);background:var(--panel-2);border-bottom:1px solid var(--line-soft);text-transform:uppercase;letter-spacing:.04em}
+.dcard-b{padding:13px 14px;font-size:12.5px;line-height:1.6}
+.kv{display:grid;grid-template-columns:64px 1fr;gap:8px 12px;font-size:12px}
+.kv .k{color:var(--muted);font-weight:600}
+.kv .v{color:var(--ink)}
+.tagline{display:flex;gap:6px;flex-wrap:wrap}
+.tg{font-size:11px;font-weight:600;padding:4px 9px;border-radius:7px;border:1px solid var(--line);background:var(--panel-2);color:var(--sub)}
+.tg.ac{background:var(--accent-soft);border-color:var(--accent-line);color:var(--accent-ink)}
+.tg.ok{background:var(--ok-soft);border-color:#C5F0D4;color:#15803D}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="tbar">
+    <span class="mk">📝</span><span class="ti">DailyReportWizard</span><span class="ver">v2.1.0</span>
+    <span class="wbtn"><span style="background:#FBBF24"></span><span style="background:#34D399"></span><span style="background:#F87171"></span></span>
+  </div>
+
+  <div class="ahead">
+    <div class="seg2"><button class="on">오후반 (M)</button><button>오전반 (T)</button></div>
+    <div class="date">2026. 6. 3 (수)</div>
+    <div class="sp"></div>
+    <button class="btn sm">📥 데이터 가져오기</button>
+    <button class="btn sm">⚙️ 설정</button>
+    <button class="btn sm danger">🗑️ 초기화</button>
+  </div>
+
+  <div class="panes">
+    <!-- 좌: 학생 목록 -->
+    <div class="pleft">
+      <div class="pl-h">학생 명단 · 중3A</div>
+      <div class="cls-grp">
+        <div class="cls-grp-h"><span class="cv">▾</span> 중3A · 개념원리 <span style="margin-left:auto;color:var(--muted);font-weight:500">3명</span></div>
+        <div class="sli on"><span class="sli-dot" style="background:var(--ok)"></span><span class="sli-nm">김철수</span><span class="sli-st">작성됨</span></div>
+        <div class="sli"><span class="sli-dot" style="background:#F59E0B"></span><span class="sli-nm">이영희</span><span class="sli-st">부분</span></div>
+        <div class="sli"><span class="sli-dot" style="background:#CBD5E1"></span><span class="sli-nm">박지민</span><span class="sli-st">미작성</span></div>
+      </div>
+    </div>
+
+    <!-- 중앙: 학생 상세 (읽기 전용) -->
+    <div class="pcenter">
+      <div class="det-h">
+        <div class="det-av">김철</div>
+        <div><div class="det-nm">김철수</div><div class="det-meta">중3A · 중3-1 개념원리 · 담임</div></div>
+        <div style="margin-left:auto"><span class="pill ok"><span class="dot" style="background:var(--ok)"></span> 작성 완료</span></div>
+      </div>
+
+      <div class="dcard">
+        <div class="dcard-h">진도 · 과제</div>
+        <div class="dcard-b">
+          <div class="kv">
+            <span class="k">진도</span><span class="v">이차함수 › 이차함수의 그래프</span>
+            <span class="k">과제</span><span class="v">개념원리 p.48 – p.52</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="dcard">
+        <div class="dcard-h">관찰 태그</div>
+        <div class="dcard-b">
+          <div class="tagline">
+            <span class="tg ok">과제 완료</span><span class="tg ac">컨디션 최상</span><span class="tg ac">이해도 완벽</span><span class="tg">개념완전습득</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="dcard">
+        <div class="dcard-h">특이사항 (AI 생성 / 편집)</div>
+        <div class="dcard-b" style="color:var(--ink)">
+          오답노트를 꼼꼼히 작성하며 응용 단계까지 스스로 도전하는 모습이 인상적입니다. 이차함수 그래프의 평행이동 개념을 정확히 이해하고 있어, 다음 단계인 최댓값·최솟값 문제도 무리 없이 진행할 수 있을 것으로 보입니다.
+        </div>
+      </div>
+    </div>
+
+    <!-- 우: 메시지 미리보기 -->
+    <div class="pright">
+      <div class="pr-h">카톡 메시지 미리보기 <span class="cnt">182자</span></div>
+      <div class="msg"><span class="nm">[김철수 학생 데일리리포트]</span>
+
+📘 진도 · 이차함수의 그래프
+📝 과제 · 개념원리 p.48–52
+
+오답노트를 꼼꼼히 작성하며 응용 단계까지 스스로 도전하는 모습이 인상적입니다. 다음 단계도 무리 없이 진행할 수 있을 것으로 보입니다.
+
+— 김민수 선생님</div>
+    </div>
+  </div>
+
+  <div class="sbar">
+    <span class="scnt"><span class="d" style="background:var(--ok)"></span> 완료 1</span>
+    <span class="scnt"><span class="d" style="background:#F59E0B"></span> 부분 1</span>
+    <span class="scnt"><span class="d" style="background:#CBD5E1"></span> 미작성 1</span>
+    <span style="margin-left:auto;color:var(--muted)">엔진 · Gemini</span>
+  </div>
+
+  <div class="foot">
+    <button class="btn">✨ 전체 AI 생성</button>
+    <button class="btn primary">🚀 카카오톡 전송</button>
+  </div>
+</div>
+</body>
+</html>

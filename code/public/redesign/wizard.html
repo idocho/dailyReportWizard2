@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>DRW 리뉴얼 — 온보딩 위저드</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<div class="wz-wrap">
+  <div class="wz">
+    <div class="wz-head">
+      <div class="wz-logo"><span class="m">📝</span> DailyReportWizard</div>
+      <div class="wz-hsub">처음 오셨네요 — 4단계로 빠르게 설정해요</div>
+    </div>
+    <div class="wz-steps">
+      <div class="stp done"><div class="stp-dot">✓</div><div class="stp-lbl">연결</div></div>
+      <div class="stp-bar fill"></div>
+      <div class="stp active"><div class="stp-dot">2</div><div class="stp-lbl">계정</div></div>
+      <div class="stp-bar"></div>
+      <div class="stp"><div class="stp-dot">3</div><div class="stp-lbl">명단</div></div>
+      <div class="stp-bar"></div>
+      <div class="stp"><div class="stp-dot">4</div><div class="stp-lbl">수업</div></div>
+    </div>
+    <div class="wz-body">
+      <div class="wz-ic">🔑</div>
+      <div class="wz-ti">내 계정</div>
+      <div class="wz-de">본인 이름으로 강사 계정을 만들거나 불러옵니다.</div>
+      <div class="field">
+        <label class="lbl">강사 이름</label>
+        <div class="selrow" style="flex-wrap:nowrap">
+          <input class="inp" placeholder="이름을 입력하세요" style="flex:1">
+          <button class="btn primary">조회</button>
+        </div>
+        <div class="help">이름이 곧 계정 키입니다 (예: <code>config/instructors/홍길동</code>). 없으면 새로 등록돼요.</div>
+      </div>
+      <div class="wz-ok">✓ 김민수 계정 준비 완료</div>
+    </div>
+    <div class="wz-foot">
+      <button class="btn sm">← 이전</button>
+      <div class="r">
+        <button class="wz-skip">나중에 할게요</button>
+        <button class="btn primary sm">다음 →</button>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

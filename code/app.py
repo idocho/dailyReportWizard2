@@ -94,19 +94,25 @@ class App:
         self._ai_last_call = 0.0       # 하위 호환용 (AiEngine이 갱신)
         self.ai = AiEngine(self)       # AI 생성 엔진
 
+        self._main_built = False
+        # Firebase 미설정(최초 실행) 시: 정상 UI 대신 메인 창에 설치 위저드를 띄운다.
+        # 위저드 완료/이탈 시 정상 레이아웃을 빌드 → 팝업 없이 한 창에서 단계 전환.
+        if not self.config.get('firebase_url') or not self.config.get('firebase_path'):
+            self._run_setup_wizard()
+        else:
+            self._build_main_ui()
+            # 공용 교재/학급 목록은 Firebase students/+classes를 단일 원본으로 사용
+            self.root.after(300, self._sync_shared_sheets_from_firebase)
+
+    def _build_main_ui(self):
+        """정상 3-패널 메인 레이아웃 빌드 (위저드 종료 후/일반 실행 시)."""
         self._build_header()
         self._build_sheet_bar()
         self._build_panels()
         self._build_statusbar()
         self._build_footer()
         self._switch_sheet('M')
-
-        # Firebase 미설정 시 설정 안내
-        if not self.config.get('firebase_url') or not self.config.get('firebase_path'):
-            self.root.after(300, self._prompt_first_run)
-        else:
-            # 공용 교재/학급 목록은 Firebase students/+classes를 단일 원본으로 사용
-            self.root.after(300, self._sync_shared_sheets_from_firebase)
+        self._main_built = True
 
     def _sync_shared_sheets_from_firebase(self):
         """시작 시 Firebase students/ + classes/ + config/ 동기화."""
@@ -117,7 +123,14 @@ class App:
             fetched_students = firebase_get(self.config, "students") or {}
             fetched_classes  = firebase_get(self.config, "classes") or {}
             if isinstance(fetched_students, dict):
-                self.all_students = fetched_students
+                # 표시 순서만 이름 오름차순 — 키(nameKey=출결번호)는 불변.
+                # 모든 .items() 순회가 이 순서를 상속 → 빌더별 정렬 불일치 원천 차단.
+                # None-safe(이름 누락 폴백 '') + 동명이인 tiebreak(nameKey).
+                self.all_students = dict(sorted(
+                    fetched_students.items(),
+                    key=lambda kv: (
+                        (kv[1].get('name') if isinstance(kv[1], dict) else None) or '',
+                        kv[0])))
             if isinstance(fetched_classes, dict):
                 self.all_classes = fetched_classes
 
@@ -173,7 +186,7 @@ class App:
                  anchor='e').pack(side='right', padx=14)
 
     def _build_sheet_bar(self):
-        bar = tk.Frame(self.root, bg="#E2E8F0")
+        bar = tk.Frame(self.root, bg="#ECECEF")
         bar.pack(fill='x')
         self.sheet_btns = {}
         for s in ['M', 'T']:
@@ -184,11 +197,11 @@ class App:
             self.sheet_btns[s] = b
         # v3.0: 진도/과제 버튼 제거 (웹에서 입력), 가져오기 항상 표시
         tk.Button(bar, text="⚙ 설정", font=FS,
-                  bg="#E2E8F0", fg=SUBTEXT, relief='flat', cursor='hand2',
+                  bg="#ECECEF", fg=SUBTEXT, relief='flat', cursor='hand2',
                   command=self._open_settings
                   ).pack(side='right', padx=4, pady=3)
         tk.Button(bar, text="🗑 초기화", font=FS,
-                  bg="#E2E8F0", fg="#EF4444", relief='flat', cursor='hand2',
+                  bg="#ECECEF", fg="#EF4444", relief='flat', cursor='hand2',
                   command=self._open_reset_dialog
                   ).pack(side='right', padx=0, pady=3)
         tk.Button(bar, text="📥 데이터 가져오기", font=FS,
@@ -339,14 +352,14 @@ class App:
         self.center_frame = f
 
         # 헤더
-        hdr = tk.Frame(f, bg="#F8FAFC",
+        hdr = tk.Frame(f, bg="#F7F7F9",
                        highlightbackground=BORDER, highlightthickness=1)
         hdr.pack(fill='x')
         self.c_name = tk.Label(hdr, text="—",
                                font=("맑은 고딕", 13, "bold"),
-                               bg="#F8FAFC", fg=TEXT)
+                               bg="#F7F7F9", fg=TEXT)
         self.c_name.pack(side='left', padx=14, pady=10)
-        self.c_sub = tk.Label(hdr, text="", font=FS, bg="#F8FAFC", fg=GRAY)
+        self.c_sub = tk.Label(hdr, text="", font=FS, bg="#F7F7F9", fg=GRAY)
         self.c_sub.pack(side='left')
         self.c_room = tk.Label(hdr, text="", font=FS,
                                bg=INDIGO_L, fg=INDIGO, padx=8, pady=3)
@@ -390,18 +403,18 @@ class App:
             # 부담임 반: 강제 완료 비활성화
             force_btn = tk.Button(
                 force_btn_frame, text="⚡ 강제 완료 (부담임 열람만)",
-                font=FS, bg="#F1F5F9", fg=GRAY,
+                font=FS, bg="#F7F7F9", fg=GRAY,
                 relief='flat', padx=8, pady=3, state='disabled')
         elif is_forced:
             force_btn = tk.Button(
                 force_btn_frame, text="⚡ 강제 완료 (ON) — 클릭하여 해제",
-                font=FS, bg="#DCFCE7", fg="#166534",
+                font=FS, bg="#ECFDF3", fg="#15803D",
                 relief='flat', padx=8, pady=3, cursor='hand2',
                 command=_toggle_force)
         else:
             force_btn = tk.Button(
                 force_btn_frame, text="⚡ 강제 완료",
-                font=FS, bg="#F1F5F9", fg=SUBTEXT,
+                font=FS, bg="#F7F7F9", fg=SUBTEXT,
                 relief='flat', padx=8, pady=3, cursor='hand2',
                 command=_toggle_force)
         force_btn.pack(side='right')
@@ -419,7 +432,7 @@ class App:
         if has_progress:
             pf = tk.LabelFrame(pad, text="  오늘 수업 (반 공통)  ",
                                font=("맑은 고딕", 9, "bold"),
-                               fg="#0F6E56", bg="#F0FDF4", padx=10, pady=8,
+                               fg="#0F6E56", bg="#ECFDF3", padx=10, pady=8,
                                highlightbackground="#BBF7D0")
             pf.pack(fill='x', pady=(0, 12))
             for subject in subjects:
@@ -427,14 +440,14 @@ class App:
                 if pd_val.get('progress') or pd_val.get('homework'):
                     tb_lbl = grade_label(tb_grade.get(subject, ''), subject)
                     tk.Label(pf, text=tb_lbl, font=("맑은 고딕", 8, "bold"),
-                             bg="#F0FDF4", fg=INDIGO).pack(anchor='w', pady=(2,0))
+                             bg="#ECFDF3", fg=INDIGO).pack(anchor='w', pady=(2,0))
                     if pd_val.get('progress'):
                         tk.Label(pf, text=f"  진도: {pd_val['progress']}",
-                                 font=FS, bg="#F0FDF4", fg=TEXT
+                                 font=FS, bg="#ECFDF3", fg=TEXT
                                  ).pack(anchor='w')
                     if pd_val.get('homework'):
                         tk.Label(pf, text=f"  과제: {pd_val['homework']}",
-                                 font=FS, bg="#F0FDF4", fg=TEXT
+                                 font=FS, bg="#ECFDF3", fg=TEXT
                                  ).pack(anchor='w')
 
         # ── 과목별 과제수행도 (읽기 전용) ──
@@ -473,14 +486,14 @@ class App:
         tk.Label(note_hdr, text="특이사항", font=("맑은 고딕", 9, "bold"),
                  bg=PANEL, fg=SUBTEXT).pack(side='left')
         ai_btn = tk.Button(note_hdr, text="✨ AI생성",
-                           font=("맑은 고딕", 8), bg="#EEF2FF", fg=INDIGO,
+                           font=("맑은 고딕", 8), bg="#EEF0FF", fg=INDIGO,
                            relief='flat', padx=8, pady=2, cursor='hand2')
         ai_btn.pack(side='right')
 
         # 부담임 과목은 AI생성 비활성화
         if self._is_sub_teacher(classId):
             ai_btn.config(state='disabled', text="✨ AI생성 (부담임)",
-                          bg="#F1F5F9", fg=GRAY, cursor='arrow')
+                          bg="#F7F7F9", fg=GRAY, cursor='arrow')
         else:
             # 쿨다운 잔여 시간에 따라 초기 상태 설정
             _engine = self.config.get('ai_engine_type', 'groq').strip().lower()
@@ -494,7 +507,7 @@ class App:
         is_sub = self._is_sub_teacher(classId)
         import sys as _sys
         _note_font = ("Segoe UI Emoji", 9) if _sys.platform == "win32" else FE
-        note_txt = tk.Text(pad, font=_note_font, bg="#F8FAFC", fg=TEXT,
+        note_txt = tk.Text(pad, font=_note_font, bg="#F7F7F9", fg=TEXT,
                            relief='flat', wrap='word', height=6,
                            undo=True,
                            highlightbackground=BORDER, highlightthickness=1,
@@ -505,7 +518,7 @@ class App:
 
         if is_sub:
             # 부담임: 읽기 전용 잠금 — FocusOut·Firebase PATCH 없음
-            note_txt.config(state='disabled', bg="#F1F5F9", fg=GRAY)
+            note_txt.config(state='disabled', bg="#F7F7F9", fg=GRAY)
         else:
             def _save_note(event=None):
                 """note_data 로컬 캐시 저장 (DB 쓰기 없음)"""
@@ -549,17 +562,17 @@ class App:
         self.right_frame = f
 
         # 헤더
-        rh = tk.Frame(f, bg="#F8FAFC",
+        rh = tk.Frame(f, bg="#F7F7F9",
                       highlightbackground=BORDER, highlightthickness=1)
         rh.pack(fill='x')
         self._dot_c = tk.Canvas(rh, width=10, height=10,
-                                bg="#F8FAFC", highlightthickness=0)
+                                bg="#F7F7F9", highlightthickness=0)
         self._dot_id = self._dot_c.create_oval(2,2,9,9, fill=GREEN, outline="")
         self._dot_c.pack(side='left', padx=(12,4), pady=10)
         self._pulse()
         tk.Label(rh, text="미리보기",
-                 font=FT, bg="#F8FAFC", fg=TEXT).pack(side='left')
-        self.char_lbl = tk.Label(rh, text="0자", font=FS, bg="#F8FAFC", fg=GRAY)
+                 font=FT, bg="#F7F7F9", fg=TEXT).pack(side='left')
+        self.char_lbl = tk.Label(rh, text="0자", font=FS, bg="#F7F7F9", fg=GRAY)
         self.char_lbl.pack(side='right', padx=12)
 
         self.to_lbl = tk.Label(f, text="", font=FS,
@@ -567,7 +580,7 @@ class App:
         self.to_lbl.pack(fill='x')
 
         self.preview = tk.Text(f, font=("맑은 고딕", 9), wrap='word',
-                               relief='flat', bg="#F8FAFC", bd=0,
+                               relief='flat', bg="#F7F7F9", bd=0,
                                highlightthickness=0, state='disabled',
                                padx=12, pady=10)
         self.preview.pack(fill='both', expand=True)
@@ -587,14 +600,14 @@ class App:
 
     # ── 상태바 / 푸터 ────────────────────────────────────────────────
     def _build_statusbar(self):
-        sb = tk.Frame(self.root, bg="#F0FDF4",
+        sb = tk.Frame(self.root, bg="#ECFDF3",
                       highlightbackground="#BBF7D0", highlightthickness=1)
         sb.pack(fill='x')
         self.status_lbl = tk.Label(sb, text="", font=FS,
-                                   bg="#F0FDF4", fg="#15803D", anchor='w')
+                                   bg="#ECFDF3", fg="#15803D", anchor='w')
         self.status_lbl.pack(side='left', padx=12, pady=4)
         tk.Label(sb, text="● 완료   ◐ 진행중   ○ 미입력",
-                 font=FS, bg="#F0FDF4", fg=GRAY).pack(side='right', padx=12)
+                 font=FS, bg="#ECFDF3", fg=GRAY).pack(side='right', padx=12)
         self._status_tooltip_text = ""
         self._attach_status_tooltip(self.status_lbl)
 
@@ -627,7 +640,7 @@ class App:
         self.send_btn = tk.Button(
             foot, text="🚀  카카오톡 전송 (0명)",
             font=("맑은 고딕", 10, "bold"),
-            bg="#E2E8F0", fg=GRAY, relief='flat',
+            bg="#ECECEF", fg=GRAY, relief='flat',
             padx=14, pady=8, cursor='hand2',
             command=self._send)
         self.send_btn.pack(side='right', padx=10, pady=8)
@@ -635,7 +648,7 @@ class App:
         # ✨ 전체 AI 생성 버튼 (STATUS_READY 학생 일괄 처리)
         self.ai_all_btn = tk.Button(
             foot, text="✨ 전체 AI 생성",
-            font=("맑은 고딕", 9), bg="#EEF2FF", fg=INDIGO,
+            font=("맑은 고딕", 9), bg="#EEF0FF", fg=INDIGO,
             relief='flat', padx=10, pady=8, cursor='hand2',
             command=self._gen_ai_note_all)
         self.ai_all_btn.pack(side='right', padx=(0, 4), pady=8)
@@ -762,8 +775,8 @@ class App:
         n = len(self._collect_ready(self.activeGroup))
         self.send_btn.config(
             text=f"🚀  카카오톡 전송 ({n}명)",
-            bg=ACCENT if n>0 else "#E2E8F0",
-            fg="#1A1D2E" if n>0 else GRAY)
+            bg=ACCENT if n>0 else "#ECECEF",
+            fg="#0E1016" if n>0 else GRAY)
 
     def _refresh_statusbar(self):
         group = self.activeGroup
@@ -1081,7 +1094,7 @@ class App:
         self.cur_cls = self.cur_name = None
         self._populate_student_list(group)
         for s, b in self.sheet_btns.items():
-            b.config(bg=PANEL if s==group else "#E2E8F0",
+            b.config(bg=PANEL if s==group else "#ECECEF",
                      fg=TEXT  if s==group else SUBTEXT)
         # 첫 학생 선택 (_my_classes 범위 내에서)
         for classId, cd in self._my_classes(group):
@@ -1095,33 +1108,348 @@ class App:
         self._refresh_statusbar()
 
     # ── 최초 실행 안내 ────────────────────────────────────────────────
+    # ── 최초 설치 위저드 (온보딩) ─────────────────────────────────
+    _WZ_STEPS = [("🔥", "연결"), ("🔑", "계정"), ("🤖", "AI 키")]
+    # 엔진별 키 발급 상세 (guide.html 4부 발췌)
+    _WZ_GUIDE = {
+        'gemini': {'tag': '무료', 'tagc': 'free',
+                   'url': 'https://aistudio.google.com/apikey', 'label': 'aistudio.google.com/apikey',
+                   'lead': 'Google AI Studio · 카드 등록 불필요, 월 제한 없음(하루 요청 한도만).',
+                   'fmt': 'AIza... 또는 AQ.Ab8...',
+                   'steps': ['Google 계정 로그인 후 위 링크 접속',
+                             '「API 키 만들기」 클릭 → 새 프로젝트에서 생성 권장',
+                             '발급된 키 복사'],
+                   'warn': '호출 시 limit: 0 오류 → 그 프로젝트 무료 할당 막힘. 새 프로젝트로 재발급.'},
+        'claude': {'tag': '유료', 'tagc': 'paid',
+                   'url': 'https://console.anthropic.com', 'label': 'console.anthropic.com',
+                   'lead': 'Anthropic Console · 문장 품질 최상, 크레딧 충전(결제) 필요.',
+                   'fmt': 'sk-ant-...',
+                   'steps': ['위 링크에서 Anthropic Console 가입',
+                             'Billing 메뉴서 결제수단 등록 + 크레딧 충전(최소 $5)',
+                             'Settings › API Keys › Create Key 로 발급'],
+                   'warn': '키는 생성 직후 한 번만 표시됨 — 즉시 복사.'},
+        'openai': {'tag': '유료', 'tagc': 'paid',
+                   'url': 'https://platform.openai.com/api-keys', 'label': 'platform.openai.com/api-keys',
+                   'lead': 'OpenAI Platform · 범용 품질, 결제 등록 필요.',
+                   'fmt': 'sk-...',
+                   'steps': ['위 링크에서 OpenAI Platform 접속',
+                             'Billing서 결제수단 등록 + 크레딧 충전',
+                             '「Create new secret key」 클릭 → 복사'],
+                   'warn': '키는 생성 직후 한 번만 표시됨 — 즉시 복사.'},
+        'groq':   {'tag': '무료', 'tagc': 'free',
+                   'url': 'https://console.groq.com/keys', 'label': 'console.groq.com/keys',
+                   'lead': 'Groq Console · 무료·매우 빠름. 분당 요청수(RPM) 제한 있어 연속 생성 시 대기 가능.',
+                   'fmt': 'gsk_...',
+                   'steps': ['위 링크에서 Groq Console 가입',
+                             '「Create API Key」 클릭 → 복사'],
+                   'warn': ''},
+    }
+
     def _prompt_first_run(self):
-        """v3.0 — Firebase 미설정 시 초기 설정 안내"""
-        win = tk.Toplevel(self.root)
-        win.title("시작하기")
-        win.geometry("420x240")
-        win.configure(bg=BG)
-        win.grab_set()
-        win.resizable(False, False)
+        """최초 실행 — 3단계 설치 위저드 (Firebase·강사·AI키)."""
+        self._run_setup_wizard()
 
-        tk.Label(win, text=f"📋  {APP_TITLE} {APP_VERSION}",
-                 font=("맑은 고딕", 12, "bold"), bg=BG, fg=TEXT
-                 ).pack(pady=(24, 6))
-        tk.Label(win,
-                 text=("먼저 Firebase DB URL과 경로를 설정해 주세요.\n\n"
-                       "웹(index.html)에서 강사 등록 및 학생 명단을\n"
-                       "구성한 뒤 '📥 데이터 가져오기'를 사용하세요."),
-                 font=FB, bg=BG, fg=SUBTEXT, justify='center'
-                 ).pack(pady=4)
+    def _run_setup_wizard(self):
+        if getattr(self, '_wz_root', None) is not None and self._wz_root.winfo_exists():
+            return
 
-        def _do():
-            win.destroy()
-            self._open_settings()
+        # 팝업(Toplevel) 대신 메인 창 전체를 덮는 오버레이 프레임. 완료/이탈 시 destroy하여
+        # 그 아래 정상 3-패널 레이아웃을 노출(없으면 빌드) → 한 창에서 레이아웃 분기.
+        overlay = tk.Frame(self.root, bg=BG)
+        overlay.place(x=0, y=0, relwidth=1, relheight=1)
+        self._wz_root = overlay
 
-        tk.Button(win, text="⚙  설정 열기",
-                  font=FT, bg=BLUE, fg='white', relief='flat',
-                  padx=16, pady=8, cursor='hand2',
-                  command=_do).pack(pady=18)
+        hdr = tk.Frame(overlay, bg=DARK, height=40); hdr.pack(fill='x'); hdr.pack_propagate(False)
+        tk.Label(hdr, text=f"📝 {APP_TITLE} {APP_VERSION} — 최초 설치 설정", font=FT, bg=DARK, fg='white').pack(side='left', padx=16)
+
+        # 가운데 정렬 카드 (메인 창 폭과 무관하게 560px 고정)
+        card = tk.Frame(overlay, bg=BG)
+        card.place(relx=0.5, rely=0.05, anchor='n', width=560)
+
+        tk.Label(card, text="처음 설치하셨네요 👋", font=("맑은 고딕", 14, "bold"), bg=BG, fg=INDIGO).pack(pady=(8, 0))
+        tk.Label(card, text="3단계로 PC 클라이언트를 설정합니다", font=FS, bg=BG, fg=GRAY).pack()
+
+        self._wz_steps_canvas = tk.Canvas(card, bg=BG, height=56, highlightthickness=0)
+        self._wz_steps_canvas.pack(fill='x', padx=30, pady=(12, 2))
+
+        self._wz_foot = tk.Frame(card, bg=BG)
+        self._wz_foot.pack(fill='x', side='bottom')
+        self._wz_body = tk.Frame(card, bg=BG)
+        self._wz_body.pack(fill='both', expand=True)
+
+        self._wz_step = 0
+        self._wz_url_var  = tk.StringVar(value=self.config.get('firebase_url', ''))
+        self._wz_path_var = tk.StringVar(value=self.config.get('firebase_path', ''))
+        self._wz_name_var = tk.StringVar(value=self.config.get('instructor_id', ''))
+        _cur = self.config.get('ai_engine_type', 'gemini').strip().lower()
+        if _cur not in AI_ENGINE_LABELS:
+            _cur = 'gemini'
+        self._wz_engine_id = _cur
+        self._wz_key_var = tk.StringVar(value=self.config.get(f'{_cur}_api_key', ''))
+        self._wz_render()
+
+    def _wz_draw_steps(self):
+        c = self._wz_steps_canvas
+        c.delete('all'); c.update_idletasks()
+        w = c.winfo_width()
+        if w < 50:
+            w = 480
+        n = len(self._WZ_STEPS); margin = 44; ys = 18; r = 15
+        xs = [margin + (w - 2 * margin) * i / (n - 1) for i in range(n)]
+        for i in range(n - 1):
+            done = i < self._wz_step
+            c.create_line(xs[i] + r, ys, xs[i + 1] - r, ys, fill=(GREEN if done else "#E2E6EE"), width=2)
+        for i, (ic, lbl) in enumerate(self._WZ_STEPS):
+            if i < self._wz_step:
+                fill = GREEN; txt = "✓"; tcol = "white"
+            elif i == self._wz_step:
+                fill = INDIGO; txt = str(i + 1); tcol = "white"
+            else:
+                fill = "#E2E6EE"; txt = str(i + 1); tcol = GRAY
+            c.create_oval(xs[i] - r, ys - r, xs[i] + r, ys + r, fill=fill, outline=fill)
+            c.create_text(xs[i], ys, text=txt, fill=tcol, font=("맑은 고딕", 10, "bold"))
+            lcol = INDIGO if i == self._wz_step else (GREEN if i < self._wz_step else GRAY)
+            c.create_text(xs[i], ys + r + 12, text=lbl, fill=lcol, font=FS)
+
+    def _wz_render(self):
+        self._wz_draw_steps()
+        for ch in self._wz_body.winfo_children():
+            ch.destroy()
+        for ch in self._wz_foot.winfo_children():
+            ch.destroy()
+        b = self._wz_body
+        if self._wz_step == 3:
+            self._wz_pane_done(b)
+        elif self._wz_step == 0:
+            self._wz_pane_head(b, "🔥", "Firebase 연결",
+                               "데이터를 읽어올 Firebase 주소를 입력하세요. 웹 앱과 동일한 URL·경로를 사용합니다.")
+            self._wz_pane_firebase(b)
+        elif self._wz_step == 1:
+            self._wz_pane_head(b, "🔑", "내 강사 계정",
+                               "본인 이름으로 강사 계정을 조회하거나 새로 등록합니다.")
+            self._wz_pane_account(b)
+        elif self._wz_step == 2:
+            self._wz_pane_head(b, "🤖", "AI 엔진 · API 키",
+                               "특이사항 자동 생성에 쓸 AI 엔진을 고르고 키를 입력하세요. 지금 건너뛰어도 됩니다.")
+            self._wz_pane_ai(b)
+        self._wz_build_footer()
+
+    def _wz_pane_head(self, b, ic, ti, de):
+        tk.Label(b, text=ic, font=("맑은 고딕", 26), bg=BG).pack(pady=(6, 0))
+        tk.Label(b, text=ti, font=("맑은 고딕", 14, "bold"), bg=BG, fg=TEXT).pack()
+        tk.Label(b, text=de, font=FS, bg=BG, fg=SUBTEXT, wraplength=440, justify='center').pack(pady=(2, 12))
+
+    def _wz_pane_firebase(self, b):
+        g = tk.Frame(b, bg=BG); g.pack(fill='x', padx=40); g.columnconfigure(0, weight=1)
+        tk.Label(g, text="Firebase DB URL", font=FS, bg=BG, fg=SUBTEXT).grid(row=0, column=0, sticky='w', pady=(0, 2))
+        tk.Entry(g, textvariable=self._wz_url_var, font=FS, relief='solid', bd=1).grid(row=1, column=0, sticky='ew', ipady=4, pady=(0, 8))
+        tk.Label(g, text="경로 (Secret Path)", font=FS, bg=BG, fg=SUBTEXT).grid(row=2, column=0, sticky='w', pady=(0, 2))
+        tk.Entry(g, textvariable=self._wz_path_var, font=FS, relief='solid', bd=1).grid(row=3, column=0, sticky='ew', ipady=4, pady=(0, 8))
+        tk.Button(g, text="⚡ 연결 테스트", font=FS, bg="#EEF0FF", fg=INDIGO, relief='flat', padx=10, pady=4,
+                  cursor='hand2', command=self._wz_test_conn).grid(row=4, column=0, sticky='w')
+        tk.Label(g, text="💡 웹(index.html)에서 쓰던 URL·경로를 그대로 입력하세요.", font=FS, bg=BG, fg=GRAY,
+                 wraplength=440, justify='left').grid(row=5, column=0, sticky='w', pady=(8, 0))
+
+    def _wz_test_conn(self):
+        url = self._wz_url_var.get().strip(); path = self._wz_path_var.get().strip()
+        if not url or not path:
+            messagebox.showwarning("알림", "URL과 경로를 입력하세요.", parent=self.root); return
+        try:
+            result = firebase_get({'firebase_url': url, 'firebase_path': path}, "config")
+            if result is None:
+                messagebox.showwarning("주의", "연결은 성공했지만 config 노드가 비어있습니다.\nFirebase 경로를 확인하세요.", parent=self.root)
+            else:
+                messagebox.showinfo("성공", "Firebase 연결 테스트에 성공했습니다!", parent=self.root)
+        except Exception as e:
+            messagebox.showerror("실패", f"연결 실패:\n{e}", parent=self.root)
+
+    def _wz_pane_account(self, b):
+        cur = self.config.get('instructor_id', '')
+        tk.Label(b, text="강사 이름", font=FS, bg=BG, fg=SUBTEXT).pack(anchor='w', padx=40)
+        row = tk.Frame(b, bg=BG); row.pack(fill='x', padx=40, pady=(2, 4))
+        tk.Entry(row, textvariable=self._wz_name_var, font=FS, relief='solid', bd=1).pack(side='left', fill='x', expand=True, ipady=4, padx=(0, 6))
+        self._wz_lookup_btn = tk.Button(row, text="조회 및 설정", font=FS, bg=DARK, fg='white', relief='flat', padx=10, cursor='hand2', command=self._wz_lookup_instr)
+        self._wz_lookup_btn.pack(side='left')
+        self._wz_acct_status = tk.Label(b, text=(f"✓ {cur} 계정 준비 완료" if cur else ""), font=FS, bg=BG, fg=GREEN if cur else GRAY, anchor='w')
+        self._wz_acct_status.pack(anchor='w', padx=40, pady=(2, 0))
+        tk.Label(b, text="없으면 자동 등록됩니다. 담당 수업·학생 명단은 웹에서만 구성하고, PC는 📥 데이터 가져오기로 읽어옵니다.",
+                 font=FS, bg=BG, fg=GRAY, wraplength=440, justify='left').pack(anchor='w', padx=40, pady=(8, 0))
+
+    def _wz_lookup_instr(self):
+        name = self._wz_name_var.get().strip()
+        if not name:
+            messagebox.showwarning("알림", "강사 이름을 입력하세요.", parent=self.root); return
+        url = self._wz_url_var.get().strip(); path = self._wz_path_var.get().strip()
+        if not url or not path:
+            messagebox.showwarning("알림", "Firebase URL과 경로를 먼저 입력하세요.", parent=self.root); return
+        self.config['firebase_url'] = url; self.config['firebase_path'] = path
+        self._wz_acct_status.config(text="조회 중...", fg=GRAY)
+        self._wz_lookup_btn.config(state='disabled')
+
+        def _fetch():
+            try:
+                data = firebase_get(self.config, f"config/instructors/{name}")
+                is_new = not data
+                if is_new:
+                    firebase_put(self.config, f"config/instructors/{name}", {"assignments": [], "presets": []})
+                self.config['instructor_id'] = name
+                self._sync_shared_sheets_from_firebase()
+                if is_new:
+                    self.config['instructor_assignments'] = []
+                    msg = f"신규 강사 계정 [{name}]을 등록했습니다.\n웹에서 담당 수업을 배정하세요."
+                else:
+                    asgn = data.get("assignments", [])
+                    self.config['instructor_assignments'] = asgn if isinstance(asgn, list) else []
+                    msg = f"기존 강사 계정 [{name}]을 불러왔습니다."
+                self.root.after(0, lambda: [
+                    self._wz_acct_status.config(text=f"✓ {name} 계정 준비 완료", fg=GREEN),
+                    self._wz_lookup_btn.config(state='normal'),
+                    messagebox.showinfo("안내", msg, parent=self.root),
+                ])
+            except Exception as e:
+                self.root.after(0, lambda: [
+                    self._wz_acct_status.config(text="조회 실패", fg=YELLOW),
+                    self._wz_lookup_btn.config(state='normal'),
+                    messagebox.showerror("오류", f"계정 처리 실패:\n{e}", parent=self.root),
+                ])
+        threading.Thread(target=_fetch, daemon=True).start()
+
+    def _wz_pane_ai(self, b):
+        g = tk.Frame(b, bg=BG); g.pack(fill='x', padx=40); g.columnconfigure(0, weight=1)
+        tk.Label(g, text="AI 엔진", font=FS, bg=BG, fg=SUBTEXT).grid(row=0, column=0, sticky='w', pady=(0, 2))
+        self._wz_engine_var = tk.StringVar(value=AI_ENGINE_LABELS[self._wz_engine_id])
+        cmb = ttk.Combobox(g, textvariable=self._wz_engine_var, state="readonly", font=FS,
+                           values=tuple(AI_ENGINE_LABELS[i] for i in AI_ENGINE_ORDER))
+        cmb.grid(row=1, column=0, sticky='ew', pady=(0, 8))
+        cmb.bind('<<ComboboxSelected>>', self._wz_on_engine)
+        self._wz_build_guide(b)
+        g2 = tk.Frame(b, bg=BG); g2.pack(fill='x', padx=40, pady=(10, 0)); g2.columnconfigure(0, weight=1)
+        tk.Label(g2, text="API 키", font=FS, bg=BG, fg=SUBTEXT).grid(row=0, column=0, sticky='w', pady=(0, 2))
+        self._wz_key_entry = tk.Entry(g2, textvariable=self._wz_key_var, font=FS, show='*', relief='solid', bd=1)
+        self._wz_key_entry.grid(row=1, column=0, sticky='ew', ipady=4)
+        tk.Button(g2, text="👁", font=FS, bg=BG, fg=GRAY, relief='flat', cursor='hand2', command=self._wz_toggle_key).grid(row=1, column=1, padx=4)
+        tk.Label(b, text="AI 생성을 안 쓰면 비워도 됩니다 — 건너뛰기 가능.", font=FS, bg=BG, fg=GRAY,
+                 wraplength=440, justify='left').pack(anchor='w', padx=40, pady=(6, 0))
+
+    def _wz_on_engine(self, event=None):
+        label2id = {AI_ENGINE_LABELS[i]: i for i in AI_ENGINE_ORDER}
+        self._wz_engine_id = label2id.get(self._wz_engine_var.get(), 'gemini')
+        self._wz_key_var.set(self.config.get(f'{self._wz_engine_id}_api_key', ''))
+        self._wz_render()
+
+    def _wz_toggle_key(self):
+        self._wz_key_entry.config(show='' if self._wz_key_entry.cget('show') == '*' else '*')
+
+    def _wz_build_guide(self, parent):
+        import webbrowser
+        gd = self._WZ_GUIDE[self._wz_engine_id]
+        box = tk.Frame(parent, bg=PANEL, highlightbackground=BORDER, highlightthickness=1)
+        box.pack(fill='x', padx=40)
+        hd = tk.Frame(box, bg=PANEL); hd.pack(fill='x', padx=11, pady=(9, 4))
+        pill_bg = "#ECFDF3" if gd['tagc'] == 'free' else "#FFFAEB"
+        pill_fg = "#15803D" if gd['tagc'] == 'free' else "#92400E"
+        tk.Label(hd, text=f" {gd['tag']} ", font=("맑은 고딕", 8, "bold"), bg=pill_bg, fg=pill_fg).pack(side='left')
+        tk.Label(hd, text=gd['lead'], font=FS, bg=PANEL, fg=SUBTEXT, wraplength=350, justify='left').pack(side='left', padx=6)
+        link = tk.Label(box, text=f"🔗 {gd['label']} 열기", font=("맑은 고딕", 9, "bold", "underline"), bg=PANEL, fg=INDIGO, cursor='hand2')
+        link.pack(anchor='w', padx=11, pady=(0, 6))
+        link.bind('<Button-1>', lambda e, u=gd['url']: webbrowser.open(u))
+        for i, t in enumerate(gd['steps']):
+            sr = tk.Frame(box, bg=PANEL); sr.pack(fill='x', padx=11, pady=1)
+            tk.Label(sr, text=str(i + 1), font=("맑은 고딕", 8, "bold"), bg=INDIGO, fg='white', width=2).pack(side='left')
+            tk.Label(sr, text=t, font=FS, bg=PANEL, fg=TEXT, wraplength=380, justify='left').pack(side='left', padx=6)
+        tk.Label(box, text=f"키 형식: {gd['fmt']}", font=FS, bg=PANEL, fg=SUBTEXT).pack(anchor='w', padx=11, pady=(6, 0))
+        if gd['warn']:
+            tk.Label(box, text=f"⚠️ {gd['warn']}", font=FS, bg="#FFFAEB", fg="#92400E", wraplength=400, justify='left').pack(fill='x', padx=11, pady=(6, 9))
+        else:
+            tk.Frame(box, bg=PANEL, height=6).pack()
+
+    def _wz_pane_done(self, b):
+        tk.Label(b, text="🎉", font=("맑은 고딕", 34), bg=BG).pack(pady=(6, 0))
+        tk.Label(b, text="설정 완료!", font=("맑은 고딕", 14, "bold"), bg=BG, fg=TEXT).pack()
+        tk.Label(b, text="이제 데이터를 가져와 사용을 시작하세요.", font=FS, bg=BG, fg=SUBTEXT).pack(pady=(2, 10))
+        fb_ok = bool(self._wz_url_var.get().strip() and self._wz_path_var.get().strip())
+        instr = self.config.get('instructor_id', '')
+        key = self._wz_key_var.get().strip()
+        eng = AI_ENGINE_LABELS.get(self._wz_engine_id, self._wz_engine_id)
+        rows = [
+            (fb_ok, "Firebase 연결됨" if fb_ok else "Firebase 미연결"),
+            (bool(instr), f"강사 계정: {instr or '미설정'}"),
+            (bool(key), f"AI 엔진: {eng}" + ("" if key else " (키 미입력 — 나중에)")),
+        ]
+        for ok, txt in rows:
+            r = tk.Frame(b, bg=PANEL, highlightbackground=BORDER, highlightthickness=1); r.pack(fill='x', padx=40, pady=3)
+            tk.Label(r, text=("✓" if ok else "–"), font=("맑은 고딕", 10, "bold"), bg=PANEL, fg=GREEN if ok else GRAY, width=2).pack(side='left', padx=(8, 0), pady=6)
+            tk.Label(r, text=txt, font=FS, bg=PANEL, fg=TEXT).pack(side='left', padx=4)
+        tk.Label(b, text="📌 다음 단계 — 학생 명단·담당 수업은 웹(index.html)에서 구성한 뒤,\n상단 📥 데이터 가져오기 버튼으로 PC에 불러오세요.",
+                 font=FS, bg="#FFFAEB", fg="#92400E", wraplength=420, justify='left').pack(fill='x', padx=40, pady=(12, 0))
+
+    def _wz_build_footer(self):
+        f = self._wz_foot
+        inner = tk.Frame(f, bg=BG); inner.pack(fill='x', padx=30, pady=12)
+        if self._wz_step == 3:
+            tk.Button(inner, text="✅ 설정 완료", font=FT, bg=INDIGO, fg='white', relief='flat', pady=8, cursor='hand2', command=self._wz_commit).pack(fill='x')
+            return
+        if self._wz_step > 0:
+            tk.Button(inner, text="← 이전", font=FS, bg="#ECECEF", fg=TEXT, relief='flat', padx=14, pady=6, cursor='hand2', command=self._wz_back).pack(side='left')
+        nextlbl = "완료 →" if self._wz_step == 2 else "다음 →"
+        tk.Button(inner, text=nextlbl, font=FS, bg=INDIGO, fg='white', relief='flat', padx=16, pady=6, cursor='hand2', command=self._wz_next).pack(side='right')
+        if self._wz_step == 2:
+            tk.Button(inner, text="건너뛰기", font=FS, bg=BG, fg=SUBTEXT, relief='flat', cursor='hand2', command=self._wz_skip_ai).pack(side='right', padx=8)
+        else:
+            tk.Button(inner, text="나중에", font=FS, bg=BG, fg=SUBTEXT, relief='flat', cursor='hand2', command=self._wz_close).pack(side='right', padx=8)
+
+    def _wz_next(self):
+        if self._wz_step == 0:
+            if not self._wz_url_var.get().strip() or not self._wz_path_var.get().strip():
+                messagebox.showwarning("알림", "Firebase URL과 경로를 입력하세요.", parent=self.root); return
+            self.config['firebase_url'] = self._wz_url_var.get().strip()
+            self.config['firebase_path'] = self._wz_path_var.get().strip()
+            self._wz_step = 1
+        elif self._wz_step == 1:
+            if not self.config.get('instructor_id'):
+                messagebox.showwarning("알림", "강사 이름 조회·설정을 먼저 완료하세요.", parent=self.root); return
+            self._wz_step = 2
+        elif self._wz_step == 2:
+            self._wz_step = 3
+        self._wz_render()
+
+    def _wz_skip_ai(self):
+        self._wz_key_var.set('')
+        self._wz_step = 3
+        self._wz_render()
+
+    def _wz_back(self):
+        self._wz_step = max(0, self._wz_step - 1)
+        self._wz_render()
+
+    def _wz_exit(self):
+        """위저드 오버레이 제거 → 정상 레이아웃 노출(없으면 빌드)."""
+        if getattr(self, '_wz_root', None) is not None:
+            self._wz_root.destroy()
+            self._wz_root = None
+        if not self._main_built:
+            self._build_main_ui()
+        else:
+            try:
+                self._populate_student_list(self.activeGroup)
+                self._refresh_student_view()
+            except Exception:
+                pass
+
+    def _wz_close(self):
+        save_config(self.config)
+        self._wz_exit()
+
+    def _wz_commit(self):
+        self.config['ai_engine_type'] = self._wz_engine_id
+        self.config[f'{self._wz_engine_id}_api_key'] = self._wz_key_var.get().strip()
+        self.config['firebase_url'] = self._wz_url_var.get().strip()
+        self.config['firebase_path'] = self._wz_path_var.get().strip()
+        save_config(self.config)
+        self._wz_exit()
+        if self.config.get('firebase_url') and self.config.get('firebase_path'):
+            self.root.after(100, self._sync_shared_sheets_from_firebase)
+        messagebox.showinfo("완료", "설정이 저장되었습니다.\n웹에서 명단 구성 후 📥 데이터 가져오기로 시작하세요.")
 
 # ── 설정 창 ──────────────────────────────────────────────────────
     def _open_settings(self):
@@ -1198,7 +1526,7 @@ class App:
 
         test_row = tk.Frame(inner, bg=BG)
         test_row.pack(fill='x', padx=16, pady=(0,10))
-        tk.Button(test_row, text="⚡ 연결 테스트", font=FS, bg="#E0E7FF", fg=INDIGO, relief='flat', padx=10, pady=4, cursor='hand2', command=_test_connection).pack(side='left')
+        tk.Button(test_row, text="⚡ 연결 테스트", font=FS, bg="#EEF0FF", fg=INDIGO, relief='flat', padx=10, pady=4, cursor='hand2', command=_test_connection).pack(side='left')
 
         # ── ③ 내 강사 계정 ────────────────────────────────────────
         tk.Frame(inner, bg=BORDER, height=1).pack(fill='x', padx=16, pady=(4,0))
@@ -1295,7 +1623,7 @@ class App:
             except Exception as e:
                 messagebox.showerror("오류", f"명단 가져오기 실패:\n{e}", parent=win)
 
-        tk.Button(fetch_row, text="🔄 학급/명단 동기화", font=FS, bg="#F1F5F9", fg=TEXT, relief='solid', bd=1, padx=10, pady=4, cursor='hand2', command=_fetch_class_data).pack(side='left')
+        tk.Button(fetch_row, text="🔄 학급/명단 동기화", font=FS, bg="#F7F7F9", fg=TEXT, relief='solid', bd=1, padx=10, pady=4, cursor='hand2', command=_fetch_class_data).pack(side='left')
         tk.Label(fetch_row, text="계정 조회 후 클릭하세요", font=FS, bg=BG, fg=GRAY).pack(side='left', padx=8)
 
         # ── 🤖 ④ AI 특이사항 생성 엔진 다중화 (요청 사항 반영) ───────────────────────────
@@ -1330,7 +1658,7 @@ class App:
 
         default_key = _key_for_engine(_cur_id)
         ai_key_var = tk.StringVar(value=default_key)
-        ai_entry = tk.Entry(ai_grid, textvariable=ai_key_var, font=FS, show='*', relief='flat', bg="#F8FAFC", highlightbackground=BORDER, highlightthickness=1)
+        ai_entry = tk.Entry(ai_grid, textvariable=ai_key_var, font=FS, show='*', relief='flat', bg="#F7F7F9", highlightbackground=BORDER, highlightthickness=1)
         ai_entry.grid(row=1, column=1, sticky='ew', ipady=3)
 
         def _on_engine_change(event=None):
@@ -1375,7 +1703,7 @@ class App:
         btn_row = tk.Frame(inner, bg=BG)
         btn_row.pack(fill='x', padx=16, pady=20)
         tk.Button(btn_row, text="💾 설정 저장하기", font=FT, bg=INDIGO, fg='white', relief='flat', padx=20, pady=8, command=_save_all, cursor='hand2').pack(side='right')
-        tk.Button(btn_row, text="취소", font=FS, bg="#E2E8F0", fg=TEXT, relief='flat', padx=16, pady=8, command=win.destroy, cursor='hand2').pack(side='right', padx=8)
+        tk.Button(btn_row, text="취소", font=FS, bg="#ECECEF", fg=TEXT, relief='flat', padx=16, pady=8, command=win.destroy, cursor='hand2').pack(side='right', padx=8)
 
 
     def _gen_ai_note(self, group, classId, nameKey, subjects, note_txt, ai_btn=None, tb_grade=None):
@@ -1486,7 +1814,7 @@ class App:
             result['sel'] = None
             win.destroy()
         tk.Button(foot, text="전송 시작", font=("맑은 고딕", 10, "bold"),
-                  bg=ACCENT, fg="#1A1D2E", relief='flat', cursor='hand2',
+                  bg=ACCENT, fg="#0E1016", relief='flat', cursor='hand2',
                   padx=14, pady=7, command=_ok).pack(side='right')
         tk.Button(foot, text="취소", font=FS, bg=PANEL, fg=SUBTEXT, relief='flat',
                   cursor='hand2', padx=12, pady=7, command=_cancel).pack(side='right', padx=6)
