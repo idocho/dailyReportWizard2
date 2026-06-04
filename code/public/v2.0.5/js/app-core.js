@@ -123,10 +123,6 @@ let adminOn=false;   // 관리자 세션 상태 (새로고침 시 해제)
 let sbFolded={};     // 사이드바 그룹 섹션 접힘 상태 {그룹명: true/false}
 let _resetSel=new Set(); // 초기화 다중 선택 상태
 let openSaIds=new Set(['sa-fb']); // 설정 아코디언 열림 상태 — renderMain() 재렌더 후 복원용
-// 초기 설정 위저드 (온보딩) — 강사 미설정 신규 사용자에게 4단계 가이드
-let wizardActive=false; // true면 renderMain()이 탭 대신 위저드 렌더
-let wzStep=0;           // 0:Firebase 1:계정 2:명단 3:수업 4:완료
-let wzCls=null;         // 위저드 수업 단계: 선택된 반(classId)
 // 점수 입력 상태
 let scoreData={};        // {weekly: {subject: {testKey: testObj}}, achievement: {curriculumKey: {testKey: testObj}}}
 let scoreEditing=null;   // {classId,subject,testKey,isAchievement} | null(=신규)
@@ -167,8 +163,6 @@ function today(){
 }
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
 function toast(m,ms=2500){const e=document.getElementById('toast');e.textContent=m;e.classList.add('show');clearTimeout(e._t);e._t=setTimeout(()=>e.classList.remove('show'),ms);}
-// 학생 배열 이름 가나다 오름차순 정렬(제자리). None-safe + 동명이인 nameKey tiebreak. 키 불변, 표시 순서만.
-function sortStu(arr){return (arr||[]).sort((a,b)=>(a.name||'').localeCompare(b.name||'','ko')||String(a.nameKey).localeCompare(String(b.nameKey)));}
 function setSync(ok){/* syncBadge 제거됨 (v0.9.4) */}
 function _normWs(s){return String(s||'').replace(/\s+/g,' ').trim();}
 function _normTbName(s){return _normWs(s);}
@@ -438,7 +432,6 @@ function makeTb(title,sub=''){
 function render(){renderSb();renderMain();}
 function renderMain(){
   const mc=document.getElementById('mc');if(!mc)return;
-  if(wizardActive){renderWizard(mc);return;}
   if(activeTab==='input')renderInput(mc);
   else if(activeTab==='scores')renderScores(mc);
   else renderSettings(mc);

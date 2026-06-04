@@ -1,3 +1,35 @@
+<#
+  build-portal.ps1 — 버전 포털(루트 index.html) 생성
+  ─────────────────────────────────────────────────────────────
+  code/public/versions.json 을 읽어 code/public/index.html(포털)을 만든다.
+  포털 = 각 버전(/vX.Y.Z/)으로 가는 목록 + 베타/개발중 라벨.
+
+  새 버전 추가 흐름:
+    1) scripts/new-version.ps1 -From v2.1.0 -To v2.2.0   # 폴더 동결 복제
+    2) versions.json 맨 앞에 새 항목 추가 (라벨 조정)
+    3) scripts/build-portal.ps1                          # 포털 갱신
+    4) firebase deploy --only hosting
+#>
+$ErrorActionPreference = 'Stop'
+$root = Split-Path -Parent $PSScriptRoot
+$pub  = Join-Path $root 'code/public'
+$meta = Get-Content (Join-Path $pub 'versions.json') -Raw -Encoding UTF8 | ConvertFrom-Json
+
+$rows = ($meta.versions | ForEach-Object {
+  $cls = $_.tagClass
+  @"
+      <a class="row" href="$($_.v)/">
+        <div class="left">
+          <div class="vh"><span class="v">$($_.v)</span><span class="tag $cls">$($_.tag)</span></div>
+          <div class="t">$($_.title)</div>
+          <div class="d">$($_.desc)</div>
+        </div>
+        <span class="go">열기 →</span>
+      </a>
+"@
+}) -join "`n"
+
+$html = @"
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -35,24 +67,12 @@
     <div class="brand"><div class="mark">📝</div><h1>DailyReportWizard<small>버전 선택 · 테스트 빌드</small></h1></div>
     <p class="lead">사용할 버전을 선택하세요. 각 버전은 독립 동결 빌드이며, 설정·데이터(로컬·Firebase)는 버전 간 공유됩니다.</p>
     <div class="card">
-      <a class="row" href="v2.1.0/">
-        <div class="left">
-          <div class="vh"><span class="v">v2.1.0</span><span class="tag dev">개발중</span></div>
-          <div class="t">최신 개발본</div>
-          <div class="d">온보딩 설정 위저드 · 미니멀·프로 디자인 리뉴얼</div>
-        </div>
-        <span class="go">열기 →</span>
-      </a>
-      <a class="row" href="v2.0.5/">
-        <div class="left">
-          <div class="vh"><span class="v">v2.0.5</span><span class="tag beta">베타</span></div>
-          <div class="t">베타 릴리즈 · 현재 안정판</div>
-          <div class="d">카카오톡 전송 대상 개별 선택 · 순차 전송 취소</div>
-        </div>
-        <span class="go">열기 →</span>
-      </a>
+$rows
     </div>
     <div class="note">베타 = 배포된 안정판 · 개발중 = 새 기능 검증용.<br>처음 사용/온보딩 테스트는 시크릿창 또는 설정의 “위저드 다시 실행”을 이용하세요.</div>
   </div>
 </body>
 </html>
+"@
+Set-Content -Path (Join-Path $pub 'index.html') -Value $html -Encoding UTF8
+Write-Host "포털 생성: code/public/index.html ($($meta.versions.Count)개 버전)" -ForegroundColor Green

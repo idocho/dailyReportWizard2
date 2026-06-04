@@ -380,9 +380,8 @@ function init(){
   loadCurriculum();
   renderSb();
   if(!instructor){
-    // 신규 사용자 — 초기 설정 위저드 시작 (4단계 순차 가이드)
-    wizardActive=true;wzStep=0;
-    renderMain();
+    renderMhdr('DailyReportWizard');
+    document.getElementById('mc').innerHTML=`<div class="empty">👋 안녕하세요!<br>먼저 강사 정보를 등록해 주세요.<br><br><button class="btn bp" onclick="goNav('setting')">⚙️ 설정으로 이동</button></div>`;
     return;
   }
   if(dbUrl&&dbPath){
@@ -411,7 +410,6 @@ function init(){
             classStudents[cid].push({nameKey,...v});
             }
           }
-          Object.values(classStudents).forEach(sortStu);
           config._classStudents=classStudents;
         }
         saveLocal();setSync(true);

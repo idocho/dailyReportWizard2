@@ -1,0 +1,19 @@
+{
+  "_comment": "버전 포털 메타. 새 버전 추가 시 이 배열 맨 앞에 항목 추가 후 scripts/build-portal.ps1 실행. tagClass: dev|beta|old",
+  "versions": [
+    {
+      "v": "v2.1.0",
+      "tag": "개발중",
+      "tagClass": "dev",
+      "title": "최신 개발본",
+      "desc": "온보딩 설정 위저드 · 미니멀·프로 디자인 리뉴얼"
+    },
+    {
+      "v": "v2.0.5",
+      "tag": "베타",
+      "tagClass": "beta",
+      "title": "베타 릴리즈 · 현재 안정판",
+      "desc": "카카오톡 전송 대상 개별 선택 · 순차 전송 취소"
+    }
+  ]
+}

@@ -147,6 +147,8 @@ function wzBack(){if(wzStep>0)wzStep--;renderMain();}
 function wzSkip(){wizardActive=false;activeTab='setting';renderSb();renderMain();}
 function wzFinish(){wizardActive=false;wzStep=0;activeTab='input';renderSb();renderMain();}
 function wzSetCls(v){wzCls=v;renderMain();}
+// 위저드 수동 재실행 (테스트/재온보딩) — 기존 강사 설정과 무관하게 처음부터 위저드 표시
+function restartWizard(){wizardActive=true;wzStep=0;wzCls=null;renderSb();renderMain();}
 async function wzAddCourse(){
   const curriculum=document.getElementById('wzGs')?.value||'';
   const textbook=(document.getElementById('wzTb')?.value||'').trim();
@@ -336,6 +338,8 @@ function renderSettings(mc){
     ${tbMgmtHtml}
 
     ${instrMgmt}
+
+    <button class="btn" style="width:100%;border-style:dashed;color:var(--indigo-ink);border-color:var(--indigo-line);justify-content:center;display:flex;gap:6px" onclick="restartWizard()">🧭 초기 설정 위저드 다시 실행 <span style="font-size:10px;color:var(--gray);font-weight:600">(테스트용)</span></button>
 
     <button class="adm-btn${adminOn?' on':''}" onclick="toggleAdmin()" id="admBtn">
       <span>${adminOn?'🔓':'🔒'}</span>

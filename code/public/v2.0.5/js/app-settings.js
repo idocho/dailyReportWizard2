@@ -18,153 +18,6 @@ function _saOpen(id){
   openSaIds.add(id);
 }
 
-// ══════════════════════════════════════════════════════════
-//  초기 설정 위저드 (온보딩) — 강사 미설정 신규 사용자 4단계 가이드
-// ══════════════════════════════════════════════════════════
-const WZ_STEPS=[
-  {ic:'🔥',lbl:'연결',ti:'Firebase 연결',de:'데이터를 저장·동기화할 Firebase 주소를 입력하세요.<br>관리자에게 받은 URL과 경로를 그대로 붙여넣으면 됩니다.'},
-  {ic:'🔑',lbl:'계정',ti:'내 계정',de:'본인 이름으로 강사 계정을 만들거나 불러옵니다.'},
-  {ic:'👥',lbl:'명단',ti:'학생 명단 불러오기',de:'연결된 Firebase에서 학급·학생 명단을 가져옵니다.'},
-  {ic:'📚',lbl:'수업',ti:'담당 수업 배정',de:'내가 가르치는 반·과목을 추가하세요. 교재가 없으면 바로 등록할 수 있어요.'},
-];
-function _wzStepsBar(){
-  let h='';
-  WZ_STEPS.forEach((s,i)=>{
-    const st=i<wzStep?'done':(i===wzStep?'active':'');
-    if(i>0)h+=`<div class="stp-bar${i<=wzStep?' fill':''}"></div>`;
-    h+=`<div class="stp ${st}"><div class="stp-dot">${i<wzStep?'✓':(i+1)}</div><div class="stp-lbl">${esc(s.lbl)}</div></div>`;
-  });
-  return h;
-}
-function renderWizard(mc){
-  renderMhdr('초기 설정');
-  if(config)_ensureConfigShape();
-  let body,foot;
-  if(wzStep===4){
-    const clsCount=config?Object.keys(config.classes||{}).length:0;
-    const stuCount=config&&config._classStudents?Object.values(config._classStudents).reduce((n,a)=>n+(a?.length||0),0):0;
-    const asgnCount=(instructor?.assignments||[]).length;
-    body=`<div class="wz-fin">
-      <div class="wz-fin-ic">🎉</div>
-      <div class="wz-pane-ti">설정 완료!</div>
-      <div class="wz-pane-de">이제 수업 입력을 시작할 수 있어요.</div>
-      <div class="wz-chk">
-        <div class="wz-chk-r"><span class="c">${dbUrl&&dbPath?'✓':'–'}</span> Firebase ${dbUrl&&dbPath?'연결됨':'미연결'}</div>
-        <div class="wz-chk-r"><span class="c">${instructor?.name?'✓':'–'}</span> 강사 계정: ${esc(instructor?.name||'미설정')}</div>
-        <div class="wz-chk-r"><span class="c">${clsCount?'✓':'–'}</span> 학급 ${clsCount}개 · 학생 ${stuCount}명</div>
-        <div class="wz-chk-r"><span class="c">${asgnCount?'✓':'–'}</span> 담당 수업 ${asgnCount}개</div>
-      </div>
-    </div>`;
-    foot=`<div></div><button class="btn bp" style="width:100%" onclick="wzFinish()">🚀 시작하기</button>`;
-  }else{
-    const s=WZ_STEPS[wzStep];
-    body=`<div class="wz-pane-ic">${s.ic}</div><div class="wz-pane-ti">${esc(s.ti)}</div><div class="wz-pane-de">${s.de}</div>`+_wzPane();
-    const back=wzStep>0?`<button class="btn" onclick="wzBack()">← 이전</button>`:`<div></div>`;
-    const skip=`<button class="wz-skip" onclick="wzSkip()">나중에 할게요</button>`;
-    const nextLbl=wzStep===3?'완료 →':'다음 →';
-    foot=`${back}<div class="wz-right">${skip}<button class="btn bp" onclick="wzNext()">${nextLbl}</button></div>`;
-  }
-  mc.innerHTML=`<div class="wz-wrap"><div class="wz">
-    <div class="wz-head">
-      <div class="wz-logo">📝 DailyReportWizard</div>
-      <div class="wz-hsub">처음 오셨네요 — 4단계로 빠르게 설정해요</div>
-    </div>
-    <div class="wz-steps">${_wzStepsBar()}</div>
-    <div class="wz-body">${body}</div>
-    <div class="wz-foot">${foot}</div>
-  </div></div>`;
-  if(wzStep===1&&!instructor?.name)setTimeout(()=>document.getElementById('acctName')?.focus(),0);
-}
-function _wzPane(){
-  if(wzStep===0){
-    const ok=(dbUrl&&dbPath)?`<div class="wz-ok">✓ 연결 정보 저장됨</div>`:'';
-    return `${ok}
-      <div class="wz-fld"><label class="wz-fl">DB URL</label>
-        <input class="inp" id="sUrl" value="${esc(dbUrl)}" placeholder="https://your-project.firebaseio.com" type="url"></div>
-      <div class="wz-fld"><label class="wz-fl">경로 (Secret Path)</label>
-        <input class="inp" id="sPth" value="${esc(dbPath)}" placeholder="drw_a7f3k9x2">
-        <div class="wz-hint">💡 관리자에게 전달받은 비밀 경로입니다.</div></div>
-      <button class="btn bp" style="width:100%" onclick="saveFb()">💾 연결 정보 저장</button>`;
-  }
-  if(wzStep===1){
-    const ok=instructor?.name?`<div class="wz-ok">✓ ${esc(instructor.name)} 계정 준비 완료</div>`:'';
-    return `${ok}
-      <div class="wz-fld"><label class="wz-fl">강사 이름</label>
-        <div class="wz-row"><input class="inp" id="acctName" value="" placeholder="이름을 입력하세요" style="flex:1" onkeydown="if(event.key==='Enter')lookupInstr()">
-          <button class="btn bp" onclick="lookupInstr()">조회</button></div>
-        <div class="wz-hint">이름이 곧 계정 키입니다 (예: <code>config/instructors/홍길동</code>). 없으면 새로 등록돼요.</div></div>`;
-  }
-  if(wzStep===2){
-    const clsCount=config?Object.keys(config.classes||{}).length:0;
-    const stuCount=config&&config._classStudents?Object.values(config._classStudents).reduce((n,a)=>n+(a?.length||0),0):0;
-    const ok=clsCount?`<div class="wz-ok">✓ ${clsCount}개 학급 · 학생 ${stuCount}명 불러옴</div>`:'';
-    return `<div style="text-align:center;padding:6px 0 14px">
-        <button class="btn bp" style="padding:12px 22px" onclick="loadCfg()">📥 학생 명단 불러오기</button>
-        <div class="wz-hint" style="text-align:center;margin-top:10px">불러온 학급/학생은 다음 단계에서 사용됩니다.</div>
-      </div>${ok}`;
-  }
-  // wzStep===3 — 담당 수업
-  const asgns=instructor?.assignments||[];
-  const rows=asgns.length
-    ?`<div class="wz-list"><div class="wz-list-r hd"><span>반</span><span>과목</span><span>역할</span><span></span></div>`
-      +asgns.map((a,i)=>`<div class="wz-list-r"><span style="font-weight:700">${esc(a.classId)}</span><span style="color:var(--sub)">${esc(a.subject)}</span><span style="color:var(--indigo)">${esc(a.role||'담임')}</span><button class="wz-rm" onclick="removeA(${i})">✕</button></div>`).join('')+`</div>`
-    :`<div style="font-size:12px;color:var(--gray);text-align:center;padding:6px 0 12px">아직 배정된 수업이 없어요.</div>`;
-  const clsList=Object.keys(config?.classes||{});
-  if(!clsList.length)return rows+`<div class="wz-hint" style="text-align:center;padding:10px 0">⚠️ 학급이 없습니다. 이전 단계에서 학생 명단을 먼저 불러오세요.</div>`;
-  if(!wzCls||!clsList.includes(wzCls))wzCls=clsList[0];
-  const clsOpts=clsList.map(c=>`<option value="${esc(c)}"${c===wzCls?' selected':''}>${esc(c)}</option>`).join('');
-  const courses=Object.keys(config.classes[wzCls]?.courses||{}).sort((a,b)=>a.localeCompare(b,'ko'));
-  let subjArea,addCourse='',canAdd=true;
-  if(courses.length){
-    subjArea=`<div><label class="wz-fl">과목</label><select class="inp sm" id="aTb">${courses.map(c=>`<option>${esc(c)}</option>`).join('')}</select></div>`;
-  }else{
-    canAdd=false;
-    subjArea=`<div><label class="wz-fl">과목</label><div style="font-size:11px;color:var(--red);padding:8px 0">⚠️ 이 반에 등록된 교재 없음</div></div>`;
-    const gsOpts='<option value="">과정 선택</option>'+GRADE_SEM_LIST.map(g=>`<option value="${esc(g.val)}">${esc(g.label)}</option>`).join('');
-    addCourse=`<div class="wz-addc">
-      <div class="wz-fl" style="color:var(--indigo);margin-bottom:7px">＋ 이 반에 과목(교재) 등록</div>
-      <div style="display:grid;grid-template-columns:1fr 1.3fr 40px;gap:6px;align-items:center">
-        <select class="inp sm" id="wzGs">${gsOpts}</select>
-        <input class="inp sm" id="wzTb" placeholder="교재명 (예: 개념원리)">
-        <button class="btn bp" style="padding:7px 0" onclick="wzAddCourse()">✓</button>
-      </div></div>`;
-  }
-  return rows+addCourse+`
-    <div class="wz-fld" style="display:grid;grid-template-columns:1fr 1fr 66px;gap:6px;align-items:end">
-      <div><label class="wz-fl">반</label><select class="inp sm" id="aCls" onchange="wzSetCls(this.value)">${clsOpts}</select></div>
-      ${subjArea}
-      <div><label class="wz-fl">역할</label><select class="inp sm" id="aRole"><option>담임</option><option>부담임</option></select></div>
-    </div>
-    <button class="btn${canAdd?' bp':''}" style="width:100%"${canAdd?'':' disabled'} onclick="addA()">+ 수업 추가</button>`;
-}
-function wzGo(i){wzStep=i;renderMain();}
-function wzNext(){
-  if(wzStep===0&&(!dbUrl||!dbPath)){toast('Firebase 연결 정보를 저장해 주세요.');return;}
-  if(wzStep===1&&!instructor){toast('강사 계정을 먼저 등록해 주세요.');return;}
-  if(wzStep<4)wzStep++;renderMain();
-}
-function wzBack(){if(wzStep>0)wzStep--;renderMain();}
-function wzSkip(){wizardActive=false;activeTab='setting';renderSb();renderMain();}
-function wzFinish(){wizardActive=false;wzStep=0;activeTab='input';renderSb();renderMain();}
-function wzSetCls(v){wzCls=v;renderMain();}
-async function wzAddCourse(){
-  const curriculum=document.getElementById('wzGs')?.value||'';
-  const textbook=(document.getElementById('wzTb')?.value||'').trim();
-  if(!wzCls){toast('반을 먼저 선택해 주세요.');return;}
-  if(!curriculum){toast('과정을 선택해 주세요.');return;}
-  if(!textbook){toast('교재명을 입력해 주세요.');return;}
-  const subject=`${curriculum} ${textbook}`;
-  if(!config)config={classes:{},instructors:{}};
-  if(!config.classes)config.classes={};
-  if(!config.classes[wzCls])config.classes[wzCls]={group:'',courses:{}};
-  if(!config.classes[wzCls].courses)config.classes[wzCls].courses={};
-  if(config.classes[wzCls].courses[subject]){toast('이미 추가된 과목입니다.');return;}
-  const courseData={textbook,curriculum};
-  config.classes[wzCls].courses[subject]=courseData;
-  saveLocal();renderMain();
-  if(dbUrl&&dbPath){try{await fbPatch(`classes/${wzCls}/courses/${subject}`,courseData);toast('과목 추가됨 ✅');}catch(e){toast('저장 실패: '+e);}}
-}
-
 function renderSettings(mc){
   renderMhdr('설정');
   if(config)_ensureConfigShape();
@@ -480,7 +333,6 @@ function addStuInline(classId,btnEl){
     if(!config._classStudents)config._classStudents={};
     if(!config._classStudents[classId])config._classStudents[classId]=[];
     config._classStudents[classId].push({nameKey,name:n,class:classId});
-    sortStu(config._classStudents[classId]);
     wrapper.remove();
     refreshStuChips(classId);
     // Firebase 저장: students/{nameKey}
@@ -824,7 +676,6 @@ async function loadCfg(){
           classStudents[cid].push({nameKey,...v});
         }
       }
-      Object.values(classStudents).forEach(sortStu);
       config._classStudents=classStudents;
     }
     saveLocal();setSync(true);
