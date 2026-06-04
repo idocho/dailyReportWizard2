@@ -1850,9 +1850,12 @@ class App:
             if cancel.is_set(): break
             self.root.after(0, lambda t=f"전송 중... ({i+1}/{total})  {m['name']}":
                             self.send_status.config(text=t))
+            # 첫 학생 워밍업 — 카톡 창 포커스/검색 안정화 (첫 전송 오작동 방지)
+            warm = 0.6 if i == 0 else 0.0
             try:
                 pyperclip.copy(m['room'])
-                pyautogui.hotkey(_MOD,'f'); time.sleep(0.2)
+                time.sleep(warm)
+                pyautogui.hotkey(_MOD,'f'); time.sleep(0.2 + warm)
                 pyautogui.press('esc');       time.sleep(0.2)
                 pyautogui.hotkey(_MOD,'f'); time.sleep(wait)
                 pyautogui.hotkey(_MOD,'v'); time.sleep(wait)

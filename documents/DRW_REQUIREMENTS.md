@@ -1,7 +1,7 @@
 # DailyReportWizard — 요구사항 명세서
 
 **Crafted by IDO(idocho@kakao.com) · Powered by Claude AI**  
-**문서 버전**: 7.2 · **앱 버전**: v2.1.0 · **최종 수정**: 2026-06-03
+**문서 버전**: 7.3 · **앱 버전**: v2.1.0 · **최종 수정**: 2026-06-04
 
 > Firebase 스키마 전체 명세: [ClassManager/documents/DB_SCHEMA.md](../../ClassManager/documents/DB_SCHEMA.md)
 
@@ -11,6 +11,7 @@
 
 | 문서 버전 | 날짜 | 주요 변경 |
 |-----------|------|-----------|
+| 7.3 | 2026-06-04 | **카톡 순차 전송 첫 학생 오작동 수정** — 3초 카운트다운 종료 직후 첫 학생 전송 시 카톡 창 포커스/검색창 안정화 전에 `ctrl+f`·붙여넣기가 발사돼 첫 명만 오작동(검색 실패·엉뚱한 입력)하던 레이스 수정. `_do_send` 루프 첫 반복(`i==0`)에 워밍업 지연 `warm=0.6s` 추가 — `room` 클립보드 복사 후 `warm`초 대기, 첫 `ctrl+f` 후 `0.2+warm`초 대기로 창 포커스 정착 보장. 2번째 학생부터는 `warm=0`(기존 타이밍 유지). `wait_time` 설정과 독립 |
 | 7.2 | 2026-06-03 | **룩앤필 리뉴얼 — 미니멀·프로 디자인 시스템 (웹+PC)** — 통일된 디자인 토큰 도입: 중성 표면 3단(`--bg`/`--panel`/`--panel-2`), 잉크 위계(`--text`/`--sub`/`--gray`), 라인 2단, 절제된 인디고 액센트(`--indigo` #4F46E5 / `--indigo-ink` #4338CA), 반경 3단, 그림자 3단. **웹**: `app.css` `:root` 토큰 교체로 전 화면 일괄 리스킨(JS 무변경, 클래스명 유지) + 사이드바(다크 #0E1016·라운드 nav·계정 카드)·카드(부드러운 그림자)·버튼·입력(포커스 링)·관찰 태그칩(`.tg-radio`/`.tg-check` 통일, 색상 의미 보존)·학생 슬림카드·설정 아코디언(아이콘 타일)·성적 카드 폴리시. **PC**: `constants.py` 팔레트 교체 + `app.py` 하드코딩 hex 스윕(표면·시맨틱 톤 정렬). 시안은 분리 사이트 `code/public/redesign/`에서 선검증. 액센트는 인디고 유지 |
 | 7.1 | 2026-06-03 | **PC 클라이언트 최초 설치 위저드(온보딩) 신설** — 기존 단일 안내 messagebox(`_prompt_first_run`)를 3단계 순차 위저드로 교체(§2.9-B). **팝업 아닌 메인 창 오버레이** 방식 — 정상 UI 빌드를 `_build_main_ui`로 분리하고 최초 실행 시 메인 창에 위저드 오버레이(`_wz_root`)만 띄움 → 완료 시 오버레이 destroy + 정상 3-패널 빌드(웹 위저드와 동일한 단일 창 레이아웃 분기). 단계: ①🔥Firebase 연결(+⚡테스트) ②🔑강사 계정(조회/등록+동기화) ③🤖AI 엔진+API키(건너뛰기 가능) → 🎉완료(요약+웹 명단 안내). 웹 위저드(§4.8-C)와 동일 컨셉, **학생 명단·수업 배정 단계는 웹 전용이라 제외**하고 **AI 엔진 키 단계 추가**(PC 전용). **엔진별 키 발급 가이드 인라인화** — AI키 단계서 엔진 선택 시 발급처/단계/키형식/주의를 위저드 안에 직접 표시(`_WZ_GUIDE`, guide.html 4부 발췌, `webbrowser.open` 링크), "가이드 참고"로 떠넘기지 않음. 스텝 인디케이터는 `tk.Canvas` 원+연결선 직접 드로잉(`_wz_draw_steps`). 단계 가드(0:URL·경로, 1:instructor_id). 신규 함수 `_run_setup_wizard`/`_wz_*` 일괄(`app.py`), 기존 `make_scroll_frame`·팔레트·폰트 재사용 |
 | 7.0 | 2026-06-03 | **초기 설정 위저드(온보딩) 신설** (웹 PWA) — 강사 미설정 신규 사용자의 빈 화면+단일 버튼을 4단계 순차 가이드로 대체. `init()` `!instructor` 시 `wizardActive=true`로 위저드 발동, `renderMain()` 최상단 분기로 위저드 활성 중 탭 이탈 차단. 단계: ①🔥 Firebase 연결(`saveFb`) ②🔑 계정(`lookupInstr`) ③👥 명단(`loadCfg`) ④📚 담당 수업(`addA`). 입력 DOM ID를 기존 설정 화면과 동일하게 두어 기존 핸들러 무수정 재사용. **교재 미등록 케이스 처리(핵심)** — 수업 배정 단계서 선택 반에 등록된 과목 없으면 인라인 과목(교재) 등록 폼(`wzGs`/`wzTb` → `wzAddCourse()`, `subject="{과정} {교재}"`, `addCourseInline` 미러) 노출 후 즉시 배정 가능. 반(classId) 생성은 위저드 범위 외(기존 학급 관리). 단계 가드(0:Firebase 미저장, 1:강사 미등록 차단), 완료 요약 체크리스트(`wzFinish`), "나중에 할게요" 이탈(`wzSkip`→설정). 상태 변수 `wizardActive`/`wzStep`/`wzCls`(`app-core.js`), `renderWizard`/`_wzPane`/`wzNext`/`wzBack`/`wzSkip`/`wzFinish`/`wzSetCls`/`wzAddCourse`(`app-settings.js`), CSS `.wz-*`/`.stp*`(`app.css`). index.html 캐시버전 `202606031200` 갱신 |
@@ -261,6 +262,7 @@ DRW 2.0이 저장하는 수업 관찰 데이터(`obs/`)와 성적 데이터(`sco
 - **전송 대상**: `STATUS_READY` 학생만, `_my_classes()` 화이트리스트 적용
 - **부담임 반 제외**: `assignments[cls].role == "부담임"` → 전송 제외. 폴백: `config/sheets/.../is_sub: true`
 - **대상자 선택 (개별 제외)**: 🚀 전송 클릭 시 `_open_send_dialog()` 체크박스 모달. 준비 완료 학생 전체 기본 체크, 체크 해제 = **이번 전송만 제외**(상태 미변경, 다음 전송엔 재포함). [전체 선택]/[전체 해제] 버튼. 선택 0명 시 전송 차단
+- **첫 학생 워밍업**: 카운트다운 종료 직후 첫 학생(`i==0`)은 `warm=0.6s` 지연 추가(`room` 복사 후 + 첫 `ctrl+f` 후) — 카톡 창 포커스/검색 정착 전 발사로 인한 첫 명 오작동 방지. 2번째부터 `warm=0`
 - **순차 전송 취소**: 전송 시작 후 `send_btn` → "⏹ 전송 취소" 토글. `self._send_cancel`(`threading.Event`) set → 3초 카운트다운 및 루프 매 학생 진입 시 검사, **현재 학생 완료 후 중단**. 취소 시 전송된 N명만 발송, **로컬 데이터 초기화 안 함**(미전송분 유지). 완료 시에만 기존 초기화 + `lastSent/` push
 - `pyautogui` 미설치 시: `AUTOMATION=False`, 전송 버튼 비활성화
 - 전송 **완료** 후: `student_data`, `note_data`, `force_data` 초기화 / `progress_data` 유지 / Firebase `lastSent/` push
