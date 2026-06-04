@@ -129,12 +129,12 @@ function _wzPane(){
         <button class="btn bp" style="padding:7px 0" onclick="wzAddCourse()">✓</button>
       </div></div>`;
   }
-  return rows+addCourse+`
+  return rows+`
     <div class="wz-fld" style="display:grid;grid-template-columns:1fr 1fr 66px;gap:6px;align-items:end">
       <div><label class="wz-fl">반</label><select class="inp sm" id="aCls" onchange="wzSetCls(this.value)">${clsOpts}</select></div>
       ${subjArea}
       <div><label class="wz-fl">역할</label><select class="inp sm" id="aRole"><option>담임</option><option>부담임</option></select></div>
-    </div>
+    </div>`+addCourse+`
     <button class="btn${canAdd?' bp':''}" style="width:100%"${canAdd?'':' disabled'} onclick="addA()">+ 수업 추가</button>`;
 }
 function wzGo(i){wzStep=i;renderMain();}
