@@ -1053,10 +1053,11 @@ class App:
             messagebox.showerror("오류", f"가져오기 실패:\n{e}")
 
     def _import_mobile_data(self, data):
-        """Firebase input/ 노드에서 학생 데이터 반영 (v2.0 스키마)
-        구조: {nameKey: {subject: {assign, note}}}
-        · 과제수행도: 항상 웹 데이터로 교체
-        · 메모/특이사항: 항상 웹 데이터로 교체
+        """Firebase input/ 노드에서 학생 데이터 반영 (v2.1.1 스키마)
+        구조: {nameKey: {subject: {assign}, ..., __note__: {note}}}
+        · 과제수행도(assign): 실 과목별, 항상 웹 데이터로 교체
+        · 메모/특이사항(note): 학생별 단일, __note__ 의사 과목에 저장
+          (구 과목별 note 데이터는 fallback 으로 1건 보존)
         """
         if not data:
             return
@@ -1068,18 +1069,27 @@ class App:
             classId = self.all_students.get(nameKey, {}).get('class', '')
             if not classId:
                 continue
+            note_key = (classId, nameKey)
+            legacy_note = ''   # 구 데이터(과목별 note) fallback 후보
             for subject, payload in subjects.items():
                 if not isinstance(payload, dict):
                     continue
-                # 과제수행도
+                # 특이사항: 학생별 단일 필드(v2.1.1) — __note__ 의사 과목에만 저장
+                if subject == '__note__':
+                    note_val = payload.get('note', '')
+                    if note_val:
+                        self.note_data[note_key] = {'value': note_val}
+                    continue   # __note__ 는 실 과목 아님 → assign 처리 제외
+                # 과제수행도 (실 과목)
                 assign_val = payload.get('assign', '')
                 student_key = (classId, nameKey, subject)
                 self.student_data[student_key] = {'value': assign_val}
-                # 메모/특이사항
-                note_val = payload.get('note', '')
-                if note_val:
-                    note_key = (classId, nameKey)
-                    self.note_data[note_key] = {'value': note_val}
+                # 구버전 마이그레이션: 과목별 note 보존 후보
+                if not legacy_note:
+                    legacy_note = payload.get('note', '') or ''
+            # __note__ 없고 구 과목별 note 있으면 fallback
+            if note_key not in self.note_data and legacy_note:
+                self.note_data[note_key] = {'value': legacy_note}
 
         save_daily_cache(self.progress_data, self.student_data, self.note_data, self.force_data)
         if self.cur_name:

@@ -1,7 +1,7 @@
 # DailyReportWizard — 요구사항 명세서
 
 **Crafted by IDO(idocho@kakao.com) · Powered by Claude AI**  
-**문서 버전**: 7.3 · **앱 버전**: v2.1.0 · **최종 수정**: 2026-06-04
+**문서 버전**: 7.4 · **앱 버전**: v2.1.1 · **최종 수정**: 2026-06-06
 
 > Firebase 스키마 전체 명세: [ClassManager/documents/DB_SCHEMA.md](../../ClassManager/documents/DB_SCHEMA.md)
 
@@ -11,6 +11,7 @@
 
 | 문서 버전 | 날짜 | 주요 변경 |
 |-----------|------|-----------|
+| 7.4 | 2026-06-06 | **특이사항 학생별 단일 필드로 정리 (v2.1.1)** — 과목별로 흩어져 입력·저장되던 특이사항을 학생 종속 단일 필드로 환원. 웹 쓰기/읽기 모두 `input/{nameKey}/__note__`(`{note}`) 사용, 과목 화면 어디서 입력해도 동일 값 공유. 과제수행도(`assign`)만 과목별 유지. PC `_import_mobile_data`는 `__note__`만 `note_data[(classId,nameKey)]`로 적재하고 실 과목 루프에서 note 제외(기존 last-non-empty-subject 덮어쓰기 모호성 제거). 구 과목별 note 데이터는 웹·PC 양쪽 fallback으로 1건 보존(마이그레이션). 초기화 시 `__note__` 학생당 1회 null PATCH 추가 |
 | 7.3 | 2026-06-04 | **카톡 순차 전송 첫 학생 오작동 수정** — 3초 카운트다운 종료 직후 첫 학생 전송 시 카톡 창 포커스/검색창 안정화 전에 `ctrl+f`·붙여넣기가 발사돼 첫 명만 오작동(검색 실패·엉뚱한 입력)하던 레이스 수정. `_do_send` 루프 첫 반복(`i==0`)에 워밍업 지연 `warm=0.6s` 추가 — `room` 클립보드 복사 후 `warm`초 대기, 첫 `ctrl+f` 후 `0.2+warm`초 대기로 창 포커스 정착 보장. 2번째 학생부터는 `warm=0`(기존 타이밍 유지). `wait_time` 설정과 독립 |
 | 7.2 | 2026-06-03 | **룩앤필 리뉴얼 — 미니멀·프로 디자인 시스템 (웹+PC)** — 통일된 디자인 토큰 도입: 중성 표면 3단(`--bg`/`--panel`/`--panel-2`), 잉크 위계(`--text`/`--sub`/`--gray`), 라인 2단, 절제된 인디고 액센트(`--indigo` #4F46E5 / `--indigo-ink` #4338CA), 반경 3단, 그림자 3단. **웹**: `app.css` `:root` 토큰 교체로 전 화면 일괄 리스킨(JS 무변경, 클래스명 유지) + 사이드바(다크 #0E1016·라운드 nav·계정 카드)·카드(부드러운 그림자)·버튼·입력(포커스 링)·관찰 태그칩(`.tg-radio`/`.tg-check` 통일, 색상 의미 보존)·학생 슬림카드·설정 아코디언(아이콘 타일)·성적 카드 폴리시. **PC**: `constants.py` 팔레트 교체 + `app.py` 하드코딩 hex 스윕(표면·시맨틱 톤 정렬). 시안은 분리 사이트 `code/public/redesign/`에서 선검증. 액센트는 인디고 유지 |
 | 7.1 | 2026-06-03 | **PC 클라이언트 최초 설치 위저드(온보딩) 신설** — 기존 단일 안내 messagebox(`_prompt_first_run`)를 3단계 순차 위저드로 교체(§2.9-B). **팝업 아닌 메인 창 오버레이** 방식 — 정상 UI 빌드를 `_build_main_ui`로 분리하고 최초 실행 시 메인 창에 위저드 오버레이(`_wz_root`)만 띄움 → 완료 시 오버레이 destroy + 정상 3-패널 빌드(웹 위저드와 동일한 단일 창 레이아웃 분기). 단계: ①🔥Firebase 연결(+⚡테스트) ②🔑강사 계정(조회/등록+동기화) ③🤖AI 엔진+API키(건너뛰기 가능) → 🎉완료(요약+웹 명단 안내). 웹 위저드(§4.8-C)와 동일 컨셉, **학생 명단·수업 배정 단계는 웹 전용이라 제외**하고 **AI 엔진 키 단계 추가**(PC 전용). **엔진별 키 발급 가이드 인라인화** — AI키 단계서 엔진 선택 시 발급처/단계/키형식/주의를 위저드 안에 직접 표시(`_WZ_GUIDE`, guide.html 4부 발췌, `webbrowser.open` 링크), "가이드 참고"로 떠넘기지 않음. 스텝 인디케이터는 `tk.Canvas` 원+연결선 직접 드로잉(`_wz_draw_steps`). 단계 가드(0:URL·경로, 1:instructor_id). 신규 함수 `_run_setup_wizard`/`_wz_*` 일괄(`app.py`), 기존 `make_scroll_frame`·팔레트·폰트 재사용 |
@@ -789,9 +790,10 @@ cfg.sheets.M.classes.중1A.tb_grade  = { "최상위수학": "중1-1", "우공비
             is_sub: false   ← 구버전 폴백 (assignments.role 우선)
       T/ ...
 
-  input/                    ← 웹 쓰기 / PC 읽기
-    {sheet}|{cls}|{name}|{tb}:      { assign: "과제 수행 양호 👍" }
-    {sheet}|{cls}|{name}|__note__:  { note: "수업 태도 양호" }
+  input/                    ← 웹 쓰기 / PC 읽기  (v2.1.1)
+    {nameKey}/
+      {subject}:   { assign: "과제 수행 양호 👍" }   ← 과목(교재)별
+      __note__:    { note: "수업 태도 양호" }          ← 학생별 단일(과목 무관)
 
   obs/                      ← 웹 쓰기 / PC 읽기 (v2.0 신규)
     {sheet}|{cls}|{name}/

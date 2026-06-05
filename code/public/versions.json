@@ -2,10 +2,17 @@
   "_comment": "버전 포털 메타. 새 버전 추가 시 이 배열 맨 앞에 항목 추가 후 scripts/build-portal.ps1 실행. tagClass: dev|beta|old",
   "versions": [
     {
-      "v": "v2.1.0",
+      "v": "v2.1.1",
       "tag": "개발중",
       "tagClass": "dev",
       "title": "최신 개발본",
+      "desc": "특이사항 학생별 단일 필드로 정리 · 온보딩 위저드"
+    },
+    {
+      "v": "v2.1.0",
+      "tag": "이전",
+      "tagClass": "old",
+      "title": "이전 개발본",
       "desc": "온보딩 설정 위저드 · 미니멀·프로 디자인 리뉴얼"
     },
     {

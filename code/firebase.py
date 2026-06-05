@@ -6,7 +6,8 @@ Crafted by IDO(idocho@kakao.com) · Powered by Claude AI
   students/        학생 명단 {nameKey: {name, class}}
   classes/         학급 정보 {classId: {group, courses/{subject}/...}}
   config/          강사·프리셋 정보
-  input/           과제수행도 + 특이사항 {nameKey: {subject: {assign, note}}}
+  input/           과제수행도(과목별) + 특이사항(학생별 단일)
+                   {nameKey: {subject: {assign}, __note__: {note}}}
   session/         진도/과제 (class_data)
   obs/             수업 관찰 태그 {nameKey: {subject: {date: {...}}}}
   lastSent/        마지막 전송 데이터 (폴백용)
