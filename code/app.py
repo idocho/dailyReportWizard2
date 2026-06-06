@@ -1813,6 +1813,9 @@ class App:
         if not sel:
             messagebox.showinfo("알림", "선택된 전송 대상이 없습니다."); return
 
+        # 특이사항 이력은 메시지 확정 시점에 기록 — 카톡 전송 성패/abort 와 무관 (전송 루프 이전 1회 원자적)
+        self._push_history(sel)
+
         self._send_cancel = threading.Event()
         self._set_send_btn_cancel(True)
         threading.Thread(target=self._do_send, args=(sel,), daemon=True).start()
@@ -1907,7 +1910,6 @@ class App:
             if cancel.is_set(): break
             time.sleep(0.1)
         sent = 0
-        sent_items = []
         for i, m in enumerate(msgs):
             if cancel.is_set(): break
             self.root.after(0, lambda t=f"전송 중... ({i+1}/{total})  {m['name']}":
@@ -1929,12 +1931,9 @@ class App:
             except Exception as e:
                 print(f"오류 [{m['name']}]: {e}")
             sent += 1
-            sent_items.append(m)
             time.sleep(0.8)
 
         cancelled = cancel.is_set()
-        # 전송된 학생 최종 note → history/{nameKey}/{date} 누적 (로컬 clear 전 동기)
-        self._push_history(sent_items)
         def _on_done():
             self._set_send_btn_cancel(False)
             if cancelled:
@@ -1949,11 +1948,13 @@ class App:
         self.root.after(0, _on_done)
 
     def _push_history(self, items):
-        """전송된 학생별 최종 note 를 history/{nameKey}/{YYYY-MM-DD} 에 누적.
-        · 학생 grain (과목 무관) — Analyzer 가 nameKey+date 로 obs/scores 와 조인
-        · 날짜키 = today_key() (YYYY-MM-DD) — obs/scores 와 동일 포맷
-        · clear 이전 동기 호출 (전송 스레드 내) — 크래시 시 이력 유실 방지
-        · note 비어있으면 기록 생략
+        """최종 메시지에 확정(merge)된 특이사항을 history/{nameKey}/{YYYY-MM-DD} 에 누적.
+
+        · 호출 시점 = 전송 **확정 직후·카톡 루프 이전** (전송 성패와 무관, 메시지 확정 기준)
+          → 카톡 전송 중 abort/크래시가 나도 이력은 이미 기록됨.
+        · 단일 원자적 multi-path PATCH (history 한 노드에 {nameKey/날짜:..} 일괄) — 1회 HTTP, 부분쓰기 없음.
+        · 학생 grain(과목 무관), 날짜키 = today_key()(YYYY-MM-DD) — obs/scores 와 조인.
+        · note 비어있으면 생략. 베스트에포트(실패해도 전송은 진행).
         """
         url  = self.config.get('firebase_url', '')
         path = self.config.get('firebase_path', '')
@@ -1961,20 +1962,22 @@ class App:
             return
         day   = today_key()
         instr = self.config.get('instructor_id', '')
+        updates = {}
         for it in items:
             nk   = it.get('nameKey')
             note = (it.get('note') or '').strip()
-            if not nk or not note:
-                continue
-            try:
-                firebase_patch(self.config, f"history/{nk}",
-                               {day: {"note": note, "instructor": instr}})
-            except Exception as e:
-                print(f"history push 실패 [{it.get('name')}]: {e}")
+            if nk and note:
+                updates[f"{nk}/{day}"] = {"note": note, "instructor": instr}
+        if not updates:
+            return
+        try:
+            firebase_patch(self.config, "history", updates)
+        except Exception as e:
+            print(f"history push 실패: {e}")
 
     def _reset_after_send(self):
         """전송 완료 후 로컬 전면 초기화 (진도/과제 포함).
-        DB 쓰기 없음 — 전송 이력은 _push_history 가 이미 history/ 에 기록함."""
+        DB 쓰기 없음 — 전송 이력은 _send() 가 전송 확정 시점에 history/ 에 이미 기록함."""
         self.student_data.clear()
         self.note_data.clear()
         self.progress_data.clear()
