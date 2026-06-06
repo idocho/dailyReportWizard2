@@ -50,7 +50,7 @@ from constants import (
     GREEN, YELLOW, GRAY, BORDER, TEXT, SUBTEXT, BLUE,
     STATUS_EMPTY, STATUS_PARTIAL, STATUS_READY, DOT_COLOR,
     FT, FB, FS, FE, _MOD,
-    ASSIGN_GRADE_LABELS, grade_label,
+    ASSIGN_GRADE_LABELS, grade_label, TAGS,
 )
 from storage  import (load_config, save_config, has_students,
                       save_daily_cache, load_daily_cache, set_runtime_cwd, RUNTIME_DIR)
@@ -475,6 +475,9 @@ class App:
                      wraplength=260, justify='left', anchor='w'
                      ).pack(side='left', fill='x', expand=True)
 
+            # ── 오늘 선택된 수업 관찰 태그 (읽기 전용, 한 줄 압축) ──
+            self._render_obs_tags(lf, nameKey, subject)
+
         # ── 특이사항 (편집 가능 + AI 생성) ──
         note_key = (classId, nameKey)
         note_val = self.note_data.get(note_key, {}).get('value', '')
@@ -551,6 +554,63 @@ class App:
 
         self.c_canvas.yview_moveto(0)
         self._update_preview()
+
+    # ── 오늘 선택된 관찰 태그 (읽기 전용 표시) ──────────────────────────
+    def _obs_tag_segments(self, nameKey, subject):
+        """오늘(today_key) obs 태그 → [(라벨, 색)] 세그먼트. 빈 카테고리 제외.
+        웹에서 선택한 condition/understand/engage/extra/highlight/caution 을
+        표시 순서대로 펼친다. highlight=초록, caution=빨강 강조."""
+        day = today_key()
+        rec = (self.tag_data.get(nameKey, {}) or {}).get(subject, {}) or {}
+        t = rec.get(day, {}) or {}
+        if not t:
+            return []
+
+        def _lut(field):
+            return {d['key']: d['label'] for d in TAGS.get(field, [])}
+
+        def _multi(field, color):
+            lut = _lut(field)
+            return [(lut[k], color) for k in (t.get(field) or []) if k in lut]
+
+        segs = []
+        # 컨디션 (단일)
+        c = t.get('condition')
+        if c and c in _lut('condition'):
+            segs.append((_lut('condition')[c], TEXT))
+        # 이해도 (단일) + 세부 (멀티)
+        u = t.get('understand')
+        if u and u in _lut('understand'):
+            segs.append((_lut('understand')[u], TEXT))
+        segs += _multi('understand_sub', TEXT)
+        # 참여·기타 (멀티)
+        segs += _multi('engage', TEXT)
+        segs += _multi('extra', TEXT)
+        # 하이라이트 (초록) — highlight 는 단일/리스트 혼재 가능
+        hl = t.get('highlight')
+        hl = hl if isinstance(hl, list) else ([hl] if hl else [])
+        hlut = _lut('highlight')
+        segs += [(hlut[k], GREEN) for k in hl if k in hlut]
+        # 주의 (빨강) — 마지막
+        segs += _multi('caution', "#DC2626")
+        return segs
+
+    def _render_obs_tags(self, parent, nameKey, subject):
+        """관찰 태그 세그먼트를 한 줄(가로)로 색별 Label 렌더. 없으면 미표시."""
+        segs = self._obs_tag_segments(nameKey, subject)
+        if not segs:
+            return
+        import sys as _sys
+        tag_font = ("Segoe UI Emoji", 9) if _sys.platform == "win32" else FE
+        bg = parent.cget('bg')
+        rowf = tk.Frame(parent, bg=bg)
+        rowf.pack(fill='x', pady=(5, 0))
+        for i, (text, color) in enumerate(segs):
+            if i:
+                tk.Label(rowf, text="·", font=tag_font, bg=bg, fg="#D1D5DB"
+                         ).pack(side='left', padx=2)
+            tk.Label(rowf, text=text, font=tag_font, bg=bg, fg=color
+                     ).pack(side='left')
 
     # ── 우측 ─────────────────────────────────────────────────────────
     def _build_right(self, parent):
@@ -768,7 +828,8 @@ class App:
                               for subj in subjects}
                 note = self.note_data.get((classId, nameKey), {}).get('value','')
                 msg  = build_message(self.date_str, class_info, display_name, assign_map, note, tb_grade=tb_grade)
-                result.append({'name': display_name, 'room': get_room(self.config, display_name), 'msg': msg})
+                result.append({'name': display_name, 'room': get_room(self.config, display_name), 'msg': msg,
+                               'nameKey': nameKey, 'classId': classId, 'note': note})
         return result
 
     def _refresh_send_btn(self):
@@ -966,12 +1027,11 @@ class App:
             # ── 2. 반 공통 진도/과제 (session/class_data) ──
             session_raw = firebase_get(self.config, "session")
             if session_raw is None:
-                # session 노드 자체 없음 → lastSent 폴백
-                last_raw   = firebase_get(self.config, "lastSent") or {}
-                class_data = last_raw.get("class_data", {})
-                date_str   = last_raw.get("date", "")
+                # session 노드 없음 — lastSent 폐기됨, 폴백 없음
+                class_data = {}
+                date_str   = ""
             else:
-                # session 노드 존재 (비어있어도 의도적 상태 — 폴백 없음)
+                # session 노드 존재 (비어있어도 의도적 상태)
                 session_raw = session_raw or {}
                 class_data  = session_raw.get("class_data") or {}
                 date_str    = session_raw.get("date", "")
@@ -1053,11 +1113,11 @@ class App:
             messagebox.showerror("오류", f"가져오기 실패:\n{e}")
 
     def _import_mobile_data(self, data):
-        """Firebase input/ 노드에서 학생 데이터 반영 (v2.1.1 스키마)
-        구조: {nameKey: {subject: {assign}, ..., __note__: {note}}}
-        · 과제수행도(assign): 실 과목별, 항상 웹 데이터로 교체
-        · 메모/특이사항(note): 학생별 단일, __note__ 의사 과목에 저장
-          (구 과목별 note 데이터는 fallback 으로 1건 보존)
+        """Firebase input/ 노드에서 특이사항(note) 반영 (v2.1.2 스키마)
+        구조: {nameKey: {__note__: {note}}}
+        · note(특이사항): 학생별 단일(__note__). 항상 웹 데이터로 교체.
+          구 과목별 note 데이터는 fallback 으로 1건 보존(마이그레이션 전 호환).
+        · 과제수행도(assign)는 더 이상 input/ 에서 읽지 않음 — obs/assign_grade 가 단일 소스.
         """
         if not data:
             return
@@ -1065,31 +1125,22 @@ class App:
         for nameKey, subjects in data.items():
             if not isinstance(subjects, dict):
                 continue
-            # 이 nameKey 가 속한 classId 조회
             classId = self.all_students.get(nameKey, {}).get('class', '')
             if not classId:
                 continue
-            note_key = (classId, nameKey)
-            legacy_note = ''   # 구 데이터(과목별 note) fallback 후보
+            note_key   = (classId, nameKey)
+            note_val   = ''
+            legacy_note = ''   # 구 과목별 note fallback 후보
             for subject, payload in subjects.items():
                 if not isinstance(payload, dict):
                     continue
-                # 특이사항: 학생별 단일 필드(v2.1.1) — __note__ 의사 과목에만 저장
                 if subject == '__note__':
-                    note_val = payload.get('note', '')
-                    if note_val:
-                        self.note_data[note_key] = {'value': note_val}
-                    continue   # __note__ 는 실 과목 아님 → assign 처리 제외
-                # 과제수행도 (실 과목)
-                assign_val = payload.get('assign', '')
-                student_key = (classId, nameKey, subject)
-                self.student_data[student_key] = {'value': assign_val}
-                # 구버전 마이그레이션: 과목별 note 보존 후보
-                if not legacy_note:
+                    note_val = payload.get('note', '') or note_val
+                elif not legacy_note:
                     legacy_note = payload.get('note', '') or ''
-            # __note__ 없고 구 과목별 note 있으면 fallback
-            if note_key not in self.note_data and legacy_note:
-                self.note_data[note_key] = {'value': legacy_note}
+            final = note_val or legacy_note
+            if final:
+                self.note_data[note_key] = {'value': final}
 
         save_daily_cache(self.progress_data, self.student_data, self.note_data, self.force_data)
         if self.cur_name:
@@ -1856,6 +1907,7 @@ class App:
             if cancel.is_set(): break
             time.sleep(0.1)
         sent = 0
+        sent_items = []
         for i, m in enumerate(msgs):
             if cancel.is_set(): break
             self.root.after(0, lambda t=f"전송 중... ({i+1}/{total})  {m['name']}":
@@ -1877,9 +1929,12 @@ class App:
             except Exception as e:
                 print(f"오류 [{m['name']}]: {e}")
             sent += 1
+            sent_items.append(m)
             time.sleep(0.8)
 
         cancelled = cancel.is_set()
+        # 전송된 학생 최종 note → history/{nameKey}/{date} 누적 (로컬 clear 전 동기)
+        self._push_history(sent_items)
         def _on_done():
             self._set_send_btn_cancel(False)
             if cancelled:
@@ -1893,27 +1948,38 @@ class App:
                 messagebox.showinfo("완료", f"{sent}명 전송 완료!")
         self.root.after(0, _on_done)
 
+    def _push_history(self, items):
+        """전송된 학생별 최종 note 를 history/{nameKey}/{YYYY-MM-DD} 에 누적.
+        · 학생 grain (과목 무관) — Analyzer 가 nameKey+date 로 obs/scores 와 조인
+        · 날짜키 = today_key() (YYYY-MM-DD) — obs/scores 와 동일 포맷
+        · clear 이전 동기 호출 (전송 스레드 내) — 크래시 시 이력 유실 방지
+        · note 비어있으면 기록 생략
+        """
+        url  = self.config.get('firebase_url', '')
+        path = self.config.get('firebase_path', '')
+        if not (url and path):
+            return
+        day   = today_key()
+        instr = self.config.get('instructor_id', '')
+        for it in items:
+            nk   = it.get('nameKey')
+            note = (it.get('note') or '').strip()
+            if not nk or not note:
+                continue
+            try:
+                firebase_patch(self.config, f"history/{nk}",
+                               {day: {"note": note, "instructor": instr}})
+            except Exception as e:
+                print(f"history push 실패 [{it.get('name')}]: {e}")
+
     def _reset_after_send(self):
-        """전송 완료 후 로컬 전면 초기화 (진도/과제 포함) — DB 쓰기는 lastSent만"""
+        """전송 완료 후 로컬 전면 초기화 (진도/과제 포함).
+        DB 쓰기 없음 — 전송 이력은 _push_history 가 이미 history/ 에 기록함."""
         self.student_data.clear()
         self.note_data.clear()
         self.progress_data.clear()
         self.force_data.clear()
         save_daily_cache(self.progress_data, {}, {}, {})
-
-        url  = self.config.get('firebase_url', '')
-        path = self.config.get('firebase_path', '')
-        if url and path:
-            def _push_last_sent():
-                try:
-                    firebase_put(self.config, "lastSent", {
-                        "date": self.date_str,
-                        "class_data": {}
-                    })
-                except Exception as e:
-                    print(f"lastSent push 실패: {e}")
-            threading.Thread(target=_push_last_sent, daemon=True).start()
-
         self.root.after(0, self._refresh_after_reset)
 
     def _refresh_after_reset(self):

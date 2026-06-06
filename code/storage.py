@@ -91,32 +91,21 @@ def has_students(cfg):
 
 # ── 일일 캐시 ────────────────────────────────────────────────────────
 def save_daily_cache(progress_data, student_data=None, note_data=None, force_data=None):
-    """진도/과제 + 과제수행도 + 특이사항 + 강제완료를 캐시로 저장."""
+    """진도/과제(class_data)만 로컬 캐시에 저장 (v2.1.2 간소화).
+
+    student_data·note_data·force_data 는 더 이상 디스크에 영속하지 않는다.
+    · 출처가 Firebase(obs/·input/)거나 로컬 전용 세션 상태라 재시작 복원 가치가 없고,
+      load_daily_cache 도 progress 만 복원해 왔음 → 죽은 I/O 제거.
+    · 인자는 호출부 호환 위해 유지하되 사용하지 않음.
+    """
     _ensure_parent(CACHE_PATH)
-    data = {"class_data": {}, "student_data": {}, "note_data": {}, "force_data": {}}
+    data = {"class_data": {}}
 
     for key, v in progress_data.items():
         data["class_data"]["|".join(key)] = {
             "progress": v.get("progress", ""),
             "homework": v.get("homework", ""),
         }
-
-    if student_data:
-        for key, v in student_data.items():
-            val = v.get("value", "")
-            if val:
-                data["student_data"]["|".join(key)] = val
-
-    if note_data:
-        for key, v in note_data.items():
-            val = v.get("value", "")
-            if val:
-                data["note_data"]["|".join(key)] = val
-
-    if force_data:
-        for key, v in force_data.items():
-            if v:
-                data["force_data"]["|".join(key)] = True
 
     with open(CACHE_PATH, 'w', encoding='utf-8') as f:
         json.dump(data, f, ensure_ascii=False, indent=2)

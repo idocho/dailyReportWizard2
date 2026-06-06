@@ -1,7 +1,7 @@
 # DailyReportWizard — 요구사항 명세서
 
 **Crafted by IDO(idocho@kakao.com) · Powered by Claude AI**  
-**문서 버전**: 7.4 · **앱 버전**: v2.1.1 · **최종 수정**: 2026-06-06
+**문서 버전**: 7.6 · **앱 버전**: v2.1.2 · **최종 수정**: 2026-06-06
 
 > Firebase 스키마 전체 명세: [ClassManager/documents/DB_SCHEMA.md](../../ClassManager/documents/DB_SCHEMA.md)
 
@@ -11,6 +11,8 @@
 
 | 문서 버전 | 날짜 | 주요 변경 |
 |-----------|------|-----------|
+| 7.6 | 2026-06-06 | **DB 재구조화 — Analyzer 정합 + 전송 코멘트 누적 (v2.1.2)** ① `history/{nameKey}/{YYYY-MM-DD}={note,instructor}` 신규 — PC가 전송 시 **clear 이전 동기** 기록(학생 grain, todayKey). AI 월간 리포트 반복 회피·맥락 소스. ② `lastSent/` 폐기(빈 껍데기), 가져오기 폴백 제거. ③ `input/.assign` 죽은 필드 + 레거시 `onPB` 제거 — 과제수행도는 `obs/assign_grade` 단일 소스. ④ 로컬 캐시 간소화 — `class_data`(진도/과제)만 디스크 영속, student/note/force는 메모리만(죽은 I/O 제거). ⑤ Firebase 스키마 섹션 실구조로 정정(누적 obs/scores/history vs 휘발 input/session, 날짜포맷 이원화 명시). ⑥ PC 쓰기 규칙 개정 — `history/` 허용. ⑦ DB 마이그레이션(`scripts/migrate_v2_1_2.py`): 구 과목별 note→`__note__` 통합, 죽은 assign 제거, lastSent 삭제 |
+| 7.5 | 2026-06-06 | **PC 학생별 선택 관찰 태그 표시 (v2.1.2)** — 웹에서 선택한 오늘 `obs/` 태그를 PC 중앙 패널 교재별 수행도 도트 줄 아래 **한 줄 압축**으로 읽기 전용 표시. 순서 컨디션→이해도(+세부)→참여→기타→하이라이트→주의, 하이라이트=초록·주의=빨강 강조, 빈 경우 생략. `_obs_tag_segments()`/`_render_obs_tags()` 신설. 기존 `tag_data`(obs 로드) 재사용 — AI 생성에만 쓰이던 데이터를 화면에도 노출 |
 | 7.4 | 2026-06-06 | **특이사항 학생별 단일 필드로 정리 (v2.1.1)** — 과목별로 흩어져 입력·저장되던 특이사항을 학생 종속 단일 필드로 환원. 웹 쓰기/읽기 모두 `input/{nameKey}/__note__`(`{note}`) 사용, 과목 화면 어디서 입력해도 동일 값 공유. 과제수행도(`assign`)만 과목별 유지. PC `_import_mobile_data`는 `__note__`만 `note_data[(classId,nameKey)]`로 적재하고 실 과목 루프에서 note 제외(기존 last-non-empty-subject 덮어쓰기 모호성 제거). 구 과목별 note 데이터는 웹·PC 양쪽 fallback으로 1건 보존(마이그레이션). 초기화 시 `__note__` 학생당 1회 null PATCH 추가 |
 | 7.3 | 2026-06-04 | **카톡 순차 전송 첫 학생 오작동 수정** — 3초 카운트다운 종료 직후 첫 학생 전송 시 카톡 창 포커스/검색창 안정화 전에 `ctrl+f`·붙여넣기가 발사돼 첫 명만 오작동(검색 실패·엉뚱한 입력)하던 레이스 수정. `_do_send` 루프 첫 반복(`i==0`)에 워밍업 지연 `warm=0.6s` 추가 — `room` 클립보드 복사 후 `warm`초 대기, 첫 `ctrl+f` 후 `0.2+warm`초 대기로 창 포커스 정착 보장. 2번째 학생부터는 `warm=0`(기존 타이밍 유지). `wait_time` 설정과 독립 |
 | 7.2 | 2026-06-03 | **룩앤필 리뉴얼 — 미니멀·프로 디자인 시스템 (웹+PC)** — 통일된 디자인 토큰 도입: 중성 표면 3단(`--bg`/`--panel`/`--panel-2`), 잉크 위계(`--text`/`--sub`/`--gray`), 라인 2단, 절제된 인디고 액센트(`--indigo` #4F46E5 / `--indigo-ink` #4338CA), 반경 3단, 그림자 3단. **웹**: `app.css` `:root` 토큰 교체로 전 화면 일괄 리스킨(JS 무변경, 클래스명 유지) + 사이드바(다크 #0E1016·라운드 nav·계정 카드)·카드(부드러운 그림자)·버튼·입력(포커스 링)·관찰 태그칩(`.tg-radio`/`.tg-check` 통일, 색상 의미 보존)·학생 슬림카드·설정 아코디언(아이콘 타일)·성적 카드 폴리시. **PC**: `constants.py` 팔레트 교체 + `app.py` 하드코딩 hex 스윕(표면·시맨틱 톤 정렬). 시안은 분리 사이트 `code/public/redesign/`에서 선검증. 액센트는 인디고 유지 |
@@ -199,6 +201,7 @@ DRW 2.0이 저장하는 수업 관찰 데이터(`obs/`)와 성적 데이터(`sco
 
 1. **진도/과제 요약** — `session/class_data`에서 로드. 입력값 있는 교재만 표시
 2. **교재별 과제수행도** — `input/`에서 로드. ●/○ 도트 + 수행도 텍스트 (읽기 전용)
+   - **선택된 관찰 태그 표시 (v2.1.2, 읽기 전용)** — 도트 줄 아래, 오늘(`today_key`) `obs/` 태그를 **한 줄 압축**으로 표시. 표시 순서: 컨디션 → 이해도(+세부) → 참여 → 기타 → 하이라이트 → 주의. 구분자 `·`. **하이라이트=초록·주의=빨강** 강조, 나머지 기본색. 태그 없으면 줄 자체 생략. 입력은 웹 전용이라 PC는 표시만. `App._obs_tag_segments()` / `_render_obs_tags()`
 3. **⚡ 강제 완료 버튼**
    - OFF: 회색 `"⚡ 강제 완료"`
    - ON: 초록 `"⚡ 강제 완료 (ON) — 클릭하여 해제"`
@@ -790,43 +793,41 @@ cfg.sheets.M.classes.중1A.tb_grade  = { "최상위수학": "중1-1", "우공비
             is_sub: false   ← 구버전 폴백 (assignments.role 우선)
       T/ ...
 
-  input/                    ← 웹 쓰기 / PC 읽기  (v2.1.1)
+  input/                    ← 웹 쓰기 / PC·Analyzer 읽기  (당일, 휘발)
     {nameKey}/
-      {subject}:   { assign: "과제 수행 양호 👍" }   ← 과목(교재)별
-      __note__:    { note: "수업 태도 양호" }          ← 학생별 단일(과목 무관)
+      __note__:  { note: "..." }     ← 당일 특이사항. **학생별 단일(과목 무관, v2.1.1+)**
+    (※ v2.1.1 이전 과목별 {subject}.note·.assign 은 폐기 — 마이그레이션으로 __note__ 통합)
 
-  obs/                      ← 웹 쓰기 / PC 읽기 (v2.0 신규)
-    {sheet}|{cls}|{name}/
-      {YYYY-MM-DD}:
-        condition:      "great" | "good" | "normal" | "bad"
-        understand:     "fast" | "normal_u" | "slow"
-        understand_sub: ["self_solve", "retry", "confused"]
-        engage:         ["present", "question", "help", "preview", "error_fix"]
-        caution:        ["sleepy", "chat", "attitude", "late"]
-        extra:          ["self_study", "weekly_test", "retest"]
-        highlight:      "perfect" | "improved" | "mastered" | "effort"  ← v3.2 신규
+  obs/                      ← 웹 쓰기 / PC·Analyzer 읽기  ★date별 누적
+    {nameKey}/{subject}/{YYYY-MM-DD}:
+        assign_grade:   "done"|"most"|"half"|"little"|"none"   ← **과제수행도 단일 소스**
+        assign_tags:    [추가 프리셋…]
+        condition:      "great"|"good"|"normal"|"low"|"bad"
+        understand:     "top"|"good"|"normal_u"|"confused"|"hard"
+        understand_sub: ["self_solve","retry","confused"]
+        engage:         ["present","question","help","preview","error_fix"]
+        caution:        ["sleepy","chat","attitude","late"]
+        extra:          ["self_study","weekly_test","retest"]
+        highlight:      ["perfect","improved","mastered","effort"]
 
-  session/                  ← 웹 쓰기 / PC 읽기
+  session/                  ← 웹 쓰기 / PC 읽기  (당일, 휘발)
+    date: "M/D (요일)"      ← 표시용 포맷 (todayKey YYYY-MM-DD 아님 — 주의)
     class_data/
-      {sheet}|{cls}|{tb}: { progress: "3단원 2차시", homework: "p.45~48" }
+      {classId}|{subject}: { progress, homework }
 
-  scores/                   ← 웹 쓰기 / Analyzer 읽기 (v2.0 신규, v5.0 구현)
-    {sheet}|{cls}/           URL 인코딩 (클래스키 = "M|3MGM")
-      {YYYY-MM-DD}|{type}|{round}:   testKey (신규 생성 시, 수정 시 유지)
-        type:      "주간Test" | "기출모의고사" | "실전모의고사" | "성취도평가" | "반배치고사" | 사용자정의
-        round:     "1" | "2" | 자유 텍스트
-        date:      "YYYY-MM-DD"
-        max_score: 100
-        memo:      ""
-        students:  { "김상덕": 85, "이민준": 92, ... }
+  scores/                   ← 웹 쓰기 / Analyzer 읽기  ★누적
+    achievement/{curriculumKey}/{testKey}: { meta:{type,date,max_score,memo,round?}, students:{nameKey:점수} }
+    weekly/{classId}/{subject}/{testKey}:   { meta, students }
+      testKey = "{YYYY-MM-DD}|{type}[|{round}]"
 
-  lastSent/                 ← PC 쓰기
-    date: "5/19 (화)"
-    class_data/
-      {sheet}|{cls}|{tb}: { progress, homework }
+  history/                  ← PC 쓰기(전송 시 동기) / Analyzer 읽기  ★v2.1.2 신규 누적
+    {nameKey}/{YYYY-MM-DD}: { note: "전송된 최종 특이사항", instructor: "{id}" }
+
+  (lastSent/ — v2.1.2 폐기)
 ```
 
-**obs 키 규칙**: `obs/{sheet}|{cls}|{name}/{YYYY-MM-DD}`  
+**누적 vs 휘발**: 누적 = `obs/`·`scores/`·`history/` (Analyzer 소스, 날짜키 YYYY-MM-DD). 휘발(당일 덮어쓰기) = `input/`·`session/`.
+**날짜 포맷**: 누적 노드·testKey = `YYYY-MM-DD`(todayKey). session.date = `M/D(요일)`(표시용).
 **TAGS key는 불변** — Firebase 저장값. label만 수정 가능.  
 **assignments 구조**: list (Firebase 저장 기준). `_fetch_class_data`에서 `config/instructors/{id}/assignments` 경로로 조회.
 
