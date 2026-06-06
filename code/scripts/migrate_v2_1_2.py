@@ -66,12 +66,12 @@ def main():
 
     # ── 2. input/ 정리 ──
     inp = fb_get(base, "input") or {}
-    n_assign, n_note_migr, n_students = 0, 0, 0
+    n_assign, n_note_migr, n_note_clean, n_students = 0, 0, 0, 0
     for nameKey, subjects in inp.items():
         if not isinstance(subjects, dict):
             continue
-        has_note = isinstance(subjects.get("__note__"), dict) and subjects["__note__"].get("note")
-        stray_notes = []
+        has_note = bool(isinstance(subjects.get("__note__"), dict) and subjects["__note__"].get("note"))
+        stray_notes = []          # (subject, note) — 정리 대상
         touched = False
         for subj, payload in subjects.items():
             if subj == "__note__" or not isinstance(payload, dict):
@@ -82,22 +82,31 @@ def main():
                 touched = True
                 if apply:
                     fb_write(base, f"input/{urllib.parse.quote(nameKey)}/{urllib.parse.quote(subj)}/assign", None, "PUT")
-            # 구 과목별 note 통합 후보 (전 과목 수집 — 손실 방지)
+            # 구 과목별 note 수집 (전 과목 — 손실 방지)
             if payload.get("note"):
-                stray_notes.append(payload["note"])
-        stray_note = " / ".join(stray_notes)
-        # __note__ 없고 구 note 있으면 통합
-        if not has_note and stray_note:
+                stray_notes.append((subj, payload["note"]))
+        # __note__ 없고 구 note 있으면 통합(전 과목 조인)
+        if not has_note and stray_notes:
+            joined = " / ".join(n for _, n in stray_notes)
             n_note_migr += 1
             touched = True
             if apply:
-                fb_write(base, f"input/{urllib.parse.quote(nameKey)}/__note__", {"note": stray_note}, "PATCH")
+                fb_write(base, f"input/{urllib.parse.quote(nameKey)}/__note__", {"note": joined}, "PATCH")
+            has_note = True
+        # __note__ 가 정본 → 중복인 과목별 .note 제거
+        if has_note and stray_notes:
+            for subj, _ in stray_notes:
+                n_note_clean += 1
+                touched = True
+                if apply:
+                    fb_write(base, f"input/{urllib.parse.quote(nameKey)}/{urllib.parse.quote(subj)}/note", None, "PUT")
         if touched:
             n_students += 1
 
     print(f"\n[input] 학생 {n_students}명 영향")
     print(f"        · 죽은 assign 필드 제거: {n_assign}건")
     print(f"        · 구 과목별 note → __note__ 통합: {n_note_migr}건")
+    print(f"        · 중복 과목별 .note 제거: {n_note_clean}건")
 
     print(f"\n=== 완료 [{mode}] ===")
     if not apply:

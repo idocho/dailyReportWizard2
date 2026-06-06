@@ -14,3 +14,4 @@ code/*.spec
 
 # Firebase 로컬 캐시
 .firebase/
+code/scripts/backup/
