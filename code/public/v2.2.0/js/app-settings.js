@@ -799,7 +799,10 @@ async function rmCourse(classId,subject){
   try{refreshCourseChips(classId);}catch(e){}
   if(dbUrl&&dbPath){
     try{await fbPut(`classes/${classId}/courses/${subject}`,null);}catch(e){}
+    // 진도/과제 동반 정리 — 과목 삭제 시 session/class_data 고아 방지
+    try{await fbPatch('session/class_data',{[`${classId}|${subject}`]:null});}catch(e){}
   }
+  delete progressData[`${classId}|${subject}`];
   _syncAssignments();
   renderMain();
 }

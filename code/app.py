@@ -1529,6 +1529,10 @@ class App:
                 if len(parts) != 2:
                     continue
                 classId, subject = parts
+                # 방어: 현존하는 과목(classes/{classId}/courses)이 아니면 무시 — 삭제된 과목의 고아 진도/과제 차단
+                _courses = (self.all_classes.get(classId, {}) or {}).get('courses', {}) or {}
+                if subject not in _courses:
+                    continue
                 tk_key = (classId, subject)
                 prog = v.get('progress', '') if isinstance(v, dict) else ''
                 hw   = v.get('homework',  '') if isinstance(v, dict) else ''
