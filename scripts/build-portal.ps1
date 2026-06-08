@@ -17,15 +17,24 @@ $pub  = Join-Path $root 'code/public'
 $meta = Get-Content (Join-Path $pub 'versions.json') -Raw -Encoding UTF8 | ConvertFrom-Json
 
 function Row($x) {
+  # 웹버전과 등치되는 네이티브앱(PC) exe 다운로드 링크. versions.json 에 "exe": false 면 숨김.
+  $exeLink = ''
+  if ($x.exe -ne $false) {
+    $exeUrl = "https://github.com/idocho/dailyReportWizard2/releases/download/$($x.v)/DailyReportWizard_$($x.v).exe"
+    $exeLink = "<a class=`"dl`" href=`"$exeUrl`" title=`"$($x.v) PC 설치파일(.exe) 직접 다운로드`">⬇ 설치파일 .exe</a>"
+  }
 @"
-      <a class="row" href="$($x.v)/">
-        <div class="left">
+      <div class="row">
+        <a class="left" href="$($x.v)/">
           <div class="vh"><span class="v">$($x.v)</span><span class="tag $($x.tagClass)">$($x.tag)</span></div>
           <div class="t">$($x.title)</div>
           <div class="d">$($x.desc)</div>
+        </a>
+        <div class="right">
+          $exeLink
+          <a class="go" href="$($x.v)/">웹 열기 →</a>
         </div>
-        <span class="go">열기 →</span>
-      </a>
+      </div>
 "@
 }
 
@@ -80,8 +89,12 @@ $html = @"
   .sec-s{font-size:10.5px;color:var(--muted);font-weight:500}
   .card{background:var(--panel);border:1px solid var(--line);border-radius:16px;box-shadow:0 1px 3px rgba(16,24,40,.07);overflow:hidden}
   .card.dev{border-style:dashed;border-color:var(--indigo-line);background:#FCFCFE;box-shadow:none}
-  .row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 18px;border-bottom:1px solid var(--soft);text-decoration:none;color:var(--ink);transition:background .12s}
+  .row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 18px;border-bottom:1px solid var(--soft);transition:background .12s}
   .row:last-child{border-bottom:none}.row:hover{background:#F7F7F9}
+  .left{flex:1;min-width:0;text-decoration:none;color:var(--ink);display:block}
+  .right{display:flex;flex-direction:column;align-items:flex-end;gap:7px;flex-shrink:0}
+  .dl{font-size:11px;font-weight:800;color:var(--indigo-ink);background:var(--indigo-l);border:1px solid var(--indigo-line);border-radius:8px;padding:5px 11px;text-decoration:none;white-space:nowrap;transition:background .12s}
+  .dl:hover{background:#E4E7FF}
   .vh{display:flex;align-items:center;gap:8px}
   .v{font-size:15px;font-weight:800}
   .tag{font-size:10px;font-weight:800;border-radius:7px;padding:2px 8px}
@@ -90,7 +103,7 @@ $html = @"
   .tag.old{background:#F1F1F4;color:var(--muted);border:1px solid var(--line)}
   .t{font-size:12.5px;font-weight:600;color:var(--ink);margin-top:5px}
   .d{font-size:11px;color:var(--muted);margin-top:2px;line-height:1.4}
-  .go{font-size:12px;font-weight:700;color:var(--indigo-ink);white-space:nowrap;flex-shrink:0}
+  .go{font-size:12px;font-weight:700;color:var(--indigo-ink);white-space:nowrap;text-decoration:none}
   .note{font-size:11px;color:var(--muted);margin-top:6px;line-height:1.6;text-align:center}
 </style>
 </head>
