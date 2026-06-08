@@ -1514,8 +1514,8 @@ class App:
     def _import_mobile_data(self, data):
         """Firebase input/ 노드에서 특이사항(note) 반영 (v2.1.2 스키마)
         구조: {nameKey: {__note__: {note}}}
-        · note(특이사항): 학생별 단일(__note__). 항상 웹 데이터로 교체.
-          구 과목별 note 데이터는 fallback 으로 1건 보존(마이그레이션 전 호환).
+        · note(특이사항): 학생별 단일(__note__). **항상 웹 데이터로 교체** — 웹에서 비웠으면
+          빈값으로 덮어쓴다(기존 기록 잔류 방지). __note__ 없으면 구 과목별 note fallback.
         · 과제수행도(assign)는 더 이상 input/ 에서 읽지 않음 — obs/assign_grade 가 단일 소스.
         """
         if not data:
@@ -1527,19 +1527,20 @@ class App:
             classId = self.all_students.get(nameKey, {}).get('class', '')
             if not classId:
                 continue
-            note_key   = (classId, nameKey)
-            note_val   = ''
-            legacy_note = ''   # 구 과목별 note fallback 후보
-            for subject, payload in subjects.items():
-                if not isinstance(payload, dict):
-                    continue
-                if subject == '__note__':
-                    note_val = payload.get('note', '') or note_val
-                elif not legacy_note:
-                    legacy_note = payload.get('note', '') or ''
-            final = note_val or legacy_note
-            if final:
-                self.note_data[note_key] = {'value': final}
+            note_key = (classId, nameKey)
+            note_rec = subjects.get('__note__')
+            if isinstance(note_rec, dict):
+                # __note__ 가 authoritative — 빈값이어도 그대로 반영(웹에서 비운 것)
+                final = note_rec.get('note', '') or ''
+            else:
+                # __note__ 없음 → 구 과목별 note fallback (마이그레이션 전 호환)
+                final = ''
+                for subject, payload in subjects.items():
+                    if subject != '__note__' and isinstance(payload, dict) and payload.get('note'):
+                        final = payload['note']
+                        break
+            # 항상 교체(빈값 포함). render/전송 측은 빈 문자열을 '메모 없음'으로 처리.
+            self.note_data[note_key] = {'value': final}
 
         save_daily_cache(self.progress_data, self.student_data, self.note_data, self.force_data)
         if self.cur_name:
