@@ -539,6 +539,34 @@ class AiEngine:
 
         prompt = build_batch_prompt(targets)
 
+        # 진행 표시 — 자동 소멸 modeless Toplevel (OK 버튼 모달 대신).
+        # 완료/에러 콜백에서 _close_prog() 으로 닫는다.
+        import tkinter as tk
+        prog = tk.Toplevel(app.root)
+        prog.title("일괄 AI 생성")
+        prog.resizable(False, False)
+        prog.configure(bg="#FFFFFF")
+        prog.transient(app.root)
+        tk.Label(prog, text=f"✨ {len(targets)}명 특이사항 생성 중...\n완료되면 자동으로 닫힙니다.",
+                 font=("맑은 고딕", 10), bg="#FFFFFF", fg="#18181B",
+                 justify="center", padx=30, pady=22).pack()
+        prog.update_idletasks()
+        try:
+            px = app.root.winfo_rootx() + (app.root.winfo_width()  - prog.winfo_width())  // 2
+            py = app.root.winfo_rooty() + (app.root.winfo_height() - prog.winfo_height()) // 2
+            prog.geometry(f"+{max(px,0)}+{max(py,0)}")
+        except Exception:
+            pass
+        prog.protocol("WM_DELETE_WINDOW", lambda: None)  # 생성 중 수동 닫기 방지
+        prog.update()
+
+        def _close_prog():
+            try:
+                if prog.winfo_exists():
+                    prog.destroy()
+            except Exception:
+                pass
+
         def _call():
             try:
                 raw = _call_ai_hub(engine_type, api_key, prompt,
@@ -567,6 +595,7 @@ class AiEngine:
                 save_daily_cache(app.progress_data, app.student_data, app.note_data, app.force_data)
 
                 def _ok(u=updated):
+                    _close_prog()
                     self._mark_called()
                     if app.cur_name:
                         app._render_student(app.activeGroup, app.cur_cls, app.cur_name)
@@ -575,12 +604,11 @@ class AiEngine:
 
             except urllib.error.HTTPError as e:
                 msg = "API 한도를 초과했습니다(429). 잠시 후 다시 시도해 주세요." if e.code == 429 else f"HTTP {e.code}: {e.reason}"
-                app.root.after(0, lambda m=msg: self._show_batch_err(m))
+                app.root.after(0, lambda m=msg: (_close_prog(), self._show_batch_err(m)))
             except Exception as e:
-                app.root.after(0, lambda m=str(e): self._show_batch_err(m))
+                app.root.after(0, lambda m=str(e): (_close_prog(), self._show_batch_err(m)))
 
         threading.Thread(target=_call, daemon=True).start()
-        messagebox.showinfo("일괄 AI 생성 진행", f"{len(targets)}명 생성 중입니다...\n완료 알림을 기다려 주세요.")
 
     def _start_cooldown_tick(self, btn):
         def _tick():

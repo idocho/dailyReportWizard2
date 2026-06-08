@@ -77,6 +77,7 @@ class App:
         self.student_data = {}   # Firebase input/ 로드 시 채워짐
         self.note_data    = {}   # Firebase input/ 로드 시 채워짐
         self.force_data   = {}   # (classId, nameKey) → bool 강제완료 플래그
+        self.exclude_prog = set()  # {(classId, subject)} — 이번 전송 메시지서 진도/과제 제외 (메모리만)
         self.tag_data     = {}   # Firebase obs/ 노드에서 로드하는 수업 관찰 태그
         self.all_students = {}   # Firebase students/ 전체 {nameKey: {name, class}}
         self.all_classes  = {}   # Firebase classes/ 전체 {classId: {group, courses/...}}
@@ -468,19 +469,38 @@ class App:
                                fg="#0F6E56", bg="#ECFDF3", padx=10, pady=8,
                                highlightbackground="#BBF7D0")
             pf.pack(fill='x', pady=(0, 12))
+            _is_sub_pf = self._is_sub_teacher(classId)
             for subject in subjects:
                 pd_val = self.progress_data.get((classId, subject), {})
                 if pd_val.get('progress') or pd_val.get('homework'):
+                    excluded = (classId, subject) in self.exclude_prog
                     tb_lbl = grade_label(tb_grade.get(subject, ''), subject)
-                    tk.Label(pf, text=tb_lbl, font=("맑은 고딕", 8, "bold"),
-                             bg="#ECFDF3", fg=INDIGO).pack(anchor='w', pady=(2,0))
+                    # 헤더 행: 과목명 + 메시지 제외 토글 (담임만)
+                    hdr = tk.Frame(pf, bg="#ECFDF3")
+                    hdr.pack(fill='x', pady=(3, 0))
+                    tk.Label(hdr, text=tb_lbl, font=("맑은 고딕", 8, "bold"),
+                             bg="#ECFDF3", fg=(GRAY if excluded else INDIGO)).pack(side='left')
+                    if not _is_sub_pf:
+                        if excluded:
+                            _xb = tk.Button(hdr, text="↩ 메시지에 포함", font=("맑은 고딕", 8),
+                                            bg="#FEE2E2", fg="#B91C1C", relief='flat',
+                                            padx=7, pady=0, cursor='hand2',
+                                            command=lambda s=subject: self._toggle_exclude_prog(classId, s))
+                        else:
+                            _xb = tk.Button(hdr, text="✕ 메시지서 제외", font=("맑은 고딕", 8),
+                                            bg="#E6F7EF", fg="#0F6E56", relief='flat',
+                                            padx=7, pady=0, cursor='hand2',
+                                            command=lambda s=subject: self._toggle_exclude_prog(classId, s))
+                        _xb.pack(side='right')
+                    _fg = GRAY if excluded else TEXT
+                    _sfx = "   — 제외됨(메시지 미포함)" if excluded else ""
                     if pd_val.get('progress'):
-                        tk.Label(pf, text=f"  진도: {pd_val['progress']}",
-                                 font=FS, bg="#ECFDF3", fg=TEXT
+                        tk.Label(pf, text=f"  진도: {pd_val['progress']}{_sfx}",
+                                 font=FS, bg="#ECFDF3", fg=_fg
                                  ).pack(anchor='w')
                     if pd_val.get('homework'):
-                        tk.Label(pf, text=f"  과제: {pd_val['homework']}",
-                                 font=FS, bg="#ECFDF3", fg=TEXT
+                        tk.Label(pf, text=f"  과제: {pd_val['homework']}{_sfx}",
+                                 font=FS, bg="#ECFDF3", fg=_fg
                                  ).pack(anchor='w')
 
         # ── 과목별 과제수행도 (읽기 전용) ──
@@ -761,6 +781,26 @@ class App:
         # v3.0: 입력 위젯 없음 — Firebase 가져오기로만 데이터 로드, no-op
         pass
 
+    def _class_info_for(self, classId, subjects):
+        """진도/과제 class_info — exclude_prog 에 든 (classId,subject)은 빈값(메시지 제외)."""
+        info = {}
+        for subj in subjects:
+            if (classId, subj) in self.exclude_prog:
+                info[subj] = {'progress': '', 'homework': ''}
+            else:
+                info[subj] = self.progress_data.get((classId, subj), {'progress': '', 'homework': ''})
+        return info
+
+    def _toggle_exclude_prog(self, classId, subject):
+        """진도/과제를 이번 전송 메시지서 제외/포함 토글 (메모리만, DB 무관)."""
+        key = (classId, subject)
+        if key in self.exclude_prog:
+            self.exclude_prog.discard(key)
+        else:
+            self.exclude_prog.add(key)
+        if self.cur_name:
+            self._render_student(self.activeGroup, self.cur_cls, self.cur_name)
+
     def _update_preview(self):
         group, classId, nameKey = self.activeGroup, self.cur_cls, self.cur_name
         if not nameKey: return
@@ -770,8 +810,7 @@ class App:
         tb_grade  = {subj: courses[subj].get('curriculum', '') for subj in subjects}
         display_name = self.all_students.get(nameKey, {}).get('name', nameKey)
         room      = get_room(self.config, display_name)
-        class_info = {subj: self.progress_data.get((classId, subj), {'progress':'','homework':''})
-                      for subj in subjects}
+        class_info = self._class_info_for(classId, subjects)
         assign_map = {subj: self.student_data.get((classId, nameKey, subj), {}).get('value','')
                       for subj in subjects}
         note = self.note_data.get((classId, nameKey), {}).get('value','')
@@ -851,8 +890,7 @@ class App:
             courses    = cls_data.get('courses', {})
             subjects   = list(courses.keys())
             tb_grade   = {subj: courses[subj].get('curriculum', '') for subj in subjects}
-            class_info = {subj: self.progress_data.get((classId, subj), {'progress':'','homework':''})
-                          for subj in subjects}
+            class_info = self._class_info_for(classId, subjects)
             class_student_keys = [k for k, v in self.all_students.items()
                                    if v.get('class') == classId]
             for nameKey in class_student_keys:
@@ -1393,6 +1431,7 @@ class App:
             self.note_data.clear()
             self.progress_data.clear()
             self.force_data.clear()
+            self.exclude_prog.clear()
 
             # ── 0. config/ + students/ + classes/ 동기화 ──
             config_data = firebase_get(self.config, "config") or {}
@@ -2410,6 +2449,7 @@ class App:
         self.note_data.clear()
         self.progress_data.clear()
         self.force_data.clear()
+        self.exclude_prog.clear()
         save_daily_cache(self.progress_data, {}, {}, {})
         self.root.after(0, self._refresh_after_reset)
 
