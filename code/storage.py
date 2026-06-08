@@ -47,6 +47,7 @@ def set_runtime_cwd():
 RUNTIME_DIR = _runtime_dir()
 CONFIG_PATH = os.path.join(RUNTIME_DIR, 'config.json')
 CACHE_PATH  = os.path.join(RUNTIME_DIR, 'daily_cache.json')
+TEMPLATES_PATH = os.path.join(RUNTIME_DIR, 'templates.json')
 
 
 # ── 내부 헬퍼 ────────────────────────────────────────────────────────
@@ -78,6 +79,25 @@ def save_config(cfg):
     _ensure_parent(CONFIG_PATH)
     with open(CONFIG_PATH, 'w', encoding='utf-8') as f:
         json.dump(cfg, f, ensure_ascii=False, indent=2)
+
+
+def load_templates():
+    """메시지 발송 탭 템플릿 목록 로드 → [{name, body}, ...]. 없으면 빈 리스트."""
+    if os.path.exists(TEMPLATES_PATH):
+        try:
+            with open(TEMPLATES_PATH, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            if isinstance(data, list):
+                return data
+        except Exception:
+            pass
+    return []
+
+
+def save_templates(templates):
+    _ensure_parent(TEMPLATES_PATH)
+    with open(TEMPLATES_PATH, 'w', encoding='utf-8') as f:
+        json.dump(templates, f, ensure_ascii=False, indent=2)
 
 
 def has_students(cfg):

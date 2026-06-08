@@ -2,10 +2,17 @@
   "_comment": "버전 포털 메타. 새 버전 추가 시 이 배열 맨 앞에 항목 추가 후 scripts/build-portal.ps1 실행. tagClass: dev|beta|old",
   "versions": [
     {
-      "v": "v2.1.2",
+      "v": "v2.2.0",
       "tag": "개발중",
       "tagClass": "dev",
       "title": "최신 개발본",
+      "desc": "메시지 발송 탭 신설 — 담당 학생 전체에게 템플릿·이미지 일괄 발송 · 설정 버튼 전역 이동"
+    },
+    {
+      "v": "v2.1.2",
+      "tag": "이전",
+      "tagClass": "old",
+      "title": "이전 개발본",
       "desc": "DB 재구조화 · 전송 코멘트 누적(history) · 학생별 관찰태그 표시 · Analyzer 정합"
     },
     {

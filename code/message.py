@@ -3,8 +3,28 @@ message.py — 카카오톡 데일리 리포트 메시지 조립
 Crafted by IDO(idocho@kakao.com) · Powered by Claude AI
 """
 import datetime
+import re
 
 from constants import grade_label
+
+
+# ── 메시지 발송 탭: {변수} 치환 엔진 (공통 변수만) ───────────────────
+def render(template, ctx):
+    """ctx 키로 {변수} 치환. 미정의 변수는 그대로 유지."""
+    def _rep(m):
+        return str(ctx.get(m.group(1), m.group(0)))
+    return re.sub(r'\{([^}]+)\}', _rep, template or '')
+
+
+def build_bulk_ctx(name, cls):
+    """발송 탭 공통 컨텍스트: {이름} {반} {날짜}."""
+    d = datetime.datetime.now()
+    return {"이름": name, "반": cls or "", "날짜": f"{d.month}/{d.day}"}
+
+
+def bulk_variables():
+    """발송 탭 변수 힌트 버튼용 목록."""
+    return [("{이름}", "학생 이름"), ("{반}", "반 이름"), ("{날짜}", "오늘 (M/D)")]
 
 
 def today_str():

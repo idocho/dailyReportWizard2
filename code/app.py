@@ -53,10 +53,13 @@ from constants import (
     ASSIGN_GRADE_LABELS, grade_label, TAGS,
 )
 from storage  import (load_config, save_config, has_students,
-                      save_daily_cache, load_daily_cache, set_runtime_cwd, RUNTIME_DIR)
+                      save_daily_cache, load_daily_cache, set_runtime_cwd, RUNTIME_DIR,
+                      load_templates, save_templates)
 from firebase import firebase_get, firebase_put, firebase_patch, fetch_tags, today_key
 from ai_engine import AiEngine
-from message   import today_str, get_room, nickname_suffix, build_message
+from message   import (today_str, get_room, nickname_suffix, build_message,
+                       render, build_bulk_ctx, bulk_variables)
+from kakao_image import copy_image_to_clipboard
 
 class App:
     def __init__(self, root):
@@ -94,6 +97,14 @@ class App:
         self._ai_last_call = 0.0       # 하위 호환용 (AiEngine이 갱신)
         self.ai = AiEngine(self)       # AI 생성 엔진
 
+        # 메시지 발송 탭 상태 (ClassManager 발송 기능 이식)
+        self.templates        = load_templates()
+        self.tmpl_idx         = -1
+        self.bulk_sel         = {}     # nameKey → BooleanVar (담당 학생 전체 선택)
+        self.bulk_attach_image = ""    # 1회성 첨부 이미지 경로 (templates.json 미저장)
+        self.bulk_image_first = tk.BooleanVar(value=False)
+        self._bulk_send_cancel = None
+
         self._main_built = False
         # Firebase 미설정(최초 실행) 시: 정상 UI 대신 메인 창에 설치 위저드를 띄운다.
         # 위저드 완료/이탈 시 정상 레이아웃을 빌드 → 팝업 없이 한 창에서 단계 전환.
@@ -105,12 +116,34 @@ class App:
             self.root.after(300, self._sync_shared_sheets_from_firebase)
 
     def _build_main_ui(self):
-        """정상 3-패널 메인 레이아웃 빌드 (위저드 종료 후/일반 실행 시)."""
+        """헤더 고정 + 노트북(데일리 리포트 / 메시지 발송) 레이아웃 빌드."""
         self._build_header()
-        self._build_sheet_bar()
-        self._build_panels()
-        self._build_statusbar()
-        self._build_footer()
+
+        nb = ttk.Notebook(self.root)
+        nb.pack(fill='both', expand=True)
+        self._nb = nb
+
+        # 탭1 — 기존 데일리 리포트 워크플로우 (시트바+3패널+상태바+푸터)
+        tab_report = tk.Frame(nb, bg=BG)
+        nb.add(tab_report, text='  📋 데일리 리포트  ')
+        self._build_sheet_bar(tab_report)
+        self._build_panels(tab_report)
+        self._build_statusbar(tab_report)
+        self._build_footer(tab_report)
+
+        # 탭2 — 메시지 발송 (ClassManager 발송 기능 이식, 담당 학생 전체)
+        tab_bulk = tk.Frame(nb, bg=BG)
+        nb.add(tab_bulk, text='  ✉ 메시지 발송  ')
+        self._build_bulk_tab(tab_bulk)
+
+        # ⚙ 설정 — 전역: 노트북 탭과 같은 행 우측에 오버레이 (두 탭 공유)
+        self.settings_btn = tk.Button(self.root, text="⚙ 설정", font=FS,
+                                      bg=BG, fg=INDIGO, relief='flat', bd=0,
+                                      cursor='hand2', padx=8,
+                                      activebackground="#E4E7FF",
+                                      command=self._open_settings)
+        self.settings_btn.place(in_=nb, relx=1.0, x=-6, y=3, anchor='ne')
+
         self._switch_sheet('M')
         self._main_built = True
 
@@ -152,6 +185,7 @@ class App:
 
             save_config(self.config)
             self._switch_sheet(self.activeGroup)
+            self._bulk_refresh_students()
             return True
         except Exception:
             pass
@@ -185,8 +219,9 @@ class App:
                  font=('맑은 고딕', 8), bg='#0d0d1a', fg='#5b5bf0',
                  anchor='e').pack(side='right', padx=14)
 
-    def _build_sheet_bar(self):
-        bar = tk.Frame(self.root, bg="#ECECEF")
+    def _build_sheet_bar(self, parent=None):
+        parent = parent or self.root
+        bar = tk.Frame(parent, bg="#ECECEF")
         bar.pack(fill='x')
         self.sheet_btns = {}
         for s in ['M', 'T']:
@@ -196,10 +231,7 @@ class App:
             b.pack(side='left')
             self.sheet_btns[s] = b
         # v3.0: 진도/과제 버튼 제거 (웹에서 입력), 가져오기 항상 표시
-        tk.Button(bar, text="⚙ 설정", font=FS,
-                  bg="#ECECEF", fg=SUBTEXT, relief='flat', cursor='hand2',
-                  command=self._open_settings
-                  ).pack(side='right', padx=4, pady=3)
+        # ⚙ 설정은 헤더(전역)로 이동 — 메시지 발송 탭과 공유 (v2.2.0)
         tk.Button(bar, text="🗑 초기화", font=FS,
                   bg="#ECECEF", fg="#EF4444", relief='flat', cursor='hand2',
                   command=self._open_reset_dialog
@@ -209,8 +241,9 @@ class App:
                   command=self._pull_mobile_data
                   ).pack(side='right', padx=8, pady=3)
 
-    def _build_panels(self):
-        pf = tk.Frame(self.root, bg=BG)
+    def _build_panels(self, parent=None):
+        parent = parent or self.root
+        pf = tk.Frame(parent, bg=BG)
         pf.pack(fill='both', expand=True)
         pf.columnconfigure(1, weight=1)
         pf.rowconfigure(0, weight=1)
@@ -659,8 +692,9 @@ class App:
             pass
 
     # ── 상태바 / 푸터 ────────────────────────────────────────────────
-    def _build_statusbar(self):
-        sb = tk.Frame(self.root, bg="#ECFDF3",
+    def _build_statusbar(self, parent=None):
+        parent = parent or self.root
+        sb = tk.Frame(parent, bg="#ECFDF3",
                       highlightbackground="#BBF7D0", highlightthickness=1)
         sb.pack(fill='x')
         self.status_lbl = tk.Label(sb, text="", font=FS,
@@ -693,8 +727,9 @@ class App:
         widget.bind('<Enter>', _show)
         widget.bind('<Leave>', _hide)
 
-    def _build_footer(self):
-        foot = tk.Frame(self.root, bg=PANEL,
+    def _build_footer(self, parent=None):
+        parent = parent or self.root
+        foot = tk.Frame(parent, bg=PANEL,
                         highlightbackground=BORDER, highlightthickness=1)
         foot.pack(fill='x', side='bottom')
         self.send_btn = tk.Button(
@@ -838,6 +873,370 @@ class App:
             text=f"🚀  카카오톡 전송 ({n}명)",
             bg=ACCENT if n>0 else "#ECECEF",
             fg="#0E1016" if n>0 else GRAY)
+
+    # ══════════════════════════════════════════════════════════════════
+    # 메시지 발송 탭 — ClassManager 발송 기능 이식 (담당 학생 전체 대상)
+    # ══════════════════════════════════════════════════════════════════
+    def _build_bulk_tab(self, parent):
+        parent.columnconfigure(0, weight=0, minsize=250)
+        parent.columnconfigure(1, weight=1)
+        parent.rowconfigure(0, weight=1)
+        self._build_bulk_left(parent)
+        self._build_bulk_right(parent)
+        self._bulk_refresh_students()
+        self._bulk_refresh_tmpl_cb()
+
+    def _build_bulk_left(self, parent):
+        frm = tk.Frame(parent, bg=PANEL,
+                       highlightbackground=BORDER, highlightthickness=1)
+        frm.grid(row=0, column=0, sticky='nsew', padx=(8, 4), pady=8)
+
+        hdr = tk.Frame(frm, bg=PANEL)
+        hdr.pack(fill='x', padx=10, pady=(10, 4))
+        tk.Label(hdr, text="담당 학생 전체", font=FT, bg=PANEL, fg=TEXT).pack(side='left')
+        tk.Button(hdr, text="↺", font=FS, bg=PANEL, fg=INDIGO, relief='flat',
+                  cursor='hand2', command=self._bulk_refresh_students).pack(side='right')
+
+        tools = tk.Frame(frm, bg=PANEL)
+        tools.pack(fill='x', padx=10, pady=(0, 4))
+        tk.Button(tools, text="전체선택", font=FS, bg=PANEL, fg=INDIGO, relief='flat',
+                  cursor='hand2', command=lambda: self._bulk_select_all(True)).pack(side='left')
+        tk.Button(tools, text="전체해제", font=FS, bg=PANEL, fg=GRAY, relief='flat',
+                  cursor='hand2', command=lambda: self._bulk_select_all(False)).pack(side='left', padx=6)
+
+        sc_frm = tk.Frame(frm, bg=PANEL)
+        sc_frm.pack(fill='both', expand=True, padx=6, pady=4)
+        self.bulk_canvas, self.bulk_list = make_scroll_frame(sc_frm, bg=PANEL)
+
+        self.bulk_count_lbl = tk.Label(frm, text="0명 선택", font=FS, bg=PANEL, fg=SUBTEXT)
+        self.bulk_count_lbl.pack(anchor='w', padx=12, pady=(0, 8))
+
+    def _build_bulk_right(self, parent):
+        frm = tk.Frame(parent, bg=PANEL,
+                       highlightbackground=BORDER, highlightthickness=1)
+        frm.grid(row=0, column=1, sticky='nsew', padx=(4, 8), pady=8)
+        frm.rowconfigure(3, weight=1)
+        frm.columnconfigure(0, weight=1)
+
+        th = tk.Frame(frm, bg=PANEL)
+        th.grid(row=0, column=0, sticky='ew', padx=12, pady=(12, 4))
+        tk.Label(th, text="메시지 템플릿", font=FT, bg=PANEL, fg=TEXT).pack(side='left')
+        tk.Button(th, text="+ 추가", font=FS, bg=INDIGO, fg='white', relief='flat',
+                  cursor='hand2', padx=6, command=self._bulk_add_template).pack(side='right')
+        tk.Button(th, text="삭제", font=FS, bg=PANEL, fg="#EF4444", relief='flat',
+                  cursor='hand2', command=self._bulk_del_template).pack(side='right', padx=4)
+
+        ts = tk.Frame(frm, bg=PANEL)
+        ts.grid(row=1, column=0, sticky='ew', padx=12, pady=(0, 6))
+        self.bulk_tmpl_var = tk.StringVar()
+        self.bulk_tmpl_cb = ttk.Combobox(ts, textvariable=self.bulk_tmpl_var,
+                                         state='readonly', width=26, font=FB)
+        self.bulk_tmpl_cb.pack(side='left')
+        self.bulk_tmpl_cb.bind('<<ComboboxSelected>>', lambda e: self._bulk_on_tmpl_change())
+
+        tk.Label(frm, text="템플릿 편집", font=FS, bg=PANEL, fg=SUBTEXT
+                 ).grid(row=2, column=0, sticky='w', padx=12)
+        self.bulk_tmpl_text = tk.Text(frm, font=FB, bg=PANEL, fg=TEXT, relief='flat',
+                                      wrap='word', highlightbackground=BORDER,
+                                      highlightthickness=1, insertbackground=TEXT, height=8)
+        self.bulk_tmpl_text.grid(row=3, column=0, sticky='nsew', padx=12, pady=(2, 4))
+        self.bulk_tmpl_text.bind('<KeyRelease>', lambda e: self._bulk_on_tmpl_edit())
+
+        hint = tk.Frame(frm, bg=PANEL)
+        hint.grid(row=4, column=0, sticky='ew', padx=12, pady=(0, 4))
+        tk.Label(hint, text="변수:", font=FS, bg=PANEL, fg=SUBTEXT).pack(side='left')
+        for var, _desc in bulk_variables():
+            tk.Button(hint, text=var, font=FS, bg=INDIGO_L, fg=INDIGO, relief='flat',
+                      cursor='hand2', padx=3,
+                      command=lambda v=var: self._bulk_insert_var(v)).pack(side='left', padx=1)
+
+        pv = tk.Frame(frm, bg=INDIGO_L)
+        pv.grid(row=5, column=0, sticky='ew', padx=12, pady=(0, 8))
+        tk.Label(pv, text="미리보기 (첫 번째 선택 학생)", font=FS, bg=INDIGO_L, fg=INDIGO
+                 ).pack(anchor='w', padx=6, pady=(4, 0))
+        self.bulk_preview_lbl = tk.Label(pv, text="", font=FS, bg=INDIGO_L, fg=TEXT,
+                                         justify='left', anchor='w', wraplength=520)
+        self.bulk_preview_lbl.pack(fill='x', padx=6, pady=(0, 6))
+
+        img = tk.Frame(frm, bg=PANEL)
+        img.grid(row=6, column=0, sticky='ew', padx=12, pady=(0, 6))
+        tk.Button(img, text="📎 이미지 첨부", font=FS, bg=INDIGO_L, fg=INDIGO, relief='flat',
+                  cursor='hand2', padx=6, command=self._bulk_choose_image).pack(side='left')
+        self.bulk_attach_lbl = tk.Label(img, text="(없음)", font=FS, bg=PANEL, fg=SUBTEXT)
+        self.bulk_attach_lbl.pack(side='left', padx=8)
+        self.bulk_attach_clear_btn = tk.Button(img, text="✕", font=FS, bg=PANEL, fg="#EF4444",
+                                               relief='flat', cursor='hand2',
+                                               command=self._bulk_clear_image)
+        tk.Checkbutton(img, text="이미지 먼저", variable=self.bulk_image_first, font=FS,
+                       bg=PANEL, fg=SUBTEXT, selectcolor='white',
+                       activebackground=PANEL).pack(side='right')
+
+        sf = tk.Frame(frm, bg=PANEL)
+        sf.grid(row=7, column=0, sticky='ew', padx=12, pady=(0, 6))
+        self.bulk_send_btn = tk.Button(sf, text="🚀 카카오톡 창 활성화 후 전송",
+                                       font=("맑은 고딕", 10, "bold"), bg=ACCENT, fg="#0E1016",
+                                       relief='flat', cursor='hand2', pady=8,
+                                       command=self._bulk_send)
+        self.bulk_send_btn.pack(fill='x')
+        self.bulk_status = tk.Label(frm, text="", font=FS, bg=PANEL, fg=GRAY, anchor='w')
+        self.bulk_status.grid(row=8, column=0, sticky='ew', padx=12, pady=(0, 10))
+
+    # ── 담당 학생 전체 수집·렌더 ─────────────────────────────────────
+    def _my_students_all(self):
+        """담당 학생 전체 (부담임 반 제외, M+T 통합, nameKey 중복 제거).
+        → [{nameKey, name, classId}, ...] (이름 정렬은 all_students 순서 상속)."""
+        result, seen = [], set()
+        for group in ('M', 'T'):
+            for classId, _cd in self._my_classes(group):
+                if self._is_sub_teacher(classId):
+                    continue
+                for nk, v in self.all_students.items():
+                    if v.get('class') == classId and nk not in seen:
+                        seen.add(nk)
+                        result.append({'nameKey': nk,
+                                       'name': v.get('name', nk),
+                                       'classId': classId})
+        return result
+
+    def _bulk_refresh_students(self):
+        if not hasattr(self, 'bulk_list'):
+            return
+        for w in self.bulk_list.winfo_children():
+            w.destroy()
+        students = self._my_students_all()
+        valid = {s['nameKey'] for s in students}
+        self.bulk_sel = {k: v for k, v in self.bulk_sel.items() if k in valid}
+
+        if not students:
+            tk.Label(self.bulk_list,
+                     text="담당 학생이 없습니다.\n설정에서 강사 계정·담당 반을 확인하세요.",
+                     font=FB, bg=PANEL, fg=SUBTEXT, justify='left'
+                     ).pack(padx=14, pady=14, anchor='w')
+            self._bulk_update_count()
+            return
+
+        by_cls = {}
+        for s in students:
+            by_cls.setdefault(s['classId'], []).append(s)
+
+        for classId in sorted(by_cls):
+            ch = tk.Frame(self.bulk_list, bg=PANEL)
+            ch.pack(fill='x', pady=(6, 0))
+            tk.Label(ch, text=classId, font=FB, bg=PANEL, fg=INDIGO,
+                     anchor='w').pack(side='left', padx=8)
+            tk.Button(ch, text="반 선택", font=FS, bg=PANEL, fg=GRAY, relief='flat',
+                      cursor='hand2',
+                      command=lambda c=classId: self._bulk_select_class(c)
+                      ).pack(side='right', padx=4)
+            for s in by_cls[classId]:
+                nk = s['nameKey']
+                if nk not in self.bulk_sel:
+                    self.bulk_sel[nk] = tk.BooleanVar(value=False)
+                tk.Checkbutton(self.bulk_list, text=s['name'], variable=self.bulk_sel[nk],
+                               font=FB, bg=PANEL, fg=TEXT, anchor='w', selectcolor='white',
+                               activebackground=PANEL, command=self._bulk_update_count
+                               ).pack(fill='x', padx=(16, 4))
+        self._bulk_update_count()
+
+    def _bulk_select_class(self, classId):
+        for s in self._my_students_all():
+            if s['classId'] == classId and s['nameKey'] in self.bulk_sel:
+                self.bulk_sel[s['nameKey']].set(True)
+        self._bulk_update_count()
+
+    def _bulk_select_all(self, val):
+        for v in self.bulk_sel.values():
+            v.set(val)
+        self._bulk_update_count()
+
+    def _bulk_update_count(self):
+        n = sum(1 for v in self.bulk_sel.values() if v.get())
+        if hasattr(self, 'bulk_count_lbl'):
+            self.bulk_count_lbl.config(text=f"{n}명 선택")
+        self._bulk_update_preview()
+
+    def _bulk_selected_students(self):
+        """선택된 학생 [{nameKey, name, classId}] (담당 전체 순서 유지)."""
+        return [s for s in self._my_students_all()
+                if self.bulk_sel.get(s['nameKey']) and self.bulk_sel[s['nameKey']].get()]
+
+    # ── 템플릿 관리 ──────────────────────────────────────────────────
+    def _bulk_refresh_tmpl_cb(self):
+        names = [t.get('name', '') for t in self.templates]
+        self.bulk_tmpl_cb['values'] = names
+        if names:
+            if not (0 <= self.tmpl_idx < len(names)):
+                self.tmpl_idx = 0
+            self.bulk_tmpl_var.set(names[self.tmpl_idx])
+            self._bulk_load_tmpl(self.tmpl_idx)
+        else:
+            self.tmpl_idx = -1
+            self.bulk_tmpl_var.set('')
+            self.bulk_tmpl_text.delete('1.0', 'end')
+            self._bulk_update_preview()
+
+    def _bulk_on_tmpl_change(self):
+        sel = self.bulk_tmpl_var.get()
+        for i, t in enumerate(self.templates):
+            if t.get('name') == sel:
+                self.tmpl_idx = i
+                self._bulk_load_tmpl(i)
+                break
+
+    def _bulk_load_tmpl(self, idx):
+        self.bulk_tmpl_text.delete('1.0', 'end')
+        self.bulk_tmpl_text.insert('1.0', self.templates[idx].get('body', ''))
+        self._bulk_update_preview()
+
+    def _bulk_on_tmpl_edit(self):
+        if 0 <= self.tmpl_idx < len(self.templates):
+            self.templates[self.tmpl_idx]['body'] = self.bulk_tmpl_text.get('1.0', 'end-1c')
+            save_templates(self.templates)
+        self._bulk_update_preview()
+
+    def _bulk_add_template(self):
+        from tkinter import simpledialog
+        name = simpledialog.askstring("템플릿 추가", "템플릿 이름:", parent=self.root)
+        if not name:
+            return
+        self.templates.append({'name': name.strip(), 'body': ''})
+        self.tmpl_idx = len(self.templates) - 1
+        save_templates(self.templates)
+        self._bulk_refresh_tmpl_cb()
+
+    def _bulk_del_template(self):
+        if not self.templates or self.tmpl_idx < 0:
+            return
+        name = self.templates[self.tmpl_idx].get('name', '')
+        if not messagebox.askyesno("삭제 확인", f'"{name}" 템플릿을 삭제할까요?', parent=self.root):
+            return
+        self.templates.pop(self.tmpl_idx)
+        self.tmpl_idx = max(0, self.tmpl_idx - 1) if self.templates else -1
+        save_templates(self.templates)
+        self._bulk_refresh_tmpl_cb()
+
+    def _bulk_insert_var(self, var):
+        self.bulk_tmpl_text.insert('insert', var)
+        self._bulk_on_tmpl_edit()
+
+    def _bulk_update_preview(self):
+        if not hasattr(self, 'bulk_preview_lbl'):
+            return
+        sel = self._bulk_selected_students()
+        if not sel:
+            self.bulk_preview_lbl.config(text="(선택된 학생 없음)")
+            return
+        s = sel[0]
+        body = (self.bulk_tmpl_text.get('1.0', 'end-1c')
+                if self.bulk_tmpl_text.winfo_exists() else '')
+        try:
+            ctx = build_bulk_ctx(s['name'], s['classId'])
+            self.bulk_preview_lbl.config(text=render(body, ctx))
+        except Exception as e:
+            self.bulk_preview_lbl.config(text=f"[오류] {e}")
+
+    # ── 이미지 첨부 ──────────────────────────────────────────────────
+    def _bulk_choose_image(self):
+        path = filedialog.askopenfilename(
+            title="첨부할 이미지 선택",
+            filetypes=[("이미지", "*.png *.jpg *.jpeg *.gif *.bmp"), ("모든 파일", "*.*")],
+            parent=self.root)
+        if not path:
+            return
+        self.bulk_attach_image = path
+        self.bulk_attach_lbl.config(text=os.path.basename(path), fg=INDIGO)
+        self.bulk_attach_clear_btn.pack(side='left')
+
+    def _bulk_clear_image(self):
+        self.bulk_attach_image = ""
+        self.bulk_attach_lbl.config(text="(없음)", fg=SUBTEXT)
+        self.bulk_attach_clear_btn.pack_forget()
+
+    # ── 전송 ─────────────────────────────────────────────────────────
+    def _bulk_send(self):
+        if not AUTOMATION:
+            messagebox.showerror("오류",
+                "pyautogui / pyperclip이 설치되어 있지 않습니다.\n"
+                "pip install pyautogui pyperclip"); return
+        sel = self._bulk_selected_students()
+        if not sel:
+            messagebox.showinfo("알림", "전송 대상 학생을 선택하세요."); return
+
+        body      = self.bulk_tmpl_text.get('1.0', 'end-1c')
+        img_path  = self.bulk_attach_image
+        img_first = self.bulk_image_first.get()
+        if img_path and not os.path.exists(img_path):
+            messagebox.showwarning("이미지 없음",
+                f"첨부 이미지를 찾을 수 없습니다:\n{img_path}", parent=self.root); return
+        if not body.strip() and not img_path:
+            messagebox.showinfo("알림", "본문 또는 첨부 이미지가 필요합니다."); return
+
+        prefix = self.config.get('room_prefix', '오직 ')
+        msgs = []
+        for s in sel:
+            ctx = build_bulk_ctx(s['name'], s['classId'])
+            m = {'name': s['name'], 'room': f"{prefix}{s['name']}", 'msg': render(body, ctx)}
+            if img_path:
+                m['image']       = img_path
+                m['image_first'] = img_first
+            msgs.append(m)
+
+        img_note = ""
+        if img_path:
+            order = "이미지→본문" if img_first else "본문→이미지"
+            img_note = f"\n📎 이미지: {os.path.basename(img_path)} ({order})"
+        if not messagebox.askyesno("전송 확인",
+                f"전송 대상: {len(msgs)}명{img_note}\n" +
+                ", ".join(m['room'] for m in msgs) +
+                "\n\n카카오톡 창 활성화 후 [예]를 누르세요. (3초 후 시작)"):
+            return
+
+        self._bulk_send_cancel = threading.Event()
+        self._bulk_set_cancel(True)
+        threading.Thread(target=self._do_bulk_send, args=(msgs,), daemon=True).start()
+
+    def _bulk_set_cancel(self, on):
+        if on:
+            self.bulk_send_btn.config(text="⏹ 전송 취소", bg="#FEE2E2", fg="#DC2626",
+                                      command=self._bulk_cancel)
+        else:
+            self.bulk_send_btn.config(text="🚀 카카오톡 창 활성화 후 전송",
+                                      bg=ACCENT, fg="#0E1016", command=self._bulk_send)
+
+    def _bulk_cancel(self):
+        if self._bulk_send_cancel:
+            self._bulk_send_cancel.set()
+        self.bulk_status.config(text="⏹ 취소 중... (현재 학생 완료 후 중단)")
+
+    def _do_bulk_send(self, msgs):
+        cancel = self._bulk_send_cancel
+        wait   = self.config.get('wait_time', 0.5)
+        total  = len(msgs)
+        for _ in range(30):
+            if cancel.is_set(): break
+            time.sleep(0.1)
+        sent = 0
+        for i, m in enumerate(msgs):
+            if cancel.is_set(): break
+            self.root.after(0, lambda t=f"전송 중... ({i+1}/{total})  {m['name']}":
+                            self.bulk_status.config(text=t))
+            warm = 0.6 if i == 0 else 0.0
+            try:
+                self._kakao_send_one(m, wait, warm)
+            except Exception as e:
+                print(f"오류 [{m['name']}]: {e}")
+            sent += 1
+            time.sleep(0.8)
+        cancelled = cancel.is_set()
+        def _done():
+            self._bulk_set_cancel(False)
+            if cancelled:
+                self.bulk_status.config(text=f"⏹ {sent}/{total}명 전송 후 취소")
+                messagebox.showinfo("전송 취소", f"{sent}명 전송 후 취소했습니다.")
+            else:
+                self.bulk_status.config(text=f"✅ 전송 완료 — {sent}명")
+                messagebox.showinfo("완료", f"{sent}명 전송 완료!")
+        self.root.after(0, _done)
 
     def _refresh_statusbar(self):
         group = self.activeGroup
@@ -1901,6 +2300,44 @@ class App:
             self._send_cancel.set()
         self.send_status.config(text="⏹  취소 중... (현재 학생 완료 후 중단)")
 
+    def _kakao_send_one(self, m, wait, warm=0.0):
+        """단일 톡방 전송: 검색→이동→본문/이미지 송신.
+        데일리 리포트·메시지 발송 탭 공용 키 시퀀스.
+        m: {room, msg, image(선택), image_first(선택)}.
+        이미지는 붙여넣기 미리보기 팝업 고려해 img_wait=max(wait,1.0) 사용."""
+        img_wait = max(wait, 1.0)
+
+        # 채팅방 검색·이동
+        pyperclip.copy(m['room'])
+        time.sleep(warm)
+        pyautogui.hotkey(_MOD, 'f'); time.sleep(0.2 + warm)
+        pyautogui.press('esc');      time.sleep(0.2)
+        pyautogui.hotkey(_MOD, 'f'); time.sleep(wait)
+        pyautogui.hotkey(_MOD, 'v'); time.sleep(wait)
+        pyautogui.press('enter');    time.sleep(wait)
+
+        def _send_text():
+            if not m.get('msg'):
+                return
+            pyperclip.copy(m['msg'])
+            pyautogui.hotkey(_MOD, 'v'); time.sleep(0.2)
+            pyautogui.press('enter');    time.sleep(0.3)
+
+        def _send_image():
+            img = m.get('image')
+            if not img:
+                return
+            if not copy_image_to_clipboard(img):
+                return
+            pyautogui.hotkey(_MOD, 'v'); time.sleep(img_wait)
+            pyautogui.press('enter');    time.sleep(img_wait)
+
+        if m.get('image_first'):
+            _send_image(); _send_text()
+        else:
+            _send_text(); _send_image()
+        pyautogui.press('esc')
+
     def _do_send(self, msgs):
         cancel = self._send_cancel
         wait   = self.config.get('wait_time', 0.5)
@@ -1917,17 +2354,7 @@ class App:
             # 첫 학생 워밍업 — 카톡 창 포커스/검색 안정화 (첫 전송 오작동 방지)
             warm = 0.6 if i == 0 else 0.0
             try:
-                pyperclip.copy(m['room'])
-                time.sleep(warm)
-                pyautogui.hotkey(_MOD,'f'); time.sleep(0.2 + warm)
-                pyautogui.press('esc');       time.sleep(0.2)
-                pyautogui.hotkey(_MOD,'f'); time.sleep(wait)
-                pyautogui.hotkey(_MOD,'v'); time.sleep(wait)
-                pyautogui.press('enter');     time.sleep(wait)
-                pyperclip.copy(m['msg'])
-                pyautogui.hotkey(_MOD,'v'); time.sleep(0.2)
-                pyautogui.press('enter');     time.sleep(0.3)
-                pyautogui.press('esc')
+                self._kakao_send_one(m, wait, warm)
             except Exception as e:
                 print(f"오류 [{m['name']}]: {e}")
             sent += 1
