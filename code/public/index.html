@@ -10,32 +10,41 @@
     --indigo:#4F46E5;--indigo-ink:#4338CA;--indigo-l:#EEF0FF;--indigo-line:#DDE1FF;--green:#16A34A;--green-l:#ECFDF3}
   *{box-sizing:border-box;margin:0;padding:0;-webkit-font-smoothing:antialiased}
   body{font-family:'Pretendard','Malgun Gothic','맑은 고딕',-apple-system,sans-serif;background:var(--bg);color:var(--ink);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;letter-spacing:-.01em}
-  .box{width:100%;max-width:480px}
+  .box{width:100%;max-width:520px}
   .brand{display:flex;align-items:center;gap:11px;margin-bottom:6px}
   .mark{width:38px;height:38px;border-radius:10px;background:linear-gradient(135deg,#6366F1,#4338CA);display:flex;align-items:center;justify-content:center;font-size:18px;box-shadow:0 2px 10px rgba(67,56,202,.4)}
   h1{font-size:17px;font-weight:800}h1 small{display:block;font-size:11.5px;font-weight:500;color:var(--muted);margin-top:1px}
-  .lead{font-size:12px;color:var(--sub);margin:10px 2px 18px}
-  .sec{margin-bottom:18px}
-  .sec-h{display:flex;align-items:baseline;gap:8px;padding:0 4px 8px}
-  .sec-t{font-size:12.5px;font-weight:800;letter-spacing:-.01em}
-  .sec-s{font-size:10.5px;color:var(--muted);font-weight:500}
+  .lead{font-size:12.5px;color:var(--sub);margin:10px 2px 20px;line-height:1.5}
+  .sec{margin-bottom:24px}
+  .sec-h{display:flex;align-items:baseline;gap:8px;padding:0 4px 10px}
+  .sec-t{font-size:13.5px;font-weight:800;letter-spacing:-.01em}
+  .sec-s{font-size:11px;color:var(--muted);font-weight:500}
   .card{background:var(--panel);border:1px solid var(--line);border-radius:16px;box-shadow:0 1px 3px rgba(16,24,40,.07);overflow:hidden}
   .card.dev{border-style:dashed;border-color:var(--indigo-line);background:#FCFCFE;box-shadow:none}
-  .row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 18px;border-bottom:1px solid var(--soft);transition:background .12s}
+  .row{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:20px 20px;border-bottom:1px solid var(--soft);transition:background .12s}
   .row:last-child{border-bottom:none}.row:hover{background:#F7F7F9}
   .left{flex:1;min-width:0;text-decoration:none;color:var(--ink);display:block}
-  .right{display:flex;flex-direction:column;align-items:flex-end;gap:7px;flex-shrink:0}
-  .dl{font-size:11px;font-weight:800;color:var(--indigo-ink);background:var(--indigo-l);border:1px solid var(--indigo-line);border-radius:8px;padding:5px 11px;text-decoration:none;white-space:nowrap;transition:background .12s}
+  .right{display:flex;flex-direction:column;align-items:flex-end;gap:9px;flex-shrink:0}
+  .dl{font-size:11.5px;font-weight:800;color:var(--indigo-ink);background:var(--indigo-l);border:1px solid var(--indigo-line);border-radius:8px;padding:7px 12px;text-decoration:none;white-space:nowrap;transition:background .12s}
   .dl:hover{background:#E4E7FF}
   .vh{display:flex;align-items:center;gap:8px}
-  .v{font-size:15px;font-weight:800}
+  .v{font-size:16px;font-weight:800}
   .tag{font-size:10px;font-weight:800;border-radius:7px;padding:2px 8px}
   .tag.dev{background:var(--indigo-l);color:var(--indigo-ink);border:1px solid var(--indigo-line)}
   .tag.beta{background:var(--green-l);color:var(--green);border:1px solid #C5F0D4}
   .tag.old{background:#F1F1F4;color:var(--muted);border:1px solid var(--line)}
-  .t{font-size:12.5px;font-weight:600;color:var(--ink);margin-top:5px}
-  .d{font-size:11px;color:var(--muted);margin-top:2px;line-height:1.4}
+  .t{font-size:13px;font-weight:600;color:var(--ink);margin-top:7px}
+  .d{font-size:11.5px;color:var(--muted);margin-top:4px;line-height:1.55}
   .go{font-size:12px;font-weight:700;color:var(--indigo-ink);white-space:nowrap;text-decoration:none}
+  /* 이전 버전 — 접기(누적 대비) */
+  details.old-sec{margin-bottom:24px}
+  .old-sum{cursor:pointer;list-style:none;user-select:none;display:flex;align-items:baseline;justify-content:space-between;gap:8px;padding:13px 16px;border:1px solid var(--line);border-radius:12px;background:var(--panel)}
+  .old-sum::-webkit-details-marker{display:none}
+  .old-sum:hover{background:#F7F7F9}
+  details[open] .old-sum{border-bottom-left-radius:0;border-bottom-right-radius:0}
+  .old-card{border-top:none;border-radius:0 0 12px 12px;background:#FCFCFD}
+  .old-card .row{padding:16px 18px}
+  .old-card .v{font-size:14px}
   .note{font-size:11px;color:var(--muted);margin-top:6px;line-height:1.6;text-align:center}
 </style>
 </head>
@@ -44,8 +53,49 @@
     <div class="brand"><div class="mark">📝</div><h1>DailyReportWizard<small>버전 선택 · 테스트 빌드</small></h1></div>
     <p class="lead">사용할 버전을 선택하세요. 각 버전은 독립 동결 빌드이며, 설정·데이터(로컬·Firebase)는 버전 간 공유됩니다.</p>
     <div class="sec">
+      <div class="sec-h"><span class="sec-t">🧪 최신 개발본</span><span class="sec-s">새 기능 검증용 · 불안정할 수 있음</span></div>
+      <div class="card dev">
+      <div class="row">
+        <a class="left" href="v2.2.1/">
+          <div class="vh"><span class="v">v2.2.1</span><span class="tag dev">개발중</span></div>
+          <div class="t">최신 개발본</div>
+          <div class="d">특이사항 당일 소비(전송 시 소거) · 진도/과제 메시지 제외 토글 · 삭제 과목 정리 · 설치형 PWA · 전송창·일괄생성 UX 개선</div>
+        </a>
+        <div class="right">
+          <a class="dl" href="https://github.com/idocho/dailyReportWizard2/releases/download/v2.2.1/DailyReportWizard_v2.2.1.exe" title="v2.2.1 PC 설치파일(.exe) 직접 다운로드">⬇ 설치파일 .exe</a>
+          <a class="go" href="v2.2.1/">웹 열기 →</a>
+        </div>
+      </div>
+      </div>
+    </div>    <div class="sec">
       <div class="sec-h"><span class="sec-t">🟢 안정 버전</span><span class="sec-s">실사용 권장</span></div>
       <div class="card">
+      <div class="row">
+        <a class="left" href="v2.0.5/">
+          <div class="vh"><span class="v">v2.0.5</span><span class="tag beta">베타</span></div>
+          <div class="t">베타 릴리즈 · 현재 안정판</div>
+          <div class="d">카카오톡 전송 대상 개별 선택 · 순차 전송 취소</div>
+        </a>
+        <div class="right">
+          <a class="dl" href="https://github.com/idocho/dailyReportWizard2/releases/download/v2.0.5/DailyReportWizard_v2.0.5.exe" title="v2.0.5 PC 설치파일(.exe) 직접 다운로드">⬇ 설치파일 .exe</a>
+          <a class="go" href="v2.0.5/">웹 열기 →</a>
+        </div>
+      </div>
+      </div>
+    </div>    <details class="sec old-sec">
+      <summary class="sec-h old-sum"><span class="sec-t">🗂 이전 버전</span><span class="sec-s">4개 · 펼치기</span></summary>
+      <div class="card old-card">
+      <div class="row">
+        <a class="left" href="v2.2.0/">
+          <div class="vh"><span class="v">v2.2.0</span><span class="tag old">이전</span></div>
+          <div class="t">이전 개발본</div>
+          <div class="d">메시지 발송 탭 신설 — 담당 학생 전체에게 템플릿·이미지 일괄 발송 · 설정 버튼 전역 이동</div>
+        </a>
+        <div class="right">
+          <a class="dl" href="https://github.com/idocho/dailyReportWizard2/releases/download/v2.2.0/DailyReportWizard_v2.2.0.exe" title="v2.2.0 PC 설치파일(.exe) 직접 다운로드">⬇ 설치파일 .exe</a>
+          <a class="go" href="v2.2.0/">웹 열기 →</a>
+        </div>
+      </div>
       <div class="row">
         <a class="left" href="v2.1.2/">
           <div class="vh"><span class="v">v2.1.2</span><span class="tag old">이전</span></div>
@@ -79,34 +129,8 @@
           <a class="go" href="v2.1.0/">웹 열기 →</a>
         </div>
       </div>
-      <div class="row">
-        <a class="left" href="v2.0.5/">
-          <div class="vh"><span class="v">v2.0.5</span><span class="tag beta">베타</span></div>
-          <div class="t">베타 릴리즈 · 현재 안정판</div>
-          <div class="d">카카오톡 전송 대상 개별 선택 · 순차 전송 취소</div>
-        </a>
-        <div class="right">
-          <a class="dl" href="https://github.com/idocho/dailyReportWizard2/releases/download/v2.0.5/DailyReportWizard_v2.0.5.exe" title="v2.0.5 PC 설치파일(.exe) 직접 다운로드">⬇ 설치파일 .exe</a>
-          <a class="go" href="v2.0.5/">웹 열기 →</a>
-        </div>
       </div>
-      </div>
-    </div>    <div class="sec">
-      <div class="sec-h"><span class="sec-t">🧪 개발 버전</span><span class="sec-s">새 기능 검증용 · 불안정할 수 있음</span></div>
-      <div class="card dev">
-      <div class="row">
-        <a class="left" href="v2.2.0/">
-          <div class="vh"><span class="v">v2.2.0</span><span class="tag dev">개발중</span></div>
-          <div class="t">최신 개발본</div>
-          <div class="d">메시지 발송 탭 신설 — 담당 학생 전체에게 템플릿·이미지 일괄 발송 · 설정 버튼 전역 이동</div>
-        </a>
-        <div class="right">
-          <a class="dl" href="https://github.com/idocho/dailyReportWizard2/releases/download/v2.2.0/DailyReportWizard_v2.2.0.exe" title="v2.2.0 PC 설치파일(.exe) 직접 다운로드">⬇ 설치파일 .exe</a>
-          <a class="go" href="v2.2.0/">웹 열기 →</a>
-        </div>
-      </div>
-      </div>
-    </div>
+    </details>
     <div class="note">평소 사용은 <b>안정 버전</b>을 권장합니다.<br>개발 버전의 온보딩 테스트는 시크릿창 또는 설정의 “위저드 다시 실행”을 이용하세요.</div>
   </div>
 </body>

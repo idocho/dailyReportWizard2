@@ -38,12 +38,26 @@ function Row($x) {
 "@
 }
 
-$stable = @($meta.versions | Where-Object { $_.tagClass -ne 'dev' })
-$dev    = @($meta.versions | Where-Object { $_.tagClass -eq 'dev' })
+$dev  = @($meta.versions | Where-Object { $_.tagClass -eq 'dev'  })
+$beta = @($meta.versions | Where-Object { $_.tagClass -eq 'beta' })
+$old  = @($meta.versions | Where-Object { $_.tagClass -eq 'old'  })
 
 $sections = ''
-if ($stable.Count) {
-  $rows = ($stable | ForEach-Object { Row $_ }) -join "`n"
+# ① 최신 개발본 — 최상단
+if ($dev.Count) {
+  $rows = ($dev | ForEach-Object { Row $_ }) -join "`n"
+  $sections += @"
+    <div class="sec">
+      <div class="sec-h"><span class="sec-t">🧪 최신 개발본</span><span class="sec-s">새 기능 검증용 · 불안정할 수 있음</span></div>
+      <div class="card dev">
+$rows
+      </div>
+    </div>
+"@
+}
+# ② 안정 버전
+if ($beta.Count) {
+  $rows = ($beta | ForEach-Object { Row $_ }) -join "`n"
   $sections += @"
     <div class="sec">
       <div class="sec-h"><span class="sec-t">🟢 안정 버전</span><span class="sec-s">실사용 권장</span></div>
@@ -53,15 +67,16 @@ $rows
     </div>
 "@
 }
-if ($dev.Count) {
-  $rows = ($dev | ForEach-Object { Row $_ }) -join "`n"
+# ③ 이전 버전 — 접기(누적 대비)
+if ($old.Count) {
+  $rows = ($old | ForEach-Object { Row $_ }) -join "`n"
   $sections += @"
-    <div class="sec">
-      <div class="sec-h"><span class="sec-t">🧪 개발 버전</span><span class="sec-s">새 기능 검증용 · 불안정할 수 있음</span></div>
-      <div class="card dev">
+    <details class="sec old-sec">
+      <summary class="sec-h old-sum"><span class="sec-t">🗂 이전 버전</span><span class="sec-s">$($old.Count)개 · 펼치기</span></summary>
+      <div class="card old-card">
 $rows
       </div>
-    </div>
+    </details>
 "@
 }
 
@@ -78,32 +93,41 @@ $html = @"
     --indigo:#4F46E5;--indigo-ink:#4338CA;--indigo-l:#EEF0FF;--indigo-line:#DDE1FF;--green:#16A34A;--green-l:#ECFDF3}
   *{box-sizing:border-box;margin:0;padding:0;-webkit-font-smoothing:antialiased}
   body{font-family:'Pretendard','Malgun Gothic','맑은 고딕',-apple-system,sans-serif;background:var(--bg);color:var(--ink);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;letter-spacing:-.01em}
-  .box{width:100%;max-width:480px}
+  .box{width:100%;max-width:520px}
   .brand{display:flex;align-items:center;gap:11px;margin-bottom:6px}
   .mark{width:38px;height:38px;border-radius:10px;background:linear-gradient(135deg,#6366F1,#4338CA);display:flex;align-items:center;justify-content:center;font-size:18px;box-shadow:0 2px 10px rgba(67,56,202,.4)}
   h1{font-size:17px;font-weight:800}h1 small{display:block;font-size:11.5px;font-weight:500;color:var(--muted);margin-top:1px}
-  .lead{font-size:12px;color:var(--sub);margin:10px 2px 18px}
-  .sec{margin-bottom:18px}
-  .sec-h{display:flex;align-items:baseline;gap:8px;padding:0 4px 8px}
-  .sec-t{font-size:12.5px;font-weight:800;letter-spacing:-.01em}
-  .sec-s{font-size:10.5px;color:var(--muted);font-weight:500}
+  .lead{font-size:12.5px;color:var(--sub);margin:10px 2px 20px;line-height:1.5}
+  .sec{margin-bottom:24px}
+  .sec-h{display:flex;align-items:baseline;gap:8px;padding:0 4px 10px}
+  .sec-t{font-size:13.5px;font-weight:800;letter-spacing:-.01em}
+  .sec-s{font-size:11px;color:var(--muted);font-weight:500}
   .card{background:var(--panel);border:1px solid var(--line);border-radius:16px;box-shadow:0 1px 3px rgba(16,24,40,.07);overflow:hidden}
   .card.dev{border-style:dashed;border-color:var(--indigo-line);background:#FCFCFE;box-shadow:none}
-  .row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 18px;border-bottom:1px solid var(--soft);transition:background .12s}
+  .row{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:20px 20px;border-bottom:1px solid var(--soft);transition:background .12s}
   .row:last-child{border-bottom:none}.row:hover{background:#F7F7F9}
   .left{flex:1;min-width:0;text-decoration:none;color:var(--ink);display:block}
-  .right{display:flex;flex-direction:column;align-items:flex-end;gap:7px;flex-shrink:0}
-  .dl{font-size:11px;font-weight:800;color:var(--indigo-ink);background:var(--indigo-l);border:1px solid var(--indigo-line);border-radius:8px;padding:5px 11px;text-decoration:none;white-space:nowrap;transition:background .12s}
+  .right{display:flex;flex-direction:column;align-items:flex-end;gap:9px;flex-shrink:0}
+  .dl{font-size:11.5px;font-weight:800;color:var(--indigo-ink);background:var(--indigo-l);border:1px solid var(--indigo-line);border-radius:8px;padding:7px 12px;text-decoration:none;white-space:nowrap;transition:background .12s}
   .dl:hover{background:#E4E7FF}
   .vh{display:flex;align-items:center;gap:8px}
-  .v{font-size:15px;font-weight:800}
+  .v{font-size:16px;font-weight:800}
   .tag{font-size:10px;font-weight:800;border-radius:7px;padding:2px 8px}
   .tag.dev{background:var(--indigo-l);color:var(--indigo-ink);border:1px solid var(--indigo-line)}
   .tag.beta{background:var(--green-l);color:var(--green);border:1px solid #C5F0D4}
   .tag.old{background:#F1F1F4;color:var(--muted);border:1px solid var(--line)}
-  .t{font-size:12.5px;font-weight:600;color:var(--ink);margin-top:5px}
-  .d{font-size:11px;color:var(--muted);margin-top:2px;line-height:1.4}
+  .t{font-size:13px;font-weight:600;color:var(--ink);margin-top:7px}
+  .d{font-size:11.5px;color:var(--muted);margin-top:4px;line-height:1.55}
   .go{font-size:12px;font-weight:700;color:var(--indigo-ink);white-space:nowrap;text-decoration:none}
+  /* 이전 버전 — 접기(누적 대비) */
+  details.old-sec{margin-bottom:24px}
+  .old-sum{cursor:pointer;list-style:none;user-select:none;display:flex;align-items:baseline;justify-content:space-between;gap:8px;padding:13px 16px;border:1px solid var(--line);border-radius:12px;background:var(--panel)}
+  .old-sum::-webkit-details-marker{display:none}
+  .old-sum:hover{background:#F7F7F9}
+  details[open] .old-sum{border-bottom-left-radius:0;border-bottom-right-radius:0}
+  .old-card{border-top:none;border-radius:0 0 12px 12px;background:#FCFCFD}
+  .old-card .row{padding:16px 18px}
+  .old-card .v{font-size:14px}
   .note{font-size:11px;color:var(--muted);margin-top:6px;line-height:1.6;text-align:center}
 </style>
 </head>
@@ -118,4 +142,4 @@ $sections
 </html>
 "@
 Set-Content -Path (Join-Path $pub 'index.html') -Value $html -Encoding UTF8
-Write-Host "포털 생성: 안정 $($stable.Count) · 개발 $($dev.Count)" -ForegroundColor Green
+Write-Host "포털 생성: 개발 $($dev.Count) · 안정 $($beta.Count) · 이전 $($old.Count)" -ForegroundColor Green
