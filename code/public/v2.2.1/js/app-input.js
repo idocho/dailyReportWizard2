@@ -45,7 +45,7 @@ function renderInput(mc){
       const bg=sel?'var(--indigo)':'var(--bg)';
       const fg=sel?'#fff':'var(--sub)';
       const curriculum=getCurriculumForSubject(x.classId,x.subject)||'';
-      const gsLabel=curriculum?(GRADE_SEM_LIST.find(g=>g.val===curriculum)?.label||curriculum):'';
+      const gsLabel=gsPrefix(curriculum, x.subject);
       return '<button onclick="selA('+i+')" style="padding:5px 12px;border-radius:16px;border:1px solid var(--border);background:'+bg+';color:'+fg+';font-size:11px;font-weight:700;white-space:nowrap;cursor:pointer;font-family:inherit">'+esc(x.classId)+(gsLabel?' <span style="opacity:.7;font-size:9px">'+esc(gsLabel)+'</span> ':' ')+esc(x.subject)+'</button>';
     }).join('');
     mTabs='<div class="m">'+groupTabHtml+'<div style="display:flex;gap:6px;padding:10px 12px;overflow-x:auto;background:var(--panel);border-bottom:1px solid var(--border)">'+tabs+'</div></div>';
@@ -53,7 +53,7 @@ function renderInput(mc){
 
   // 진도 피커 초기값 파싱 — curriculum은 classes/{classId}/courses/{subject}/curriculum
   const curriculum=getCurriculumForSubject(classId,subject)||'';
-  const gsLabel=curriculum?(GRADE_SEM_LIST.find(g=>g.val===curriculum)?.label||curriculum):'';
+  const gsLabel=gsPrefix(curriculum, subject);
   const curCurr=getCurriculumByGradeSem(curriculum);
   const pgVal=pd.progress||'';
   // pgVal 형식: "대단원 › 소단원" or "대단원" or 자유텍스트

@@ -204,6 +204,19 @@ function getCurriculumForSubject(classId, subject){
 }
 
 /**
+ * 과정명 표시 prefix — subject 키가 이미 과정명으로 시작하면 '' 반환(중복 방지).
+ * 신규 교재 키는 "{curriculum} {textbook}" 복합이라 gsLabel 을 또 붙이면 과정명이 두 번 나옴.
+ * (PC grade_label 의 "이미 과정명으로 시작하면 prepend 안 함" 규칙을 웹에 대응)
+ */
+function gsPrefix(curriculum, subject){
+  if(!curriculum) return '';
+  const label = (GRADE_SEM_LIST.find(g=>g.val===curriculum)?.label) || curriculum;
+  const s = String(subject||'');
+  if(s.startsWith(curriculum + ' ') || s.startsWith(label + ' ')) return '';
+  return label;
+}
+
+/**
  * curriculum 키(점 표기) → curriculumKey(언더스코어)
  */
 function curriculumToKey(curriculum){
