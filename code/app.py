@@ -2268,17 +2268,20 @@ class App:
         반환: 선택된 ready 항목 리스트 / 취소 시 None"""
         win = tk.Toplevel(self.root)
         win.title("카카오톡 전송 대상 선택")
-        win.geometry("390x540")
+        win.geometry("400x600")
+        win.minsize(380, 460)
+        win.resizable(True, True)
         win.configure(bg=BG)
         win.grab_set()
         result = {'sel': None}
+        vars_ = []
 
+        # ── 상단 안내 + 전체 선택/해제 ──
         tk.Label(win, text=f"전송 대상 {len(ready)}명 — 제외할 학생은 체크 해제하세요",
                  font=FT, bg=BG, fg=TEXT, wraplength=350, justify='left'
-                 ).pack(pady=(14, 6), padx=16, anchor='w')
+                 ).pack(side='top', pady=(14, 6), padx=16, anchor='w')
 
-        top = tk.Frame(win, bg=BG); top.pack(fill='x', padx=16)
-        vars_ = []
+        top = tk.Frame(win, bg=BG); top.pack(side='top', fill='x', padx=16)
         def _set_all(val):
             for v, _ in vars_: v.set(val)
         tk.Button(top, text="전체 선택", font=FS, bg=PANEL, fg=INDIGO, relief='flat',
@@ -2286,7 +2289,30 @@ class App:
         tk.Button(top, text="전체 해제", font=FS, bg=PANEL, fg=GRAY, relief='flat',
                   cursor='hand2', command=lambda: _set_all(False)).pack(side='left', padx=6)
 
-        body = tk.Frame(win, bg=BG); body.pack(fill='both', expand=True, padx=16, pady=8)
+        # ── 하단 고정 (버튼이 항상 보이도록 side='bottom' 먼저 배치) ──
+        foot = tk.Frame(win, bg=BG); foot.pack(side='bottom', fill='x', padx=16, pady=(6, 14))
+        def _ok():
+            result['sel'] = [r for v, r in vars_ if v.get()]
+            win.destroy()
+        def _cancel():
+            result['sel'] = None
+            win.destroy()
+        tk.Button(foot, text="전송 시작", font=("맑은 고딕", 10, "bold"),
+                  bg=ACCENT, fg="#0E1016", relief='flat', cursor='hand2',
+                  padx=14, pady=7, command=_ok).pack(side='right')
+        tk.Button(foot, text="취소", font=FS, bg=PANEL, fg=SUBTEXT, relief='flat',
+                  cursor='hand2', padx=12, pady=7, command=_cancel).pack(side='right', padx=6)
+
+        tk.Label(win, text="카카오톡 창 활성화 후 [전송 시작]을 누르세요. (3초 후 시작)",
+                 font=FS, bg=BG, fg=SUBTEXT, wraplength=350, justify='left'
+                 ).pack(side='bottom', padx=16, pady=(4, 8), anchor='w')
+        if skipped:
+            tk.Label(win, text=f"미입력 제외 {len(skipped)}명: " + ", ".join(skipped),
+                     font=FS, bg=BG, fg=GRAY, wraplength=350, justify='left'
+                     ).pack(side='bottom', padx=16, pady=(0, 4), anchor='w')
+
+        # ── 중앙 스크롤 학생 리스트 (남은 공간 채움) ──
+        body = tk.Frame(win, bg=BG); body.pack(side='top', fill='both', expand=True, padx=16, pady=8)
         canvas = tk.Canvas(body, bg=PANEL, highlightthickness=0)
         sb = ttk.Scrollbar(body, orient='vertical', command=canvas.yview)
         lst = tk.Frame(canvas, bg=PANEL)
@@ -2303,28 +2329,6 @@ class App:
                            activebackground=PANEL, padx=6, pady=2
                            ).pack(fill='x')
             vars_.append((v, r))
-
-        if skipped:
-            tk.Label(win, text=f"미입력 제외 {len(skipped)}명: " + ", ".join(skipped),
-                     font=FS, bg=BG, fg=GRAY, wraplength=350, justify='left'
-                     ).pack(padx=16, pady=(0, 4), anchor='w')
-
-        tk.Label(win, text="카카오톡 창 활성화 후 [전송 시작]을 누르세요. (3초 후 시작)",
-                 font=FS, bg=BG, fg=SUBTEXT, wraplength=350, justify='left'
-                 ).pack(padx=16, pady=(4, 8), anchor='w')
-
-        foot = tk.Frame(win, bg=BG); foot.pack(fill='x', padx=16, pady=(0, 14))
-        def _ok():
-            result['sel'] = [r for v, r in vars_ if v.get()]
-            win.destroy()
-        def _cancel():
-            result['sel'] = None
-            win.destroy()
-        tk.Button(foot, text="전송 시작", font=("맑은 고딕", 10, "bold"),
-                  bg=ACCENT, fg="#0E1016", relief='flat', cursor='hand2',
-                  padx=14, pady=7, command=_ok).pack(side='right')
-        tk.Button(foot, text="취소", font=FS, bg=PANEL, fg=SUBTEXT, relief='flat',
-                  cursor='hand2', padx=12, pady=7, command=_cancel).pack(side='right', padx=6)
 
         win.wait_window()
         return result['sel']
