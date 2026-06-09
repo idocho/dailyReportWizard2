@@ -2423,13 +2423,15 @@ class App:
         self.root.after(0, _on_done)
 
     def _push_history(self, items):
-        """최종 메시지에 확정(merge)된 특이사항을 history/{nameKey}/{YYYY-MM-DD} 에 누적.
+        """전송 확정 시점(카톡 루프 이전)에 ① 최종 note 를 history 에 누적, ② 원본 입력 note 소거.
 
         · 호출 시점 = 전송 **확정 직후·카톡 루프 이전** (전송 성패와 무관, 메시지 확정 기준)
-          → 카톡 전송 중 abort/크래시가 나도 이력은 이미 기록됨.
-        · 단일 원자적 multi-path PATCH (history 한 노드에 {nameKey/날짜:..} 일괄) — 1회 HTTP, 부분쓰기 없음.
-        · 학생 grain(과목 무관), 날짜키 = today_key()(YYYY-MM-DD) — obs/scores 와 조인.
-        · note 비어있으면 생략. 베스트에포트(실패해도 전송은 진행).
+          → 카톡 전송 중 abort/크래시가 나도 이력 보존 + 원본 draft 정리됨.
+        · ① history/{nameKey}/{YYYY-MM-DD} = {note, instructor} — 메시지에 들어간 최종 note (학생 grain, todayKey).
+        · ② input/{nameKey}/__note__ = null — 전송된 학생의 원본 입력 특이사항 소거(draft consume).
+          → 특이사항이 obs(날짜별)처럼 "당일 소비"로 동작, 다음 가져오기 fresh(옛 메모 잔류 방지).
+          최종본은 ①history 에 보존됨.
+        · 각각 단일 원자적 multi-path PATCH (1회 HTTP). 베스트에포트(실패해도 전송 진행).
         """
         url  = self.config.get('firebase_url', '')
         path = self.config.get('firebase_path', '')
@@ -2437,18 +2439,26 @@ class App:
             return
         day   = today_key()
         instr = self.config.get('instructor_id', '')
-        updates = {}
+        hist_updates = {}   # history/  : {nameKey}/{date} → {note, instructor}
+        note_clears  = {}   # input/    : {nameKey}/__note__ → null (소거)
         for it in items:
             nk   = it.get('nameKey')
+            if not nk:
+                continue
             note = (it.get('note') or '').strip()
-            if nk and note:
-                updates[f"{nk}/{day}"] = {"note": note, "instructor": instr}
-        if not updates:
-            return
-        try:
-            firebase_patch(self.config, "history", updates)
-        except Exception as e:
-            print(f"history push 실패: {e}")
+            if note:
+                hist_updates[f"{nk}/{day}"] = {"note": note, "instructor": instr}
+            note_clears[f"{nk}/__note__"] = None
+        if hist_updates:
+            try:
+                firebase_patch(self.config, "history", hist_updates)
+            except Exception as e:
+                print(f"history push 실패: {e}")
+        if note_clears:
+            try:
+                firebase_patch(self.config, "input", note_clears)
+            except Exception as e:
+                print(f"input note 소거 실패: {e}")
 
     def _reset_after_send(self):
         """전송 완료 후 로컬 전면 초기화 (진도/과제 포함).

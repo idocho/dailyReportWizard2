@@ -1,7 +1,7 @@
 # DailyReportWizard — 요구사항 명세서
 
 **Crafted by IDO(idocho@kakao.com) · Powered by Claude AI**  
-**문서 버전**: 7.8 · **앱 버전**: v2.2.0 · **최종 수정**: 2026-06-08
+**문서 버전**: 7.9 · **앱 버전**: v2.2.0 · **최종 수정**: 2026-06-08
 
 > Firebase 스키마 전체 명세: [ClassManager/documents/DB_SCHEMA.md](../../ClassManager/documents/DB_SCHEMA.md)
 
@@ -11,6 +11,7 @@
 
 | 문서 버전 | 날짜 | 주요 변경 |
 |-----------|------|-----------|
+| 7.9 | 2026-06-08 | **특이사항 전송 시 소거 — 당일 소비 모델 (v2.2.0)** `input/{nameKey}/__note__`(특이사항)가 날짜 무관 단일 필드라 전송 후에도 영속 → 다음 가져오기 시 옛 메모가 잔류하던 문제. 전송 확정 시점(`_push_history`)에 ① 메시지 최종 note → `history/`(기존), ② **원본 입력 note `input/{nameKey}/__note__` → null 소거**(신규, 단일 원자적 multi-path PATCH). 특이사항이 obs(날짜별)처럼 "당일 소비"로 동작 → 다음날/가져오기 fresh. PC의 input/ 쓰기는 전송된 학생 `__note__` 소거만 허용(CLAUDE.md 규칙 반영) |
 | 7.8 | 2026-06-08 | **진도/과제 메시지 제외 토글 + 버그픽스 (v2.2.0)** ① 데일리 탭 중앙 패널 "오늘 수업(반 공통)" 과목별 **`✕ 메시지서 제외`** 토글 — 전날 잔류 진도/과제 등 불필요 데이터를 담임이 이번 전송 메시지서 제외(메모리 `exclude_prog`, DB·readiness 무관, 전송/가져오기 시 리셋). `_class_info_for()` 공통 헬퍼로 preview·전송 일관. 부담임은 토글 미표시. ② **빈 웹 note 미반영 버그** — `_import_mobile_data` `if final` 가드 제거, `__note__` 빈값도 항상 덮어씀(기존 기록 잔류 방지). ③ **AI 일괄생성 진행 팝업 잔류 버그** — OK 모달 → 자동 소멸 modeless Toplevel, 완료/에러 시 `_close_prog()`. ④ **삭제된 과목 진도/과제 고아 read 버그** — 웹 `rmCourse`가 `classes/courses`만 지우고 `session/class_data/{classId\|subject}`는 잔류시켜 PC가 계속 read하던 문제. (a) PC 가져오기 시 **현존 `courses`에 없는 pkey 무시**(방어 필터), (b) 웹 과목 삭제 시 `session/class_data` 동반 null PATCH(예방), (c) 기존 고아 11건 1회 청소 |
 | 7.7 | 2026-06-08 | **메시지 발송 탭 신설 — ClassManager 발송 기능 이식 (v2.2.0)** 메인 UI를 `ttk.Notebook` 2탭 구조로 전환(헤더/크레딧은 상단 고정). ① **탭1 「📋 데일리 리포트」** = 기존 시트바+3패널+상태바+푸터 워크플로우 그대로(빌더 4개에 `parent` 인자 추가, 동작·레이아웃 무변경). ② **탭2 「✉ 메시지 발송」** 신설(§2.13) — **담당 학생 전체**(`_my_classes('M')+_my_classes('T')`, 부담임🔒 반 제외, nameKey 중복 제거)를 반별 체크박스로 제공, `{이름}{반}{날짜}` 변수 템플릿(`templates.json` 로컬 영속)·미리보기·**이미지 첨부**(본문↔이미지 순서 토글) 후 카톡 일괄 전송. 데일리 전용 부수효과(`history/` 기록·전송 후 초기화)는 **호출 안 함** — 일반 공지/안내 발송 전용. ③ 카톡 키 시퀀스를 `_kakao_send_one(m, wait, warm)` 공용 헬퍼로 추출 — `_do_send`(데일리)·`_do_bulk_send`(발송 탭) 공유, 이미지 송신(`copy_image_to_clipboard`+붙여넣기, `img_wait=max(wait,1.0)`) 일원화. 신규 모듈 `kakao_image.py`, `message.render/build_bulk_ctx/bulk_variables`, `storage.load_templates/save_templates`. ④ **⚙ 설정 버튼을 노트북 탭 행 우측으로 이동** — 기존 데일리 탭 시트바에서 분리, 두 탭이 공유하는 전역 설정(Firebase·강사·AI키·room_prefix·wait_time)이라 탭과 동일 행(노트북 탭 스트립) 우측에 `place(in_=nb, relx=1.0, anchor='ne')` 오버레이로 배치. M/T·📥 가져오기·🗑 초기화는 데일리 워크플로우 컨트롤이라 탭 내 유지 |
 | 7.6 | 2026-06-06 | **DB 재구조화 — Analyzer 정합 + 전송 코멘트 누적 (v2.1.2)** ① `history/{nameKey}/{YYYY-MM-DD}={note,instructor}` 신규 — PC가 **전송 확정 시점(카톡 루프 이전, 전송 성패 무관)**에 단일 원자적 multi-path PATCH로 기록(학생 grain, todayKey). 카톡 전송 중 abort/크래시에도 이력 보존. AI 월간 리포트 반복 회피·맥락 소스. ② `lastSent/` 폐기(빈 껍데기), 가져오기 폴백 제거. ③ `input/.assign` 죽은 필드 + 레거시 `onPB` 제거 — 과제수행도는 `obs/assign_grade` 단일 소스. ④ 로컬 캐시 간소화 — `class_data`(진도/과제)만 디스크 영속, student/note/force는 메모리만(죽은 I/O 제거). ⑤ Firebase 스키마 섹션 실구조로 정정(누적 obs/scores/history vs 휘발 input/session, 날짜포맷 이원화 명시). ⑥ PC 쓰기 규칙 개정 — `history/` 허용. ⑦ DB 마이그레이션(`scripts/migrate_v2_1_2.py`): 구 과목별 note→`__note__` 통합, 죽은 assign 제거, lastSent 삭제 |
