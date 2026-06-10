@@ -1254,7 +1254,7 @@ class App:
 
     def _do_bulk_send(self, msgs):
         cancel = self._bulk_send_cancel
-        wait   = self.config.get('wait_time', 0.5)
+        wait   = self._send_wait()
         total  = len(msgs)
         # v2.2.3: 카톡 창 자동 포커스 (데일리 _do_send 와 동일 정책)
         for _ in range(10):
@@ -2023,13 +2023,20 @@ class App:
         delay_grid.pack(fill='x', padx=16, pady=(0,10))
         delay_grid.columnconfigure(1, weight=1)
 
-        tk.Label(delay_grid, text="대기 시간(초)", font=FS, bg=BG, fg=SUBTEXT).grid(row=0, column=0, sticky='w', pady=3, padx=(0,8))
-        wait_var = tk.StringVar(value=str(self.config.get('wait_time', 0.5)))
-        tk.Entry(delay_grid, textvariable=wait_var, font=FS, relief='solid', bd=1).grid(row=0, column=1, sticky='ew', ipady=3)
+        tk.Label(delay_grid, text="전송 속도", font=FS, bg=BG, fg=SUBTEXT).grid(row=0, column=0, sticky='w', pady=3, padx=(0,8))
+        speed_var = tk.StringVar(value=self.config.get('send_speed', 'normal'))
+        speed_row = tk.Frame(delay_grid, bg=BG)
+        speed_row.grid(row=0, column=1, sticky='w')
+        for _val, _lbl in (('fast', '고속'), ('normal', '보통 (권장)'), ('stable', '안정')):
+            tk.Radiobutton(speed_row, text=_lbl, variable=speed_var, value=_val,
+                           font=FS, bg=BG, fg=TEXT, selectcolor=BG,
+                           activebackground=BG).pack(side='left', padx=(0, 10))
+        tk.Label(delay_grid, text="고속=고성능 PC · 보통=일반 환경 · 안정=저사양/카톡 응답 느릴 때",
+                 font=FS, bg=BG, fg=GRAY).grid(row=1, column=1, sticky='w', pady=(0, 3))
 
-        tk.Label(delay_grid, text="카톡 접두사", font=FS, bg=BG, fg=SUBTEXT).grid(row=1, column=0, sticky='w', pady=3, padx=(0,8))
+        tk.Label(delay_grid, text="카톡 접두사", font=FS, bg=BG, fg=SUBTEXT).grid(row=2, column=0, sticky='w', pady=3, padx=(0,8))
         prefix_var = tk.StringVar(value=self.config.get('room_prefix', '오직 '))
-        tk.Entry(delay_grid, textvariable=prefix_var, font=FS, relief='solid', bd=1).grid(row=1, column=1, sticky='ew', ipady=3)
+        tk.Entry(delay_grid, textvariable=prefix_var, font=FS, relief='solid', bd=1).grid(row=2, column=1, sticky='ew', ipady=3)
 
         # ── ② Firebase Database 연결 설정 ───────────────────
         tk.Frame(inner, bg=BORDER, height=1).pack(fill='x', padx=16, pady=(4,0))
@@ -2214,10 +2221,8 @@ class App:
         
         def _save_all():
             try:
-                try:
-                    self.config['wait_time'] = float(wait_var.get().strip())
-                except ValueError:
-                    self.config['wait_time'] = 0.5
+                self.config['send_speed'] = speed_var.get()  # 프리셋(고속/보통/안정) — wait_time 대체
+                self.config.pop('wait_time', None)           # 구 숫자 설정 제거
                 self.config['room_prefix'] = prefix_var.get().strip()
 
                 self.config['firebase_url'] = fb_url_var.get().strip()
@@ -2369,6 +2374,14 @@ class App:
         win.wait_window()
         return result['sel']
 
+    # 전송 속도 프리셋 → 단계 대기(초). 검증 게이트가 실패를 흡수하므로
+    # 프리셋은 "1차 시도 마진"만 결정 — 안정은 저사양/카톡 응답 지연 환경용.
+    _SEND_SPEED_WAITS = {'fast': 0.3, 'normal': 0.5, 'stable': 1.0}
+
+    def _send_wait(self):
+        # 구 wait_time(숫자) 설정 잔존 시에도 프리셋 우선, 미설정이면 보통
+        return self._SEND_SPEED_WAITS.get(self.config.get('send_speed', 'normal'), 0.5)
+
     def _set_send_btn_cancel(self, on):
         """전송 중 send_btn → 취소 버튼 토글."""
         if on:
@@ -2489,7 +2502,7 @@ class App:
 
     def _do_send(self, msgs):
         cancel = self._send_cancel
-        wait   = self.config.get('wait_time', 0.5)
+        wait   = self._send_wait()
         total  = len(msgs)
         # v2.2.3: 카톡 창 자동 포커스 — 기존 "3초 내 직접 클릭" 의존이 간헐 오류 최다 원인.
         # 취소 여유 1초 후 자동 포커스, 실패 시 키 입력 없이 안전 중단.
