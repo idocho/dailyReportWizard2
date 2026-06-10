@@ -60,7 +60,7 @@ from firebase import (firebase_get, firebase_put, firebase_patch, fetch_tags,
 from ai_engine import AiEngine
 from message   import (today_str, get_room, nickname_suffix, build_message,
                        render, build_bulk_ctx, bulk_variables)
-from kakao_image import copy_image_to_clipboard
+from kakao_image import copy_image_to_clipboard, focus_kakao
 
 class App:
     def __init__(self, root):
@@ -1012,7 +1012,7 @@ class App:
 
         sf = tk.Frame(frm, bg=PANEL)
         sf.grid(row=7, column=0, sticky='ew', padx=12, pady=(0, 6))
-        self.bulk_send_btn = tk.Button(sf, text="🚀 카카오톡 창 활성화 후 전송",
+        self.bulk_send_btn = tk.Button(sf, text="🚀 카카오톡으로 전송",
                                        font=("맑은 고딕", 10, "bold"), bg=ACCENT, fg="#0E1016",
                                        relief='flat', cursor='hand2', pady=8,
                                        command=self._bulk_send)
@@ -1227,7 +1227,7 @@ class App:
         if not messagebox.askyesno("전송 확인",
                 f"전송 대상: {len(msgs)}명{img_note}\n" +
                 ", ".join(m['room'] for m in msgs) +
-                "\n\n카카오톡 창 활성화 후 [예]를 누르세요. (3초 후 시작)"):
+                "\n\n[예]를 누르면 카카오톡 창을 자동으로 찾아 전송을 시작합니다."):
             return
 
         self._bulk_send_cancel = threading.Event()
@@ -1239,7 +1239,7 @@ class App:
             self.bulk_send_btn.config(text="⏹ 전송 취소", bg="#FEE2E2", fg="#DC2626",
                                       command=self._bulk_cancel)
         else:
-            self.bulk_send_btn.config(text="🚀 카카오톡 창 활성화 후 전송",
+            self.bulk_send_btn.config(text="🚀 카카오톡으로 전송",
                                       bg=ACCENT, fg="#0E1016", command=self._bulk_send)
 
     def _bulk_cancel(self):
@@ -1251,27 +1251,53 @@ class App:
         cancel = self._bulk_send_cancel
         wait   = self.config.get('wait_time', 0.5)
         total  = len(msgs)
-        for _ in range(30):
+        # v2.2.3: 카톡 창 자동 포커스 (데일리 _do_send 와 동일 정책)
+        for _ in range(10):
             if cancel.is_set(): break
             time.sleep(0.1)
+        if not cancel.is_set() and not focus_kakao():
+            def _no_kakao():
+                self._bulk_set_cancel(False)
+                self.bulk_status.config(text="❌ 카카오톡 창을 찾지 못해 중단")
+                messagebox.showerror("카카오톡 창 없음",
+                    "카카오톡 창을 찾을 수 없습니다.\n"
+                    "카카오톡 실행·로그인 상태를 확인한 뒤 다시 전송하세요.")
+            self.root.after(0, _no_kakao)
+            return
         sent = 0
+        failed = []
+        focus_lost = False
         for i, m in enumerate(msgs):
             if cancel.is_set(): break
             self.root.after(0, lambda t=f"전송 중... ({i+1}/{total})  {m['name']}":
                             self.bulk_status.config(text=t))
+            if i > 0 and not focus_kakao(0.3):
+                focus_lost = True
+                break
             warm = 0.6 if i == 0 else 0.0
             try:
                 self._kakao_send_one(m, wait, warm)
+                sent += 1
             except Exception as e:
                 print(f"오류 [{m['name']}]: {e}")
-            sent += 1
+                failed.append(m.get('name', '?'))
             time.sleep(0.8)
         cancelled = cancel.is_set()
         def _done():
             self._bulk_set_cancel(False)
-            if cancelled:
+            fail_line = f"\n⚠ 실패 {len(failed)}명: {', '.join(failed)}" if failed else ""
+            if focus_lost:
+                self.bulk_status.config(text=f"❌ 카톡 창 소실 — {sent}/{total}명에서 중단")
+                messagebox.showerror("전송 중단",
+                    f"{sent}명 전송 후 카카오톡 창을 잃어 중단했습니다.\n"
+                    "카카오톡 확인 후 다시 전송하세요." + fail_line)
+            elif cancelled:
                 self.bulk_status.config(text=f"⏹ {sent}/{total}명 전송 후 취소")
-                messagebox.showinfo("전송 취소", f"{sent}명 전송 후 취소했습니다.")
+                messagebox.showinfo("전송 취소", f"{sent}명 전송 후 취소했습니다." + fail_line)
+            elif failed:
+                self.bulk_status.config(text=f"⚠ 전송 {sent}/{total}명 — 실패 {len(failed)}명")
+                messagebox.showwarning("일부 실패",
+                    f"{sent}명 전송 완료, {len(failed)}명 실패:\n{', '.join(failed)}")
             else:
                 self.bulk_status.config(text=f"✅ 전송 완료 — {sent}명")
                 messagebox.showinfo("완료", f"{sent}명 전송 완료!")
@@ -2304,7 +2330,7 @@ class App:
         tk.Button(foot, text="취소", font=FS, bg=PANEL, fg=SUBTEXT, relief='flat',
                   cursor='hand2', padx=12, pady=7, command=_cancel).pack(side='right', padx=6)
 
-        tk.Label(win, text="카카오톡 창 활성화 후 [전송 시작]을 누르세요. (3초 후 시작)",
+        tk.Label(win, text="[전송 시작]을 누르면 카카오톡 창을 자동으로 찾아 전송합니다.",
                  font=FS, bg=BG, fg=SUBTEXT, wraplength=350, justify='left'
                  ).pack(side='bottom', padx=16, pady=(4, 8), anchor='w')
         if skipped:
@@ -2391,16 +2417,32 @@ class App:
         cancel = self._send_cancel
         wait   = self.config.get('wait_time', 0.5)
         total  = len(msgs)
-        # 3초 카운트다운 — 취소 가능
-        for _ in range(30):
+        # v2.2.3: 카톡 창 자동 포커스 — 기존 "3초 내 직접 클릭" 의존이 간헐 오류 최다 원인.
+        # 취소 여유 1초 후 자동 포커스, 실패 시 키 입력 없이 안전 중단.
+        for _ in range(10):
             if cancel.is_set(): break
             time.sleep(0.1)
+        if not cancel.is_set() and not focus_kakao():
+            def _no_kakao():
+                self._set_send_btn_cancel(False)
+                self.send_status.config(text="❌ 카카오톡 창을 찾지 못해 중단")
+                messagebox.showerror("카카오톡 창 없음",
+                    "카카오톡 창을 찾을 수 없습니다.\n"
+                    "카카오톡 실행·로그인 상태를 확인한 뒤 다시 전송하세요.\n"
+                    "(입력 데이터는 유지됩니다. 전송 코멘트는 이미 기록되어 안전합니다)")
+            self.root.after(0, _no_kakao)
+            return
         sent = 0
         failed = []   # v2.2.3: 카톡 전송 예외 학생 집계 — 기존엔 실패도 sent로 합산돼 유실이 가려짐
+        focus_lost = False
         for i, m in enumerate(msgs):
             if cancel.is_set(): break
             self.root.after(0, lambda t=f"전송 중... ({i+1}/{total})  {m['name']}":
                             self.send_status.config(text=t))
+            # 매 학생 전 카톡 메인 창 재포커스 — 전송 중 사용자가 다른 창을 만져도 복구
+            if i > 0 and not focus_kakao(0.3):
+                focus_lost = True
+                break
             # 첫 학생 워밍업 — 카톡 창 포커스/검색 안정화 (첫 전송 오작동 방지)
             warm = 0.6 if i == 0 else 0.0
             try:
@@ -2412,6 +2454,15 @@ class App:
             time.sleep(0.8)
 
         cancelled = cancel.is_set()
+        if focus_lost:
+            def _lost():
+                self._set_send_btn_cancel(False)
+                self.send_status.config(text=f"❌ 카톡 창 소실 — {sent}/{total}명에서 중단")
+                messagebox.showerror("전송 중단",
+                    f"{sent}명 전송 후 카카오톡 창을 잃어 중단했습니다.\n"
+                    "카카오톡 확인 후 다시 전송하세요. (입력 데이터 유지)")
+            self.root.after(0, _lost)
+            return
         def _on_done():
             self._set_send_btn_cancel(False)
             fail_line = f"\n⚠ 전송 실패 {len(failed)}명: {', '.join(failed)}" if failed else ""

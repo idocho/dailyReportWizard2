@@ -1,7 +1,7 @@
 # DailyReportWizard — 요구사항 명세서
 
 **Crafted by IDO(idocho@kakao.com) · Powered by Claude AI**  
-**문서 버전**: 8.3 · **앱 버전**: v2.2.3(개발)/v2.2.2(안정) · **최종 수정**: 2026-06-11
+**문서 버전**: 8.4 · **앱 버전**: v2.2.3(개발)/v2.2.2(안정) · **최종 수정**: 2026-06-11
 
 > Firebase 스키마 전체 명세: [ClassManager/documents/DB_SCHEMA.md](../../ClassManager/documents/DB_SCHEMA.md)
 
@@ -11,6 +11,7 @@
 
 | 문서 버전 | 날짜 | 주요 변경 |
 |-----------|------|-----------|
+| 8.4 | 2026-06-11 | **카카오톡 창 자동 포커스 — 간헐 전송 오류 근본 대응** 기존 "전송 시작 후 3초 내 카톡 창 직접 클릭" 의존이 간헐 오류 최다 원인(실패 시 키 입력이 엉뚱한 창으로). `kakao_image.focus_kakao()` 신설 — Win32 EnumWindows로 카톡 메인 창(제목 '카카오톡'/'KakaoTalk', class `EVA_Window_Dblclk` 우선) 탐지, **트레이 상태(invisible)도 SW_RESTORE 복원**, ALT 탭 후 SetForegroundWindow + 전면 검증. `_do_send`/`_do_bulk_send`: 3초 카운트다운 → 1초 취소 여유+자동 포커스(실패 시 키 입력 없이 안전 중단, 데이터 유지), **매 학생 전 재포커스**(전송 중 사용자 개입 복구, 소실 시 해당 지점 중단+안내). 버튼/다이얼로그 문구에서 수동 클릭 지시 제거. ClassManager `kakao_send.py`에도 동일 구현(매 건 재포커스, done_cb는 실제 성공 건수). 실기 검증: 트레이 숨김 카톡 복원·전면화 성공 |
 | 8.3 | 2026-06-11 | **메시지 발송 기본 빌트인 템플릿** `storage.DEFAULT_TEMPLATES` 5종(일반 공지·휴원/일정 변경·시험 안내·결석 보강 안내·교재 준비 안내, 변수 {이름}{반}{날짜}) — `templates.json` 없거나 비어 있을 때만 시드, 사용자 수정·삭제분은 재주입 안 함. CM도 동일 정책으로 6종(공통 5 + 성적 통보 score형) — `ClassManager/template_engine.DEFAULT_TEMPLATES` |
 | 8.2 | 2026-06-11 | **신뢰성 일괄 수정 (v2.2.3 개발 라인)** ① **[웹] 주간성적 입력 차단 해제** — `_canInputWeekly`가 `course.instructor` 필드로 판정했으나 과목 등록이 이 필드를 저장한 적 없어(실DB 36과목 전부 미보유) 반별 시험 저장이 전원 차단되던 버그. 담당 수업 배정(assignments) 기준으로 교체(`_canInputAchievement`와 동일 모델). ② **[웹] write 실패 표면화** — 핵심 입력 3종(과제수행도/메모·진도/과제·관찰태그)의 무음 실패(`setSync` no-op)와 설정·성적·초기화의 `.catch(()=>{})` 21곳을 `fbFail(label)` toast로 일괄 교체. 로컬 저장은 유지되므로 재시도 안내. ③ **[PC] 전송 시 특이사항 유실 가드** — `_push_history`의 history 기록+`__note__` 소거를 루트 단일 multi-path PATCH로 원자화(실패 시 둘 다 미적용 → note 보존, 경고 팝업). `_do_send` 카톡 예외 학생을 sent에서 제외하고 실패 명단 표시, 실패 존재 시 로컬 초기화 보류(재전송 가능). ④ [CM] 성적통지 nameKey/meta 버그 수정은 ClassManager repo(template_engine v2.0 스키마 대응 + 회귀 테스트 3종) 참조 |
 | 8.1 | 2026-06-11 | **운영: DB 일일 백업 체계 (A1)** `code/scripts/backup_db.py`(루트 전체 스냅샷 → `scripts/backup/drw2_*.json`, 30일 보존, git 제외) + `restore_db.py`(노드/전체 복원, dry-run 기본, 복원 전 현재 상태 자동 저장) + `register_backup_task.ps1`(작업 스케줄러 매일 14:00, 미실행 시 보충). Security Rules 도입 전 데이터 유실 대비 안전망. 호스팅은 하위호환 버전(v2.2.2)만 공개 — 구버전 ignore+redirect(`firebase.json`), 개발 라인 v2.2.3 신설 |
