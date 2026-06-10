@@ -40,19 +40,21 @@ function getScorePath(classId, subject, testKey, type){
 async function _pushScore(classId, subject, testKey, val, type){
   if(!dbUrl||!dbPath)return;
   const path=getScorePath(classId,subject,testKey,type||val.type||'');
-  try{await fbPatch(path.slice(0,path.lastIndexOf('/')),{[testKey]:val});}catch(e){}
+  try{await fbPatch(path.slice(0,path.lastIndexOf('/')),{[testKey]:val});}catch(e){fbFail('성적')(e);}
 }
 async function _deleteScore(classId, subject, testKey, type){
   if(!dbUrl||!dbPath)return;
   const path=getScorePath(classId,subject,testKey,type||'');
-  try{await fbPatch(path.slice(0,path.lastIndexOf('/')),{[testKey]:null});}catch(e){}
+  try{await fbPatch(path.slice(0,path.lastIndexOf('/')),{[testKey]:null});}catch(e){fbFail('성적 삭제')(e);}
 }
 
-// ── 반별 시험 권한: 해당 subject의 instructor만 ────────────────────
+// ── 반별 시험 권한: 해당 수업이 내 담당 배정(assignments)에 있으면 허용 ──
 function _canInputWeekly(classId, subject){
   const course=config?.classes?.[classId]?.courses?.[subject];
   if(course?.archived)return false; // 보관 과목은 입력 차단
-  return course?.instructor===instructor?.id;
+  // v2.2.3: course.instructor 필드 → assignments 기준으로 교체.
+  // 과목 등록이 instructor를 저장한 적이 없어(실DB 36개 과목 전부 미보유) 주간성적 저장이 전원 차단되던 버그.
+  return (instructor?.assignments||[]).some(a=>a.classId===classId&&a.subject===subject);
 }
 // 학년단위 시험: 담임 여부 (assignments에 해당 classId+subject가 있고 role이 '담임')
 function _canInputAchievement(classId){
@@ -345,13 +347,13 @@ async function _saveScore(classId, subject){
     if(!scoreData.achievement)scoreData.achievement={};
     if(!scoreData.achievement[curriculumKey])scoreData.achievement[curriculumKey]={};
     scoreData.achievement[curriculumKey][testKey]=testObj;
-    if(dbUrl&&dbPath)await fbPatch(`scores/achievement/${curriculumKey}`,{[testKey]:testObj}).catch(()=>{});
+    if(dbUrl&&dbPath)await fbPatch(`scores/achievement/${curriculumKey}`,{[testKey]:testObj}).catch(fbFail('성적'));
   } else {
     if(!scoreData.weekly)scoreData.weekly={};
     if(!scoreData.weekly[classId])scoreData.weekly[classId]={};
     if(!scoreData.weekly[classId][subject])scoreData.weekly[classId][subject]={};
     scoreData.weekly[classId][subject][testKey]=testObj;
-    if(dbUrl&&dbPath)await fbPatch(`scores/weekly/${classId}/${subject}`,{[testKey]:testObj}).catch(()=>{});
+    if(dbUrl&&dbPath)await fbPatch(`scores/weekly/${classId}/${subject}`,{[testKey]:testObj}).catch(fbFail('성적'));
   }
 
   scoreEditing=null;scoreView='list';
@@ -364,10 +366,10 @@ async function _confirmDeleteScore(classId,subject,testKey,type){
   const curriculumKey=curriculumToKey(curriculum);
   if(isAchievement){
     if(scoreData.achievement?.[curriculumKey])delete scoreData.achievement[curriculumKey][testKey];
-    if(dbUrl&&dbPath)await fbPatch(`scores/achievement/${curriculumKey}`,{[testKey]:null}).catch(()=>{});
+    if(dbUrl&&dbPath)await fbPatch(`scores/achievement/${curriculumKey}`,{[testKey]:null}).catch(fbFail('성적 삭제'));
   } else {
     if(scoreData.weekly?.[classId]?.[subject])delete scoreData.weekly[classId][subject][testKey];
-    if(dbUrl&&dbPath)await fbPatch(`scores/weekly/${classId}/${subject}`,{[testKey]:null}).catch(()=>{});
+    if(dbUrl&&dbPath)await fbPatch(`scores/weekly/${classId}/${subject}`,{[testKey]:null}).catch(fbFail('성적 삭제'));
   }
   toast('삭제됨');renderMain();
 }

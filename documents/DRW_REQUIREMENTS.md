@@ -1,7 +1,7 @@
 # DailyReportWizard — 요구사항 명세서
 
 **Crafted by IDO(idocho@kakao.com) · Powered by Claude AI**  
-**문서 버전**: 8.1 · **앱 버전**: v2.2.2 · **최종 수정**: 2026-06-10
+**문서 버전**: 8.2 · **앱 버전**: v2.2.3(개발)/v2.2.2(안정) · **최종 수정**: 2026-06-11
 
 > Firebase 스키마 전체 명세: [ClassManager/documents/DB_SCHEMA.md](../../ClassManager/documents/DB_SCHEMA.md)
 
@@ -11,6 +11,7 @@
 
 | 문서 버전 | 날짜 | 주요 변경 |
 |-----------|------|-----------|
+| 8.2 | 2026-06-11 | **신뢰성 일괄 수정 (v2.2.3 개발 라인)** ① **[웹] 주간성적 입력 차단 해제** — `_canInputWeekly`가 `course.instructor` 필드로 판정했으나 과목 등록이 이 필드를 저장한 적 없어(실DB 36과목 전부 미보유) 반별 시험 저장이 전원 차단되던 버그. 담당 수업 배정(assignments) 기준으로 교체(`_canInputAchievement`와 동일 모델). ② **[웹] write 실패 표면화** — 핵심 입력 3종(과제수행도/메모·진도/과제·관찰태그)의 무음 실패(`setSync` no-op)와 설정·성적·초기화의 `.catch(()=>{})` 21곳을 `fbFail(label)` toast로 일괄 교체. 로컬 저장은 유지되므로 재시도 안내. ③ **[PC] 전송 시 특이사항 유실 가드** — `_push_history`의 history 기록+`__note__` 소거를 루트 단일 multi-path PATCH로 원자화(실패 시 둘 다 미적용 → note 보존, 경고 팝업). `_do_send` 카톡 예외 학생을 sent에서 제외하고 실패 명단 표시, 실패 존재 시 로컬 초기화 보류(재전송 가능). ④ [CM] 성적통지 nameKey/meta 버그 수정은 ClassManager repo(template_engine v2.0 스키마 대응 + 회귀 테스트 3종) 참조 |
 | 8.1 | 2026-06-11 | **운영: DB 일일 백업 체계 (A1)** `code/scripts/backup_db.py`(루트 전체 스냅샷 → `scripts/backup/drw2_*.json`, 30일 보존, git 제외) + `restore_db.py`(노드/전체 복원, dry-run 기본, 복원 전 현재 상태 자동 저장) + `register_backup_task.ps1`(작업 스케줄러 매일 14:00, 미실행 시 보충). Security Rules 도입 전 데이터 유실 대비 안전망. 호스팅은 하위호환 버전(v2.2.2)만 공개 — 구버전 ignore+redirect(`firebase.json`), 개발 라인 v2.2.3 신설 |
 | 8.0 | 2026-06-10 | **과목 소프트 삭제(archived) + classes 전체 PUT 제거 (v2.2.2)** ① 웹 `rmCourse`가 하드 삭제(`fbPut null`) 대신 **`classes/{classId}/courses/{subject}/archived: true` 마킹** — obs/scores/history/session 기록을 DB에 보존하면서 표시·입력·전송에서만 제외(웹 `activeCourses()`, PC `firebase.active_courses()` 공통 필터). 같은 과정·교재 재추가 시 `archived:null` PATCH로 **복원**(기존 기록 그대로 연결, `addCourseInline`/`wzAddCourse` 중복 검사도 archived 구분). Analyzer는 course 노드가 보존되므로 보관 과목의 과거 기록 조인 가능. 관리자 과목 목록은 보관 과목을 「보관」 배지로 표시. `_canInputWeekly`·`_syncAssignments`·PC 가져오기 방어필터 모두 활성 과목 기준. 실패 시 무음이던 `rmCourse` DB 쓰기에 toast+로컬 롤백 추가. ② **`pushCfg()`(classes 노드 전체 PUT) 제거** — stale 로컬 config를 가진 다른 기기가 삭제된 과목을 통째 부활시키던 버그 원인(3MAXIMO 사례). `rmCls`는 해당 학급 노드만 타겟 `fbPut null`로 전환, 죽은 코드 `addCls`/`addCourse`(prompt형) 삭제. 기존 3MAXIMO 잔존 과목 2건(공통수학1 시험직전R·대수 RPM)은 DB에서 archived 마킹 완료 |
 | 7.9 | 2026-06-08 | **특이사항 전송 시 소거 — 당일 소비 모델 (v2.2.0)** `input/{nameKey}/__note__`(특이사항)가 날짜 무관 단일 필드라 전송 후에도 영속 → 다음 가져오기 시 옛 메모가 잔류하던 문제. 전송 확정 시점(`_push_history`)에 ① 메시지 최종 note → `history/`(기존), ② **원본 입력 note `input/{nameKey}/__note__` → null 소거**(신규, 단일 원자적 multi-path PATCH). 특이사항이 obs(날짜별)처럼 "당일 소비"로 동작 → 다음날/가져오기 fresh. PC의 input/ 쓰기는 전송된 학생 `__note__` 소거만 허용(CLAUDE.md 규칙 반영) |

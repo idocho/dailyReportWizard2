@@ -170,6 +170,8 @@ function toast(m,ms=2500){const e=document.getElementById('toast');e.textContent
 // 학생 배열 이름 가나다 오름차순 정렬(제자리). None-safe + 동명이인 nameKey tiebreak. 키 불변, 표시 순서만.
 function sortStu(arr){return (arr||[]).sort((a,b)=>(a.name||'').localeCompare(b.name||'','ko')||String(a.nameKey).localeCompare(String(b.nameKey)));}
 function setSync(ok){/* syncBadge 제거됨 (v0.9.4) */}
+// v2.2.3: Firebase write 실패 표면화 — 무음 catch 일괄 대체용. 로컬엔 저장돼 있으니 재시도 안내.
+function fbFail(label){return e=>toast(`⚠️ ${label} 서버 저장 실패 — 네트워크 확인 후 다시 시도하세요`,4000);}
 // 소프트 삭제: archived 과목 제외. 과목 "삭제"는 archived:true 마킹 — obs/scores/history/session 데이터는 DB에 보존되고 노출만 차단. 같은 키로 재추가 시 복원.
 function activeCourses(clsD){const out={};for(const[s,c]of Object.entries((clsD||{}).courses||{})){if(!(c&&c.archived))out[s]=c;}return out;}
 function _normWs(s){return String(s||'').replace(/\s+/g,' ').trim();}
@@ -235,7 +237,7 @@ async function pushInput(key,val){
     const realSubject=subject==='__note__'?null:subject;
     if(!_canWrite(classId,realSubject))return;
   }
-  try{await fbPatch('input',{[key]:val});setSync(true);}catch(e){setSync(false);}
+  try{await fbPatch('input',{[key]:val});}catch(e){fbFail('과제수행도/메모')(e);}
 }
 async function pushProgress(pkey,val){
   progressData[pkey]=val;saveLocal();
@@ -245,7 +247,7 @@ async function pushProgress(pkey,val){
     const [classId,subject]=p;
     if(!_canWrite(classId,subject))return;
   }
-  try{await fbPatch('session/class_data',{[pkey]:val});setSync(true);}catch(e){setSync(false);}
+  try{await fbPatch('session/class_data',{[pkey]:val});}catch(e){fbFail('진도/과제')(e);}
 }
 
 // ── 오늘 날짜 키 (YYYY-MM-DD) ────────────────────────────────────
@@ -313,7 +315,7 @@ async function pushObs(classId,nameKey,subject){
   const dateKey=todayKey();
   const val=tagData?.[nameKey]?.[subject]?.[dateKey]||{};
   // Firebase 경로: obs/{nameKey}/{subject}/{YYYY-MM-DD}
-  try{await fbPatch(`obs/${nameKey}/${subject}`,{[dateKey]:val});setSync(true);}catch(e){setSync(false);}
+  try{await fbPatch(`obs/${nameKey}/${subject}`,{[dateKey]:val});}catch(e){fbFail('관찰 태그')(e);}
 }
 
 // ── 태그 토글 핸들러 ─────────────────────────────────────────────

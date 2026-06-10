@@ -626,7 +626,7 @@ function savePreset(i){
   if(!instructor?.presets)return;
   instructor.presets[i]=val;
   saveLocal();
-  if(dbUrl&&dbPath&&instructor.id)fbPatch(`config/instructors/${encodeURIComponent(instructor.id)}`,{presets:instructor.presets}).catch(()=>{});
+  if(dbUrl&&dbPath&&instructor.id)fbPatch(`config/instructors/${encodeURIComponent(instructor.id)}`,{presets:instructor.presets}).catch(fbFail('문구'));
   toast('문구 수정됨 ✅');
   renderMain();
 }
@@ -649,7 +649,7 @@ async function lookupInstr(){
     const d=await fbGet(`config/instructors/${encodeURIComponent(name)}`);
     if(d){
       // 기존 엔트리에 name 필드가 없으면(구 데이터) id로 백필
-      if(!d.name){d.name=name;fbPatch(`config/instructors/${encodeURIComponent(name)}`,{name}).catch(()=>{});}
+      if(!d.name){d.name=name;fbPatch(`config/instructors/${encodeURIComponent(name)}`,{name}).catch(fbFail('계정'));}
       instructor={id:name,...d};saveLocal();curAI=0;renderSb();renderMain();
       toast(`${name} 계정으로 로그인됨 ✅`);
     } else {
@@ -671,7 +671,7 @@ function _defaultPresets(){
 async function _registerInstr(name){
   const defPresets=_defaultPresets();
   instructor={id:name,name,assignments:[],presets:defPresets};saveLocal();
-  if(dbUrl&&dbPath)await fbPatch(`config/instructors/${encodeURIComponent(name)}`,{name,assignments:[],presets:defPresets}).catch(()=>{});
+  if(dbUrl&&dbPath)await fbPatch(`config/instructors/${encodeURIComponent(name)}`,{name,assignments:[],presets:defPresets}).catch(fbFail('계정 등록'));
   renderSb();renderMain();toast(`${name} 등록됨 ✅ — 담당 수업·자주 쓰는 문구를 설정해 주세요`);
 }
 
@@ -709,13 +709,13 @@ function addA(){
   if(!instructor.assignments)instructor.assignments=[];
   if(instructor.assignments.some(a=>a.classId===classId&&a.subject===subject)){toast('이미 추가된 수업입니다.');return;}
   instructor.assignments.push({classId,subject,group,role});saveLocal();
-  if(dbUrl&&dbPath&&instructor.id)fbPatch(`config/instructors/${encodeURIComponent(instructor.id)}`,{assignments:instructor.assignments}).catch(()=>{});
+  if(dbUrl&&dbPath&&instructor.id)fbPatch(`config/instructors/${encodeURIComponent(instructor.id)}`,{assignments:instructor.assignments}).catch(fbFail('담당 수업'));
   toast('담당 수업 추가됨 ✅');openSaIds.add('sa-asgn');renderMain();
 }
 function removeA(i){
   if(!instructor?.assignments)return;if(!confirm('이 담당 수업을 제거합니까?'))return;
   instructor.assignments.splice(i,1);if(curAI>=instructor.assignments.length)curAI=0;saveLocal();
-  if(dbUrl&&dbPath&&instructor.id)fbPatch(`config/instructors/${encodeURIComponent(instructor.id)}`,{assignments:instructor.assignments}).catch(()=>{});
+  if(dbUrl&&dbPath&&instructor.id)fbPatch(`config/instructors/${encodeURIComponent(instructor.id)}`,{assignments:instructor.assignments}).catch(fbFail('담당 수업'));
   renderMain();renderSb();
 }
 
@@ -743,7 +743,7 @@ function _syncAssignments(){
   if(curAI>=instructor.assignments.length)curAI=0;
   saveLocal();
   if(dbUrl&&dbPath&&instructor.id)
-    fbPatch(`config/instructors/${encodeURIComponent(instructor.id)}`,{assignments:instructor.assignments}).catch(()=>{});
+    fbPatch(`config/instructors/${encodeURIComponent(instructor.id)}`,{assignments:instructor.assignments}).catch(fbFail('담당 수업'));
 }
 
 function rmCls(classId){
@@ -755,7 +755,7 @@ function rmCls(classId){
     instructor.assignments=instructor.assignments.filter(a=>a.classId!==classId);
     if(instructor.assignments.length!==before){
       if(curAI>=instructor.assignments.length)curAI=0;
-      if(dbUrl&&dbPath&&instructor.id)fbPatch(`config/instructors/${encodeURIComponent(instructor.id)}`,{assignments:instructor.assignments}).catch(()=>{});
+      if(dbUrl&&dbPath&&instructor.id)fbPatch(`config/instructors/${encodeURIComponent(instructor.id)}`,{assignments:instructor.assignments}).catch(fbFail('담당 수업'));
     }
   }
   saveLocal();
@@ -912,7 +912,7 @@ async function _doResetPresets(){
   const def=_defaultPresets();
   if(instructor){instructor.presets=[...def];}
   if(dbUrl&&dbPath&&instructor?.id){
-    await fbPatch(`config/instructors/${instructor.id}`,{presets:def}).catch(()=>{});
+    await fbPatch(`config/instructors/${instructor.id}`,{presets:def}).catch(fbFail('문구'));
   }
   saveLocal();
 }
@@ -958,8 +958,8 @@ async function clrSelected(){
       for(const a of asgns){
         const students=(config?._classStudents||{})[a.classId]||[];
         for(const s of students){
-          ops.push(fbPut(`input/${s.nameKey}/${a.subject}`,null).catch(()=>{}));
-          if(!noteDone.has(s.nameKey)){noteDone.add(s.nameKey);ops.push(fbPut(`input/${s.nameKey}/__note__`,null).catch(()=>{}));}
+          ops.push(fbPut(`input/${s.nameKey}/${a.subject}`,null).catch(fbFail('초기화')));
+          if(!noteDone.has(s.nameKey)){noteDone.add(s.nameKey);ops.push(fbPut(`input/${s.nameKey}/__note__`,null).catch(fbFail('초기화')));}
         }
       }
     }
@@ -986,7 +986,7 @@ async function clrSelected(){
     if(sel.includes('all-progress')){progressData={};ops.push(fbPut('session',null));}
     if(sel.includes('assignments')){
       const instrs=await fbGet('config/instructors').catch(()=>null);
-      if(instrs)for(const id of Object.keys(instrs))ops.push(fbPatch(`config/instructors/${id}`,{assignments:[]}).catch(()=>{}));
+      if(instrs)for(const id of Object.keys(instrs))ops.push(fbPatch(`config/instructors/${id}`,{assignments:[]}).catch(fbFail('초기화')));
     }
     if(sel.includes('config')){
       ops.push(fbPut('config',null));ops.push(fbPut('input',null));ops.push(fbPut('session',null));ops.push(fbPut('students',null));
@@ -1063,14 +1063,14 @@ function addPreset(){
   if(!instructor.presets)instructor.presets=[];
   if(instructor.presets.includes(val)){toast('이미 있는 프리셋입니다.');return;}
   instructor.presets.push(val);inp.value='';saveLocal();
-  if(dbUrl&&dbPath&&instructor.id)fbPatch(`config/instructors/${encodeURIComponent(instructor.id)}`,{presets:instructor.presets}).catch(()=>{});
+  if(dbUrl&&dbPath&&instructor.id)fbPatch(`config/instructors/${encodeURIComponent(instructor.id)}`,{presets:instructor.presets}).catch(fbFail('문구'));
   renderMain();
 }
 function rmPreset(i){
   if(!instructor?.presets)return;
   if(!confirm(`"${instructor.presets[i]}" 프리셋을 삭제합니까?`))return;
   instructor.presets.splice(i,1);saveLocal();
-  if(dbUrl&&dbPath&&instructor.id)fbPatch(`config/instructors/${encodeURIComponent(instructor.id)}`,{presets:instructor.presets}).catch(()=>{});
+  if(dbUrl&&dbPath&&instructor.id)fbPatch(`config/instructors/${encodeURIComponent(instructor.id)}`,{presets:instructor.presets}).catch(fbFail('문구'));
   renderMain();
 }
 

@@ -2396,6 +2396,7 @@ class App:
             if cancel.is_set(): break
             time.sleep(0.1)
         sent = 0
+        failed = []   # v2.2.3: 카톡 전송 예외 학생 집계 — 기존엔 실패도 sent로 합산돼 유실이 가려짐
         for i, m in enumerate(msgs):
             if cancel.is_set(): break
             self.root.after(0, lambda t=f"전송 중... ({i+1}/{total})  {m['name']}":
@@ -2404,19 +2405,28 @@ class App:
             warm = 0.6 if i == 0 else 0.0
             try:
                 self._kakao_send_one(m, wait, warm)
+                sent += 1
             except Exception as e:
                 print(f"오류 [{m['name']}]: {e}")
-            sent += 1
+                failed.append(m.get('name', '?'))
             time.sleep(0.8)
 
         cancelled = cancel.is_set()
         def _on_done():
             self._set_send_btn_cancel(False)
+            fail_line = f"\n⚠ 전송 실패 {len(failed)}명: {', '.join(failed)}" if failed else ""
             if cancelled:
                 self.send_status.config(text=f"⏹ {sent}/{total}명 전송 후 취소 — 나머지 유지")
                 messagebox.showinfo("전송 취소",
                     f"{sent}명 전송 후 취소했습니다.\n"
-                    "전송되지 않은 학생 데이터는 유지됩니다.")
+                    "전송되지 않은 학생 데이터는 유지됩니다." + fail_line)
+            elif failed:
+                self.send_status.config(text=f"⚠ 전송 {sent}/{total}명 — 실패 {len(failed)}명")
+                messagebox.showwarning("일부 실패",
+                    f"{sent}명 전송 완료, {len(failed)}명 실패:\n{', '.join(failed)}\n\n"
+                    "최종 코멘트는 history에 기록되어 있습니다.\n"
+                    "실패 학생은 카톡 상태 확인 후 개별 재전송하세요.\n"
+                    "(로컬 입력 데이터는 초기화하지 않고 유지합니다)")
             else:
                 self.send_status.config(text=f"✅ 전송 완료 — {sent}명")
                 self._reset_after_send()
@@ -2440,26 +2450,28 @@ class App:
             return
         day   = today_key()
         instr = self.config.get('instructor_id', '')
-        hist_updates = {}   # history/  : {nameKey}/{date} → {note, instructor}
-        note_clears  = {}   # input/    : {nameKey}/__note__ → null (소거)
+        # v2.2.3: history 기록과 note 소거를 루트 단일 multi-path PATCH로 통합 — 원자성 확보.
+        # 기존: 별개 PATCH 2회 → history 실패 후 소거 성공 시 최종 코멘트가 양쪽 모두에서 소실되는 유실 경로.
+        # 통합 후: 실패하면 둘 다 미적용 → note가 input/에 남아 재시도 가능.
+        updates = {}   # 루트 기준: history/{nk}/{date} → {note,instructor}, input/{nk}/__note__ → null
         for it in items:
             nk   = it.get('nameKey')
             if not nk:
                 continue
             note = (it.get('note') or '').strip()
             if note:
-                hist_updates[f"{nk}/{day}"] = {"note": note, "instructor": instr}
-            note_clears[f"{nk}/__note__"] = None
-        if hist_updates:
+                updates[f"history/{nk}/{day}"] = {"note": note, "instructor": instr}
+            updates[f"input/{nk}/__note__"] = None
+        if updates:
             try:
-                firebase_patch(self.config, "history", hist_updates)
+                firebase_patch(self.config, "", updates)
             except Exception as e:
-                print(f"history push 실패: {e}")
-        if note_clears:
-            try:
-                firebase_patch(self.config, "input", note_clears)
-            except Exception as e:
-                print(f"input note 소거 실패: {e}")
+                print(f"history 기록/note 소거 실패: {e}")
+                self.root.after(0, lambda e=e: messagebox.showwarning(
+                    "기록 실패",
+                    "전송 코멘트의 서버 기록(history)에 실패했습니다.\n"
+                    "특이사항 원본은 보존되어 있으니 네트워크 확인 후 재전송하면 다시 기록됩니다.\n\n"
+                    f"오류: {e}"))
 
     def _reset_after_send(self):
         """전송 완료 후 로컬 전면 초기화 (진도/과제 포함).
