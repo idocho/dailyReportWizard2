@@ -2466,9 +2466,14 @@ class App:
             _send_image(); _send_text()
         else:
             _send_text(); _send_image()
-        # 방 탈출 보장 — 팝업/지연으로 esc가 방 아닌 곳에 먹혀 한 방에 갇히는 문제 차단.
-        # 전면이 이 방을 벗어날 때까지 esc 반복(최대 4회).
-        if WIN_VERIFY:
+        # 방 정리 정책:
+        # · 이미지를 보낸 방은 닫지 않는다 — 업로드가 백그라운드 진행 중이라 esc 시
+        #   "전송 중인 파일" 확인 팝업이 뜨고(확인 시 업로드 취소 위험) 흐름이 막힘.
+        #   방을 열어두면 업로드는 자체 완료되고, 다음 학생은 메인 창 검색으로 진행.
+        # · 텍스트만 보낸 방은 esc로 닫되, 전면이 방을 벗어날 때까지 반복(최대 4회).
+        if m.get('image'):
+            send_debug(f"이미지 업로드 진행 — 방 유지(미닫음) room={room!r}")
+        elif WIN_VERIFY:
             for _ in range(4):
                 pyautogui.press('esc'); time.sleep(0.2)
                 if not _in_room():
