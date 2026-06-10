@@ -10,7 +10,9 @@ Crafted by IDO(idocho@kakao.com) · Powered by Claude AI
                    {nameKey: {subject: {assign}, __note__: {note}}}
   session/         진도/과제 (class_data)
   obs/             수업 관찰 태그 {nameKey: {subject: {date: {...}}}}
-  lastSent/        마지막 전송 데이터 (폴백용)
+
+과목 소프트 삭제(v2.2.2): courses/{subject}/archived == true 면 보관 과목 —
+표시·입력·전송에서 제외하되 obs/scores/history 기록은 보존. active_courses() 사용.
 """
 import json
 import urllib.request
@@ -61,6 +63,17 @@ def firebase_patch(cfg, node, data):
     req.add_header('Content-Type', 'application/json; charset=utf-8')
     with urllib.request.urlopen(req, timeout=10) as r:
         return json.loads(r.read())
+
+
+# ── 데이터 헬퍼 ──────────────────────────────────────────────────────
+def active_courses(cls_data):
+    """archived(보관) 과목을 제외한 courses dict 반환.
+
+    과목 '삭제'는 웹에서 archived:true 소프트 마킹 — obs/scores/history 기록은
+    DB에 보존되고 표시·입력·전송에서만 제외된다. 같은 키로 재추가 시 복원."""
+    courses = (cls_data or {}).get('courses', {}) or {}
+    return {s: c for s, c in courses.items()
+            if not (isinstance(c, dict) and c.get('archived'))}
 
 
 # ── 태그 전용 (Firebase 경로: obs/) ──────────────────────────────────

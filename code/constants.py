@@ -6,7 +6,7 @@ import platform as _platform
 
 # ── 앱 메타 ───────────────────────────────────────────────────────────
 APP_TITLE   = "Daily Report Wizard"
-APP_VERSION = "v2.2.1"
+APP_VERSION = "v2.2.2"
 APP_CREDIT  = "Crafted by IDO(idocho@kakao.com)  ·  Powered by Claude AI"
 
 AI_COOLDOWN_GROQ   = 30  # Groq 무료 플랜 RPM 제한 대응 (보수적)

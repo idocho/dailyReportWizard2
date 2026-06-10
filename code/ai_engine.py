@@ -13,7 +13,7 @@ DEBUG_AI_PROMPT: bool = False
 
 from constants import (APP_VERSION, AI_COOLDOWNS, AI_COOLDOWN_PAID,
                        AI_ENGINE_LABELS, GEMINI_MODEL, TAGS, grade_label)
-from firebase import fetch_tags_today, today_key
+from firebase import fetch_tags_today, today_key, active_courses
 from storage import save_daily_cache
 
 def dprint(*args, **kwargs):
@@ -485,8 +485,8 @@ class AiEngine:
         for cls, cls_data in app._my_classes(sheet):
             if app._is_sub_teacher(cls):
                 continue
-            # v2.0: 과목은 courses 키, 학생은 all_students에서 필터
-            courses  = cls_data.get('courses', {})
+            # v2.0: 과목은 courses 키(보관 과목 제외), 학생은 all_students에서 필터
+            courses  = active_courses(cls_data)
             tbs      = list(courses.keys())
             tb_grade = {s: courses[s].get('curriculum', '') for s in tbs}
             class_students = [

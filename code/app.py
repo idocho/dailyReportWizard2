@@ -55,7 +55,8 @@ from constants import (
 from storage  import (load_config, save_config, has_students,
                       save_daily_cache, load_daily_cache, set_runtime_cwd, RUNTIME_DIR,
                       load_templates, save_templates)
-from firebase import firebase_get, firebase_put, firebase_patch, fetch_tags, today_key
+from firebase import (firebase_get, firebase_put, firebase_patch, fetch_tags,
+                      today_key, active_courses)
 from ai_engine import AiEngine
 from message   import (today_str, get_room, nickname_suffix, build_message,
                        render, build_bulk_ctx, bulk_variables)
@@ -408,7 +409,7 @@ class App:
             w.destroy()
 
         cls_data  = self.all_classes.get(classId, {})
-        courses   = cls_data.get('courses', {})
+        courses   = active_courses(cls_data)
         subjects  = list(courses.keys())
         tb_grade  = {subj: courses[subj].get('curriculum', '') for subj in subjects}
         display_name = self.all_students.get(nameKey, {}).get('name', nameKey)
@@ -805,7 +806,7 @@ class App:
         group, classId, nameKey = self.activeGroup, self.cur_cls, self.cur_name
         if not nameKey: return
         cls_data  = self.all_classes.get(classId, {})
-        courses   = cls_data.get('courses', {})
+        courses   = active_courses(cls_data)
         subjects  = list(courses.keys())
         tb_grade  = {subj: courses[subj].get('curriculum', '') for subj in subjects}
         display_name = self.all_students.get(nameKey, {}).get('name', nameKey)
@@ -857,7 +858,7 @@ class App:
         # 강제 완료 플래그 우선
         if self.force_data.get((classId, nameKey)):
             return STATUS_READY
-        courses  = self.all_classes.get(classId, {}).get('courses', {})
+        courses  = active_courses(self.all_classes.get(classId, {}))
         subjects = list(courses.keys())
         filled = sum(1 for subj in subjects
                      if self.student_data.get((classId, nameKey, subj), {}).get('value', ''))
@@ -887,7 +888,7 @@ class App:
         for classId, cls_data in self._my_classes(group):
             if self._is_sub_teacher(classId):
                 continue
-            courses    = cls_data.get('courses', {})
+            courses    = active_courses(cls_data)
             subjects   = list(courses.keys())
             tb_grade   = {subj: courses[subj].get('curriculum', '') for subj in subjects}
             class_info = self._class_info_for(classId, subjects)
@@ -1382,7 +1383,7 @@ class App:
         if not cid: return
         cls_student_keys = [k for k, v in self.all_students.items()
                              if v.get('class') == cid]
-        courses  = self.all_classes.get(cid, {}).get('courses', {})
+        courses  = active_courses(self.all_classes.get(cid, {}))
         subjects = list(courses.keys())
 
         for nameKey in cls_student_keys:
@@ -1529,8 +1530,8 @@ class App:
                 if len(parts) != 2:
                     continue
                 classId, subject = parts
-                # 방어: 현존하는 과목(classes/{classId}/courses)이 아니면 무시 — 삭제된 과목의 고아 진도/과제 차단
-                _courses = (self.all_classes.get(classId, {}) or {}).get('courses', {}) or {}
+                # 방어: 활성 과목(archived 제외)이 아니면 무시 — 삭제·보관된 과목의 고아 진도/과제 차단
+                _courses = active_courses(self.all_classes.get(classId, {}))
                 if subject not in _courses:
                     continue
                 tk_key = (classId, subject)

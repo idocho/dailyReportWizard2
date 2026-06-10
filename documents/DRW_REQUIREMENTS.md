@@ -1,7 +1,7 @@
 # DailyReportWizard — 요구사항 명세서
 
 **Crafted by IDO(idocho@kakao.com) · Powered by Claude AI**  
-**문서 버전**: 7.9 · **앱 버전**: v2.2.1 · **최종 수정**: 2026-06-08
+**문서 버전**: 8.0 · **앱 버전**: v2.2.2 · **최종 수정**: 2026-06-10
 
 > Firebase 스키마 전체 명세: [ClassManager/documents/DB_SCHEMA.md](../../ClassManager/documents/DB_SCHEMA.md)
 
@@ -11,6 +11,7 @@
 
 | 문서 버전 | 날짜 | 주요 변경 |
 |-----------|------|-----------|
+| 8.0 | 2026-06-10 | **과목 소프트 삭제(archived) + classes 전체 PUT 제거 (v2.2.2)** ① 웹 `rmCourse`가 하드 삭제(`fbPut null`) 대신 **`classes/{classId}/courses/{subject}/archived: true` 마킹** — obs/scores/history/session 기록을 DB에 보존하면서 표시·입력·전송에서만 제외(웹 `activeCourses()`, PC `firebase.active_courses()` 공통 필터). 같은 과정·교재 재추가 시 `archived:null` PATCH로 **복원**(기존 기록 그대로 연결, `addCourseInline`/`wzAddCourse` 중복 검사도 archived 구분). Analyzer는 course 노드가 보존되므로 보관 과목의 과거 기록 조인 가능. 관리자 과목 목록은 보관 과목을 「보관」 배지로 표시. `_canInputWeekly`·`_syncAssignments`·PC 가져오기 방어필터 모두 활성 과목 기준. 실패 시 무음이던 `rmCourse` DB 쓰기에 toast+로컬 롤백 추가. ② **`pushCfg()`(classes 노드 전체 PUT) 제거** — stale 로컬 config를 가진 다른 기기가 삭제된 과목을 통째 부활시키던 버그 원인(3MAXIMO 사례). `rmCls`는 해당 학급 노드만 타겟 `fbPut null`로 전환, 죽은 코드 `addCls`/`addCourse`(prompt형) 삭제. 기존 3MAXIMO 잔존 과목 2건(공통수학1 시험직전R·대수 RPM)은 DB에서 archived 마킹 완료 |
 | 7.9 | 2026-06-08 | **특이사항 전송 시 소거 — 당일 소비 모델 (v2.2.0)** `input/{nameKey}/__note__`(특이사항)가 날짜 무관 단일 필드라 전송 후에도 영속 → 다음 가져오기 시 옛 메모가 잔류하던 문제. 전송 확정 시점(`_push_history`)에 ① 메시지 최종 note → `history/`(기존), ② **원본 입력 note `input/{nameKey}/__note__` → null 소거**(신규, 단일 원자적 multi-path PATCH). 특이사항이 obs(날짜별)처럼 "당일 소비"로 동작 → 다음날/가져오기 fresh. PC의 input/ 쓰기는 전송된 학생 `__note__` 소거만 허용(CLAUDE.md 규칙 반영) |
 | 7.8 | 2026-06-08 | **진도/과제 메시지 제외 토글 + 버그픽스 (v2.2.0)** ① 데일리 탭 중앙 패널 "오늘 수업(반 공통)" 과목별 **`✕ 메시지서 제외`** 토글 — 전날 잔류 진도/과제 등 불필요 데이터를 담임이 이번 전송 메시지서 제외(메모리 `exclude_prog`, DB·readiness 무관, 전송/가져오기 시 리셋). `_class_info_for()` 공통 헬퍼로 preview·전송 일관. 부담임은 토글 미표시. ② **빈 웹 note 미반영 버그** — `_import_mobile_data` `if final` 가드 제거, `__note__` 빈값도 항상 덮어씀(기존 기록 잔류 방지). ③ **AI 일괄생성 진행 팝업 잔류 버그** — OK 모달 → 자동 소멸 modeless Toplevel, 완료/에러 시 `_close_prog()`. ④ **삭제된 과목 진도/과제 고아 read 버그** — 웹 `rmCourse`가 `classes/courses`만 지우고 `session/class_data/{classId\|subject}`는 잔류시켜 PC가 계속 read하던 문제. (a) PC 가져오기 시 **현존 `courses`에 없는 pkey 무시**(방어 필터), (b) 웹 과목 삭제 시 `session/class_data` 동반 null PATCH(예방), (c) 기존 고아 11건 1회 청소 |
 | 7.7 | 2026-06-08 | **메시지 발송 탭 신설 — ClassManager 발송 기능 이식 (v2.2.0)** 메인 UI를 `ttk.Notebook` 2탭 구조로 전환(헤더/크레딧은 상단 고정). ① **탭1 「📋 데일리 리포트」** = 기존 시트바+3패널+상태바+푸터 워크플로우 그대로(빌더 4개에 `parent` 인자 추가, 동작·레이아웃 무변경). ② **탭2 「✉ 메시지 발송」** 신설(§2.13) — **담당 학생 전체**(`_my_classes('M')+_my_classes('T')`, 부담임🔒 반 제외, nameKey 중복 제거)를 반별 체크박스로 제공, `{이름}{반}{날짜}` 변수 템플릿(`templates.json` 로컬 영속)·미리보기·**이미지 첨부**(본문↔이미지 순서 토글) 후 카톡 일괄 전송. 데일리 전용 부수효과(`history/` 기록·전송 후 초기화)는 **호출 안 함** — 일반 공지/안내 발송 전용. ③ 카톡 키 시퀀스를 `_kakao_send_one(m, wait, warm)` 공용 헬퍼로 추출 — `_do_send`(데일리)·`_do_bulk_send`(발송 탭) 공유, 이미지 송신(`copy_image_to_clipboard`+붙여넣기, `img_wait=max(wait,1.0)`) 일원화. 신규 모듈 `kakao_image.py`, `message.render/build_bulk_ctx/bulk_variables`, `storage.load_templates/save_templates`. ④ **⚙ 설정 버튼을 노트북 탭 행 우측으로 이동** — 기존 데일리 탭 시트바에서 분리, 두 탭이 공유하는 전역 설정(Firebase·강사·AI키·room_prefix·wait_time)이라 탭과 동일 행(노트북 탭 스트립) 우측에 `place(in_=nb, relx=1.0, anchor='ne')` 오버레이로 배치. M/T·📥 가져오기·🗑 초기화는 데일리 워크플로우 컨트롤이라 탭 내 유지 |
@@ -837,6 +838,17 @@ cfg.sheets.M.classes.중1A.tb_grade  = { "최상위수학": "중1-1", "우공비
             tb_grade: { "우공비": "중3-1", "라이트쎈": "중3-1" }  ← v3.4 신규
             is_sub: false   ← 구버전 폴백 (assignments.role 우선)
       T/ ...
+
+  classes/                  ← 웹·CM 쓰기 / 전 클라이언트 읽기 (v2.0 정본 — config/sheets 아님)
+    {classId}/
+      group: "M"|"T"
+      courses/
+        {subject}/           ← subject = "{과정} {교재}" 조합 키
+          textbook:   "SIGNATURE 100+"
+          curriculum: "중3-1"
+          archived:   true   ← v8.0 소프트 삭제. true면 보관 과목 — 표시·입력·전송 제외,
+                               obs/scores/history/session 기록은 보존. 같은 키 재추가 시 필드 제거(복원).
+                               쓰기는 항상 과목 노드 단위 PATCH (classes 전체 PUT 금지 — 부활 버그)
 
   input/                    ← 웹 쓰기 / PC·Analyzer 읽기  (당일, 휘발)
     {nameKey}/
