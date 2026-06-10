@@ -1214,11 +1214,11 @@ class App:
         if not body.strip() and not img_path:
             messagebox.showinfo("알림", "본문 또는 첨부 이미지가 필요합니다."); return
 
-        prefix = self.config.get('room_prefix', '오직 ')
         msgs = []
         for s in sel:
             ctx = build_bulk_ctx(s['name'], s['classId'])
-            m = {'name': s['name'], 'room': f"{prefix}{s['name']}", 'msg': render(body, ctx)}
+            # 방 검색어는 get_room 단일 경로 — prefix-이름 공백 1개 보장 (직접 이어붙이기 금지)
+            m = {'name': s['name'], 'room': get_room(self.config, s['name']), 'msg': render(body, ctx)}
             if img_path:
                 m['image']       = img_path
                 m['image_first'] = img_first
