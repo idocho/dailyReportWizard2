@@ -61,13 +61,16 @@ from ai_engine import AiEngine
 from message   import (today_str, get_room, nickname_suffix, build_message,
                        render, build_bulk_ctx, bulk_variables)
 from kakao_image import (copy_image_to_clipboard, focus_kakao,
-                         room_opened, copy_text_verified)
+                         room_opened, copy_text_verified,
+                         set_debug_log, send_debug)
 
 class App:
     def __init__(self, root):
         self.root = root
         self.root.title(f"{APP_TITLE}  {APP_VERSION}")
         self.root.configure(bg=BG)
+        # 전송 게이트 진단 로그 (exe는 콘솔이 없어 print 유실 — 파일 기록)
+        set_debug_log(os.path.join(RUNTIME_DIR, 'send_debug.log'))
         self.root.geometry("1100x780")
         self.root.minsize(920, 680)
         self.root.resizable(True, True)
@@ -1281,6 +1284,7 @@ class App:
                 sent += 1
             except Exception as e:
                 print(f"오류 [{m['name']}]: {e}")
+                send_debug(f"학생 실패 [{m['name']}]: {e}")
                 failed.append(m.get('name', '?'))
             time.sleep(0.8)
         cancelled = cancel.is_set()
@@ -2400,14 +2404,17 @@ class App:
             pyautogui.press('enter');    time.sleep(max(w, 0.4))
             return room_opened(room)
 
+        send_debug(f"send start room={room!r} wait={wait} warm={warm}")
         time.sleep(warm)
         if not _open_room(wait, warm):
             # 재시도 1회 — 검색 패널 정리·메인 창 재포커스 후 대기 늘려서
+            send_debug(f"1차 열기 실패 → 재시도 room={room!r}")
             pyautogui.press('esc'); time.sleep(0.3)
             focus_kakao(0.4)
             if not _open_room(max(wait, 1.0), 0.3):
                 pyautogui.press('esc')
                 raise RuntimeError(f"채팅방 열기 실패(검색 미일치/응답 지연): {room}")
+        send_debug(f"방 열림 확인 → 본문 전송 room={room!r}")
 
         def _send_text():
             if not m.get('msg'):
@@ -2469,6 +2476,7 @@ class App:
                 sent += 1
             except Exception as e:
                 print(f"오류 [{m['name']}]: {e}")
+                send_debug(f"학생 실패 [{m['name']}]: {e}")
                 failed.append(m.get('name', '?'))
             time.sleep(0.8)
 

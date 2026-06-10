@@ -55,6 +55,29 @@ def copy_image_to_clipboard(path: str) -> bool:
         return False
 
 
+# ── 전송 디버그 로그 (exe는 console=False라 print 유실 — 파일로) ──────
+_DBG_PATH = None
+
+
+def set_debug_log(path):
+    """전송 게이트 진단 로그 파일 경로 설정 (앱 시작 시 1회)."""
+    global _DBG_PATH
+    _DBG_PATH = path
+
+
+def _dbg(msg):
+    if not _DBG_PATH:
+        return
+    try:
+        with open(_DBG_PATH, 'a', encoding='utf-8') as f:
+            f.write(f"[{time.strftime('%H:%M:%S')}] {msg}\n")
+    except OSError:
+        pass
+
+
+send_debug = _dbg  # 외부(app.py)에서 전송 단계 기록용 공개 별칭
+
+
 # ── 카카오톡 창 자동 포커스 (v2.2.3) ─────────────────────────────────
 # 기존: 전송 시작 후 3초 안에 사용자가 직접 카톡 창을 클릭해야 했음 — 실패 시
 # 키 입력이 엉뚱한 창으로 들어가는 간헐 오류의 최다 원인. 자동 포커스로 대체.
@@ -110,11 +133,15 @@ def room_opened(room: str, tries: int = 6, interval: float = 0.25) -> bool:
     if not _IS_WIN:
         return True
     import re
+    titles = []
     for _ in range(tries):
         t = foreground_title().strip()
+        titles.append(t)
         if t == room or (t.startswith(room) and re.fullmatch(r'[\s\d()]*', t[len(room):])):
+            _dbg(f"room_opened OK room={room!r}")
             return True
         time.sleep(interval)
+    _dbg(f"room_opened FAIL room={room!r} seen={titles!r}")
     return False
 
 
@@ -123,17 +150,22 @@ def copy_text_verified(text: str, timeout: float = 1.5) -> bool:
     try:
         import pyperclip
     except ImportError:
+        _dbg("copy_text_verified FAIL: pyperclip import 불가")
         return False
     deadline = time.time() + timeout
+    last_err = None
     while time.time() < deadline:
         try:
             pyperclip.copy(text)
             time.sleep(0.05)
-            if pyperclip.paste() == text:
+            got = pyperclip.paste()
+            if got == text:
                 return True
-        except Exception:
-            pass
+            last_err = f"불일치 got={got[:40]!r}"
+        except Exception as e:
+            last_err = repr(e)
         time.sleep(0.1)
+    _dbg(f"copy_text_verified FAIL text={text[:40]!r} last={last_err}")
     return False
 
 
