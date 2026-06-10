@@ -331,8 +331,8 @@
       <h3>프로그램 다운로드</h3>
       <p>아래 버튼으로 최신 실행 파일을 내려받습니다. (약 23MB, 설치 과정 없는 단일 실행 파일)</p>
       <p style="margin:10px 0">
-        <a class="dlbtn" href="https://github.com/idocho/dailyReportWizard2/releases/download/v2.2.1/DailyReportWizard_v2.2.1.exe">⬇ DailyReportWizard_v2.2.1.exe 다운로드</a>
-        <span style="display:inline-block;margin-left:10px;font-size:12px;color:var(--gray)">최신 버전 <b>v2.2.1</b></span>
+        <a class="dlbtn" href="https://github.com/idocho/dailyReportWizard2/releases/download/v2.2.2/DailyReportWizard_v2.2.2.exe">⬇ DailyReportWizard_v2.2.2.exe 다운로드</a>
+        <span style="display:inline-block;margin-left:10px;font-size:12px;color:var(--gray)">최신 버전 <b>v2.2.2</b></span>
       </p>
       <p style="font-size:12.5px;color:var(--gray)">전체 릴리즈 목록:
         <a href="https://github.com/idocho/dailyReportWizard2/releases" target="_blank" rel="noopener">github.com/idocho/dailyReportWizard2/releases</a></p>
@@ -615,13 +615,18 @@
     <tr><td>🔑 내 계정</td><td>강사 이름 조회/등록, 다른 계정으로 전환.</td></tr>
     <tr><td>🎯 자주 쓰는 문구</td><td>과제 평가에 쓰는 문구(프리셋) 추가·수정·삭제. 내 계정에만 적용.</td></tr>
     <tr><td>📚 내 담당 수업</td><td>담당 반·과목·역할 추가/삭제.</td></tr>
-    <tr><td>🏫 학급 &amp; 학생 관리</td><td>학급·과목·학생 추가/삭제. 과목엔 커리큘럼(학년학기)·교재명 연결.</td></tr>
+    <tr><td>🏫 학급 &amp; 학생 관리</td><td>학급·과목·학생 추가/삭제. 과목엔 커리큘럼(학년학기)·교재명 연결. 과목 삭제는 <b>보관(숨김)</b> 처리 — 기록은 보존.</td></tr>
     <tr><td>🗑 초기화</td><td>항목을 골라 선택 초기화. 카드를 탭해 다중 선택 후 실행.</td></tr>
     <tr><td>🔒 관리자 모드</td><td>암호 입력 시 활성. 강사 관리·전체 데이터 초기화 등 고위험 기능 노출.</td></tr>
   </table>
 
   <div class="note warn"><span class="ico">🛑</span><div><b>초기화는 되돌릴 수 없습니다.</b> 특히 👑 관리자 전용 항목(전체 입력/진도 삭제, 명단 &amp; 설정 삭제)은
     모든 강사 데이터에 영향을 줍니다. 베타 중에는 꼭 필요할 때만, 두 번 확인하고 실행하세요.</div></div>
+
+  <div class="note tip"><span class="ico">🆕</span><div><b>v2.2.2 — 과목 보관(소프트 삭제).</b>
+    학급 관리에서 과목(교재) 칩의 <b>×</b> 를 누르면 이제 완전 삭제가 아니라 <b>보관(숨김)</b> 처리됩니다.
+    화면·입력·전송에서는 사라지지만 <b>그동안의 관찰·성적 기록은 모두 보존</b>되어 월간 리포트에 계속 활용됩니다.
+    내신 대비가 끝나 원래 교재로 돌아갈 때처럼 <b>같은 과정·교재를 다시 추가하면 그대로 복원</b>되고 이전 기록도 이어집니다.</div></div>
 
   <h2 class="sec">데이터 동기화 주의</h2>
   <div class="note info"><span class="ico">🔄</span><div>
@@ -645,6 +650,11 @@
   <details class="faq"><summary>성적 저장이 안 돼요</summary>
     <div class="ans"><p>입력 권한 문제일 수 있습니다. 주간/단원 시험은 과목 담당, 학년단위 시험은 담임만 저장 가능합니다.
       본인 역할(담임/부담임)을 <span class="nav-chip">📚 내 담당 수업</span> 에서 확인하세요.</p></div>
+  </details>
+  <details class="faq"><summary>삭제한 교재가 PC 앱에 계속 보여요</summary>
+    <div class="ans"><p>웹과 PC 모두 <b>v2.2.2 이상</b>이어야 합니다. v2.2.2부터 과목 삭제가 '보관' 방식으로 바뀌어
+      모든 기기에서 일관되게 숨겨집니다. 구버전 PC 앱은 보관 과목을 인식하지 못하니 최신 exe로 업데이트하세요.
+      이미 보관한 과목을 되살리려면 학급 관리에서 같은 과정·교재를 다시 추가하면 됩니다.</p></div>
   </details>
   <details class="faq"><summary>화면이 작다고 차단되나요?</summary>
     <div class="ans"><p>베타 기간에는 소형 화면 차단을 해제해 두었습니다. 다만 9인치급 이상 태블릿(가로) 또는 PC가 가장 편합니다.
