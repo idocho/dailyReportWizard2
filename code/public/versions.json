@@ -1,54 +1,12 @@
 {
-  "_comment": "버전 포털 메타. 새 버전 추가 시 이 배열 맨 앞에 항목 추가 후 scripts/build-portal.ps1 실행. tagClass: dev|beta|old",
+  "_comment": "버전 포털 메타. DB 스키마 완전 하위호환 버전만 공개 — 구버전은 hosting ignore + v2.2.2 redirect (firebase.json). 새 버전 추가 시 맨 앞에 항목 추가 후 scripts/build-portal.ps1 실행. tagClass: dev|beta|old",
   "versions": [
     {
       "v": "v2.2.2",
-      "tag": "개발중",
-      "tagClass": "dev",
-      "title": "최신 개발본",
-      "desc": "과목 소프트 삭제(보관) — 삭제해도 기록 보존·노출만 차단, 동일 교재 재추가 시 복원 · 과목 삭제 무음 실패 수정 · classes 전체 PUT 제거(삭제 과목 부활 버그 차단)"
-    },
-    {
-      "v": "v2.2.1",
-      "tag": "이전",
-      "tagClass": "old",
-      "title": "이전 개발본",
-      "desc": "특이사항 당일 소비(전송 시 소거) · 진도/과제 메시지 제외 토글 · 삭제 과목 정리 · 설치형 PWA · 전송창·일괄생성 UX 개선"
-    },
-    {
-      "v": "v2.2.0",
-      "tag": "이전",
-      "tagClass": "old",
-      "title": "이전 개발본",
-      "desc": "메시지 발송 탭 신설 — 담당 학생 전체에게 템플릿·이미지 일괄 발송 · 설정 버튼 전역 이동"
-    },
-    {
-      "v": "v2.1.2",
-      "tag": "이전",
-      "tagClass": "old",
-      "title": "이전 개발본",
-      "desc": "DB 재구조화 · 전송 코멘트 누적(history) · 학생별 관찰태그 표시 · Analyzer 정합"
-    },
-    {
-      "v": "v2.1.1",
-      "tag": "이전",
-      "tagClass": "old",
-      "title": "이전 개발본",
-      "desc": "특이사항 학생별 단일 필드로 정리 · 온보딩 위저드"
-    },
-    {
-      "v": "v2.1.0",
-      "tag": "이전",
-      "tagClass": "old",
-      "title": "이전 개발본",
-      "desc": "온보딩 설정 위저드 · 미니멀·프로 디자인 리뉴얼"
-    },
-    {
-      "v": "v2.0.5",
       "tag": "베타",
       "tagClass": "beta",
       "title": "베타 릴리즈 · 현재 안정판",
-      "desc": "카카오톡 전송 대상 개별 선택 · 순차 전송 취소"
+      "desc": "과목 소프트 삭제(보관) — 삭제해도 기록 보존·노출만 차단, 동일 교재 재추가 시 복원 · 과목 삭제 무음 실패 수정 · classes 전체 PUT 제거(삭제 과목 부활 버그 차단)"
     }
   ]
 }
