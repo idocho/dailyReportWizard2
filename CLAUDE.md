@@ -21,12 +21,19 @@
 ### 프로젝트 파일 위치
 | 항목 | 경로 |
 |------|------|
-| 웹 PWA JS (분할) | `code/public/js/app-core.js`, `app-input.js`, `app-scores.js`, `app-settings.js` |
-| 웹 PWA CSS | `code/public/css/app.css` |
-| 웹 PWA HTML | `code/public/index.html` |
+| **현재 개발 라인 (웹 수정은 여기만)** | `code/public/v2.2.3/` — JS `js/app-core.js`·`app-input.js`·`app-scores.js`·`app-settings.js`, CSS `css/app.css`, HTML `index.html` |
+| 동결 버전 (수정 금지) | `code/public/v2.2.2/` 이하 전 버전 — 릴리즈 시 `scripts/new-version.ps1`로 동결 복제 |
+| 버전 포털 | `code/public/versions.json` → `scripts/build-portal.ps1` 로 `code/public/index.html` 생성 |
+| PC 앱 | `code/app.py`, `firebase.py`, `constants.py`, `ai_engine.py` 등 |
 | 요구사항 문서 | `documents/DRW_REQUIREMENTS.md` |
 | Analyzer 요구사항 | `documents/ANALYZER_REQUIREMENTS.md` |
-| 커리큘럼 원본 JSON | `src/math-curriculum-2022.json` |
+| 공유 DB 스키마 정본 | `../ClassManager/documents/DB_SCHEMA.md` |
+| 커리큘럼 원본 JSON | `code/public/v2.2.3/data/math-curriculum-2022.json` (버전 디렉터리 내 — 별도 `src/` 없음) |
+
+### 버전 정책 (2026-06-11~)
+- **DB 스키마 완전 하위호환 버전만 호스팅 공개.** 구버전은 `firebase.json` ignore + `/v최신/` 302 redirect
+- 웹 변경은 항상 현재 개발 라인 디렉터리에만. JS/CSS 수정 시 `index.html` 캐시버스트 `?v=` 갱신
+- 릴리즈: 개발 라인 안정화 → versions.json 라벨 갱신(안정판) → 다음 개발 라인 신설(`new-version.ps1`)
 
 ## 아키텍처 핵심 원칙
 
