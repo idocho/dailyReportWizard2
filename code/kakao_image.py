@@ -123,7 +123,7 @@ def foreground_title() -> str:
     return buf.value
 
 
-def room_opened(room: str, tries: int = 6, interval: float = 0.25) -> bool:
+def room_opened(room: str, tries: int = 15, interval: float = 0.1) -> bool:
     """카톡 채팅방이 실제로 열렸는지 검증 — 전면 창 제목이 방 이름과 일치할 때까지 폴링.
 
     검색→Enter 후 방이 안 열린 채 본문을 붙여넣으면 검색창/이전 방으로 발사되는
@@ -191,6 +191,9 @@ def focus_kakao(settle: float = 0.6) -> bool:
     import ctypes
     user32 = ctypes.windll.user32
     SW_RESTORE, VK_MENU, KEYEVENTF_KEYUP = 9, 0x12, 2
+    # 빠른 경로: 이미 전면이면 복원/ALT/대기 생략 (연속 발송 시 학생당 settle 절약)
+    if user32.IsWindowVisible(hwnd) and user32.GetForegroundWindow() == hwnd:
+        return True
     try:
         if not user32.IsWindowVisible(hwnd) or user32.IsIconic(hwnd):
             user32.ShowWindow(hwnd, SW_RESTORE)   # 트레이/최소화 → 복원

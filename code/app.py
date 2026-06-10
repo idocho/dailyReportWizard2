@@ -1286,7 +1286,7 @@ class App:
                 print(f"오류 [{m['name']}]: {e}")
                 send_debug(f"학생 실패 [{m['name']}]: {e}")
                 failed.append(m.get('name', '?'))
-            time.sleep(0.8)
+            time.sleep(0.3)  # 학생 간 간격 — 게이트 검증으로 단축(기존 0.8)
         cancelled = cancel.is_set()
         def _done():
             self._bulk_set_cancel(False)
@@ -2393,25 +2393,29 @@ class App:
         img_wait = max(wait, 1.0)
         room = m['room']
 
-        def _open_room(w, settle):
-            """검색창 초기화 → 방 이름 검색 → Enter → 방 열림 검증."""
+        def _open_room(key_gap, search_load, post_enter):
+            """검색창 초기화 → 방 이름 검색 → Enter → 방 열림 검증(폴링이 즉시 통과 감지).
+
+            key_gap: 키 입력 간 간격, search_load: 붙여넣기 후 검색 결과 로딩 대기,
+            post_enter: Enter 후 방 창 생성까지 최소 대기 — 이후는 room_opened 폴링이 흡수."""
             if not copy_text_verified(room):
                 return False
-            pyautogui.hotkey(_MOD, 'f'); time.sleep(0.2 + settle)
-            pyautogui.press('esc');      time.sleep(0.2)
-            pyautogui.hotkey(_MOD, 'f'); time.sleep(w)
-            pyautogui.hotkey(_MOD, 'v'); time.sleep(max(w, 0.5))
-            pyautogui.press('enter');    time.sleep(max(w, 0.4))
+            pyautogui.hotkey(_MOD, 'f'); time.sleep(key_gap)
+            pyautogui.press('esc');      time.sleep(key_gap)
+            pyautogui.hotkey(_MOD, 'f'); time.sleep(key_gap)
+            pyautogui.hotkey(_MOD, 'v'); time.sleep(search_load)
+            pyautogui.press('enter');    time.sleep(post_enter)
             return room_opened(room)
 
         send_debug(f"send start room={room!r} wait={wait} warm={warm}")
         time.sleep(warm)
-        if not _open_room(wait, warm):
-            # 재시도 1회 — 검색 패널 정리·메인 창 재포커스 후 대기 늘려서
-            send_debug(f"1차 열기 실패 → 재시도 room={room!r}")
+        # 빠른 1차 시도 — 검증 게이트가 실패를 즉시 감지하므로 고정 마진 최소화.
+        # 실패 시에만 느린 프로파일로 재시도 (시스템 부하·카톡 응답 지연 흡수).
+        if not _open_room(max(0.15, wait * 0.5) + warm, max(0.3, wait), 0.1):
+            send_debug(f"1차 열기 실패 → 느린 프로파일 재시도 room={room!r}")
             pyautogui.press('esc'); time.sleep(0.3)
             focus_kakao(0.4)
-            if not _open_room(max(wait, 1.0), 0.3):
+            if not _open_room(0.3, max(wait, 1.0), 0.5):
                 pyautogui.press('esc')
                 raise RuntimeError(f"채팅방 열기 실패(검색 미일치/응답 지연): {room}")
         send_debug(f"방 열림 확인 → 본문 전송 room={room!r}")
@@ -2421,8 +2425,8 @@ class App:
                 return
             if not copy_text_verified(m['msg']):
                 raise RuntimeError(f"본문 클립보드 복사 실패: {room}")
-            pyautogui.hotkey(_MOD, 'v'); time.sleep(0.2)
-            pyautogui.press('enter');    time.sleep(0.3)
+            pyautogui.hotkey(_MOD, 'v'); time.sleep(0.15)
+            pyautogui.press('enter');    time.sleep(0.2)
 
         def _send_image():
             img = m.get('image')
@@ -2478,7 +2482,7 @@ class App:
                 print(f"오류 [{m['name']}]: {e}")
                 send_debug(f"학생 실패 [{m['name']}]: {e}")
                 failed.append(m.get('name', '?'))
-            time.sleep(0.8)
+            time.sleep(0.3)  # 학생 간 간격 — 게이트 검증으로 단축(기존 0.8)
 
         cancelled = cancel.is_set()
         if focus_lost:
