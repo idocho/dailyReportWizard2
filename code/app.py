@@ -72,6 +72,11 @@ class App:
         self.root.configure(bg=BG)
         # 전송 게이트 진단 로그 (exe는 콘솔이 없어 print 유실 — 파일 기록)
         set_debug_log(os.path.join(RUNTIME_DIR, 'send_debug.log'))
+        # 스마트 전송 속도 상태 — 학습된 wait 는 config에 영속(다음 실행 이어받음)
+        self._smart_wait        = float(self.config.get('smart_wait', 0.5) or 0.5)
+        self._smart_fast_streak = 0
+        self._open_ema          = None   # "Enter→방 열림" 실측 지연 EMA
+        self._last_open_stats   = None   # (t_open, retried) — 직전 학생 측정값
         self.root.geometry("1100x780")
         self.root.minsize(920, 680)
         self.root.resizable(True, True)
@@ -1283,6 +1288,7 @@ class App:
                 focus_lost = True
                 break
             warm = 0.6 if i == 0 else 0.0
+            wait = self._send_wait()   # 스마트 모드: 직전 학생 측정으로 갱신된 값
             try:
                 self._kakao_send_one(m, wait, warm)
                 sent += 1
@@ -1290,8 +1296,12 @@ class App:
                 print(f"오류 [{m['name']}]: {e}")
                 send_debug(f"학생 실패 [{m['name']}]: {e}")
                 failed.append(m.get('name', '?'))
+            if self._last_open_stats:
+                self._smart_adjust(*self._last_open_stats)
+                self._last_open_stats = None
             time.sleep(0.3)  # 학생 간 간격 — 게이트 검증으로 단축(기존 0.8)
         cancelled = cancel.is_set()
+        self._smart_persist()   # 스마트 모드 학습값 저장 — 다음 실행 이어받기
         def _done():
             self._bulk_set_cancel(False)
             fail_line = f"\n⚠ 실패 {len(failed)}명: {', '.join(failed)}" if failed else ""
@@ -2024,14 +2034,15 @@ class App:
         delay_grid.columnconfigure(1, weight=1)
 
         tk.Label(delay_grid, text="전송 속도", font=FS, bg=BG, fg=SUBTEXT).grid(row=0, column=0, sticky='w', pady=3, padx=(0,8))
-        speed_var = tk.StringVar(value=self.config.get('send_speed', 'normal'))
+        speed_var = tk.StringVar(value=self.config.get('send_speed', 'smart'))
         speed_row = tk.Frame(delay_grid, bg=BG)
         speed_row.grid(row=0, column=1, sticky='w')
-        for _val, _lbl in (('fast', '고속'), ('normal', '보통 (권장)'), ('stable', '안정')):
+        for _val, _lbl in (('smart', '스마트 (권장)'), ('fast', '고속'),
+                           ('normal', '보통'), ('stable', '안정')):
             tk.Radiobutton(speed_row, text=_lbl, variable=speed_var, value=_val,
                            font=FS, bg=BG, fg=TEXT, selectcolor=BG,
-                           activebackground=BG).pack(side='left', padx=(0, 10))
-        tk.Label(delay_grid, text="고속=고성능 PC · 보통=일반 환경 · 안정=저사양/카톡 응답 느릴 때",
+                           activebackground=BG).pack(side='left', padx=(0, 8))
+        tk.Label(delay_grid, text="스마트=응답 속도를 실측해 자동 가감속 · 고속/보통/안정=수동 고정",
                  font=FS, bg=BG, fg=GRAY).grid(row=1, column=1, sticky='w', pady=(0, 3))
 
         tk.Label(delay_grid, text="카톡 접두사", font=FS, bg=BG, fg=SUBTEXT).grid(row=2, column=0, sticky='w', pady=3, padx=(0,8))
@@ -2377,10 +2388,49 @@ class App:
     # 전송 속도 프리셋 → 단계 대기(초). 검증 게이트가 실패를 흡수하므로
     # 프리셋은 "1차 시도 마진"만 결정 — 안정은 저사양/카톡 응답 지연 환경용.
     _SEND_SPEED_WAITS = {'fast': 0.3, 'normal': 0.5, 'stable': 1.0}
+    _SMART_MIN, _SMART_MAX = 0.25, 1.2
 
     def _send_wait(self):
-        # 구 wait_time(숫자) 설정 잔존 시에도 프리셋 우선, 미설정이면 보통
-        return self._SEND_SPEED_WAITS.get(self.config.get('send_speed', 'normal'), 0.5)
+        """현재 전송 속도 — 스마트면 학습값, 수동 프리셋이면 고정값. 미설정은 스마트."""
+        mode = self.config.get('send_speed', 'smart')
+        if mode == 'smart':
+            return self._smart_wait
+        return self._SEND_SPEED_WAITS.get(mode, 0.5)
+
+    def _smart_adjust(self, t_open, retried):
+        """스마트 모드 적응(AIMD + EMA) — 게이트 실측이 곧 시스템 응답성 신호.
+
+        · 1차 실패(재시도 발생) → wait ×1.6 즉시 감속 (승법 증가)
+        · 빠른 통과(t_open≤0.2s) 연속 3회 → wait -0.1s 가속 (가산 감소)
+        · 지연 EMA 가 높으면(>0.6s) 선제 감속 — 추세 반영
+        범위 [0.25, 1.2]s. 검증 게이트가 바닥을 받치므로 공격적이어도 오발송 불가."""
+        if self.config.get('send_speed', 'smart') != 'smart':
+            return
+        self._open_ema = t_open if self._open_ema is None else 0.6 * self._open_ema + 0.4 * t_open
+        if retried:
+            self._smart_wait = min(self._SMART_MAX, self._smart_wait * 1.6)
+            self._smart_fast_streak = 0
+        elif self._open_ema > 0.8:
+            self._smart_wait = min(self._SMART_MAX, self._smart_wait + 0.1)
+            self._smart_fast_streak = 0
+        elif t_open <= 0.2:
+            self._smart_fast_streak += 1
+            if self._smart_fast_streak >= 2:
+                self._smart_wait = max(self._SMART_MIN, self._smart_wait - 0.15)
+                self._smart_fast_streak = 0
+        else:
+            self._smart_fast_streak = 0
+        send_debug(f"smart wait={self._smart_wait:.2f} t_open={t_open:.2f} "
+                   f"retried={retried} ema={self._open_ema:.2f}")
+
+    def _smart_persist(self):
+        """학습된 wait 영속 — 다음 실행이 이어받음 (스마트 모드일 때만)."""
+        if self.config.get('send_speed', 'smart') == 'smart':
+            self.config['smart_wait'] = round(self._smart_wait, 2)
+            try:
+                save_config(self.config)
+            except Exception:
+                pass
 
     def _set_send_btn_cancel(self, on):
         """전송 중 send_btn → 취소 버튼 토글."""
@@ -2421,20 +2471,29 @@ class App:
             pyautogui.press('esc');      time.sleep(key_gap)
             pyautogui.hotkey(_MOD, 'f'); time.sleep(key_gap)
             pyautogui.hotkey(_MOD, 'v'); time.sleep(search_load)
-            pyautogui.press('enter');    time.sleep(post_enter)
-            return room_opened(room)
+            pyautogui.press('enter')
+            _t0 = time.time()
+            time.sleep(post_enter)
+            ok = room_opened(room)
+            self._last_t_open = time.time() - _t0   # 스마트 모드 적응용 실측
+            return ok
 
-        send_debug(f"send start room={room!r} wait={wait} warm={warm}")
+        send_debug(f"send start room={room!r} wait={wait:.2f} warm={warm}")
         time.sleep(warm)
+        self._last_t_open = None
+        retried = False
         # 빠른 1차 시도 — 검증 게이트가 실패를 즉시 감지하므로 고정 마진 최소화.
         # 실패 시에만 느린 프로파일로 재시도 (시스템 부하·카톡 응답 지연 흡수).
         if not _open_room(max(0.15, wait * 0.5) + warm, max(0.3, wait), 0.1):
             send_debug(f"1차 열기 실패 → 느린 프로파일 재시도 room={room!r}")
+            retried = True
             pyautogui.press('esc'); time.sleep(0.3)
             focus_kakao(0.4)
             if not _open_room(0.3, max(wait, 1.0), 0.5):
                 pyautogui.press('esc')
+                self._last_open_stats = (1.5, True)   # 완전 실패 — 최대 지연으로 학습
                 raise RuntimeError(f"채팅방 열기 실패(검색 미일치/응답 지연): {room}")
+        self._last_open_stats = (self._last_t_open if self._last_t_open is not None else 1.5, retried)
         send_debug(f"방 열림 확인 → 본문 전송 room={room!r}")
 
         def _send_text():
@@ -2532,6 +2591,7 @@ class App:
                 break
             # 첫 학생 워밍업 — 카톡 창 포커스/검색 안정화 (첫 전송 오작동 방지)
             warm = 0.6 if i == 0 else 0.0
+            wait = self._send_wait()   # 스마트 모드: 직전 학생 측정으로 갱신된 값
             try:
                 self._kakao_send_one(m, wait, warm)
                 sent += 1
@@ -2539,9 +2599,13 @@ class App:
                 print(f"오류 [{m['name']}]: {e}")
                 send_debug(f"학생 실패 [{m['name']}]: {e}")
                 failed.append(m.get('name', '?'))
+            if self._last_open_stats:
+                self._smart_adjust(*self._last_open_stats)
+                self._last_open_stats = None
             time.sleep(0.3)  # 학생 간 간격 — 게이트 검증으로 단축(기존 0.8)
 
         cancelled = cancel.is_set()
+        self._smart_persist()   # 스마트 모드 학습값 저장 — 다음 실행 이어받기
         if focus_lost:
             def _lost():
                 self._set_send_btn_cancel(False)
