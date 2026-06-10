@@ -133,16 +133,18 @@ def room_opened(room: str, tries: int = 6, interval: float = 0.25) -> bool:
     if not _IS_WIN:
         return True
     import re
-    # 공백 무시 비교 — 카톡 검색이 공백을 무시하므로 room_prefix 공백 유무("오직조이도" vs
-    # 창 제목 "오직 조이도")로 검증만 실패하던 실측 사례 대응. 잔여부 숫자/괄호는 허용(인원수).
+    # 포함 비교(공백 무시) — "오직 XXX"는 검색 키워드일 뿐, 실제 창 제목은 친구명 등
+    # 다른 텍스트와 섞여 있을 수 있음(실측). 카톡 검색도 공백 무시라 동일 기준 적용.
+    # 단, 메인 창 제목('카카오톡')은 방 아님 — 키워드가 제목에 포함될 때만 통과.
     norm = lambda s: re.sub(r'\s+', '', s)
     nr = norm(room)
+    if not nr:
+        return False
     titles = []
     for _ in range(tries):
         t = foreground_title().strip()
         titles.append(t)
-        nt = norm(t)
-        if nt == nr or (nt.startswith(nr) and re.fullmatch(r'[\d()]*', nt[len(nr):])):
+        if nr in norm(t):
             _dbg(f"room_opened OK room={room!r} title={t!r}")
             return True
         time.sleep(interval)
