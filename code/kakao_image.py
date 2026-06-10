@@ -89,6 +89,54 @@ def _find_kakao_hwnd():
     return (main or fallback or [None])[0]
 
 
+def foreground_title() -> str:
+    """현재 전면 창 제목. 비 Windows 는 빈 문자열."""
+    if not _IS_WIN:
+        return ""
+    import ctypes
+    user32 = ctypes.windll.user32
+    buf = ctypes.create_unicode_buffer(256)
+    user32.GetWindowTextW(user32.GetForegroundWindow(), buf, 256)
+    return buf.value
+
+
+def room_opened(room: str, tries: int = 6, interval: float = 0.25) -> bool:
+    """카톡 채팅방이 실제로 열렸는지 검증 — 전면 창 제목이 방 이름과 일치할 때까지 폴링.
+
+    검색→Enter 후 방이 안 열린 채 본문을 붙여넣으면 검색창/이전 방으로 발사되는
+    연쇄 오류(단일 방 연속 전송·미전송)의 차단 지점. 비 Windows 는 검증 생략(True).
+    제목 잔여부가 숫자/공백/괄호뿐이면 허용(그룹방 인원수 표기 대응).
+    """
+    if not _IS_WIN:
+        return True
+    import re
+    for _ in range(tries):
+        t = foreground_title().strip()
+        if t == room or (t.startswith(room) and re.fullmatch(r'[\s\d()]*', t[len(room):])):
+            return True
+        time.sleep(interval)
+    return False
+
+
+def copy_text_verified(text: str, timeout: float = 1.5) -> bool:
+    """클립보드에 텍스트 복사 후 실제 반영을 확인. 클립보드 레이스(이전 내용 붙여넣기) 차단."""
+    try:
+        import pyperclip
+    except ImportError:
+        return False
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        try:
+            pyperclip.copy(text)
+            time.sleep(0.05)
+            if pyperclip.paste() == text:
+                return True
+        except Exception:
+            pass
+        time.sleep(0.1)
+    return False
+
+
 def focus_kakao(settle: float = 0.6) -> bool:
     """카카오톡 메인 창을 전면으로. 성공(전면 확인) 시 True.
 

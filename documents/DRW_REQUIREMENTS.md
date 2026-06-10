@@ -1,7 +1,7 @@
 # DailyReportWizard — 요구사항 명세서
 
 **Crafted by IDO(idocho@kakao.com) · Powered by Claude AI**  
-**문서 버전**: 8.4 · **앱 버전**: v2.2.3(개발)/v2.2.2(안정) · **최종 수정**: 2026-06-11
+**문서 버전**: 8.5 · **앱 버전**: v2.2.3(개발)/v2.2.2(안정) · **최종 수정**: 2026-06-11
 
 > Firebase 스키마 전체 명세: [ClassManager/documents/DB_SCHEMA.md](../../ClassManager/documents/DB_SCHEMA.md)
 
@@ -11,6 +11,7 @@
 
 | 문서 버전 | 날짜 | 주요 변경 |
 |-----------|------|-----------|
+| 8.5 | 2026-06-11 | **카톡 순차 전송 검증 게이트 — 연쇄 오류(단일 방 연속 전송·미전송) 차단** 검색→Enter 후 방이 실제 열렸는지 확인 없이 본문을 붙여넣던 것이 원인: 타이밍 한 번 밀리면 본문이 검색창/이전 방으로 발사돼 연쇄. `_kakao_send_one` 재구성 — ① `copy_text_verified()`: 클립보드 반영 폴링 확인(이전 내용 붙여넣기 레이스 차단), ② `room_opened()`: 전면 창 제목=방 이름 폴링 검증(그룹방 인원수 표기 허용) — **미확인 시 본문 미발사**, ③ 실패 시 검색 정리+메인 재포커스 후 대기 늘려 1회 재시도, 그래도 실패면 예외 → 해당 학생만 실패 집계(연쇄 차단, 오방 전송도 차단). 본문 클립보드도 검증. ClassManager `kakao_send.py` 동일 미러. 헬퍼: `kakao_image.foreground_title/room_opened/copy_text_verified` |
 | 8.4 | 2026-06-11 | **카카오톡 창 자동 포커스 — 간헐 전송 오류 근본 대응** 기존 "전송 시작 후 3초 내 카톡 창 직접 클릭" 의존이 간헐 오류 최다 원인(실패 시 키 입력이 엉뚱한 창으로). `kakao_image.focus_kakao()` 신설 — Win32 EnumWindows로 카톡 메인 창(제목 '카카오톡'/'KakaoTalk', class `EVA_Window_Dblclk` 우선) 탐지, **트레이 상태(invisible)도 SW_RESTORE 복원**, ALT 탭 후 SetForegroundWindow + 전면 검증. `_do_send`/`_do_bulk_send`: 3초 카운트다운 → 1초 취소 여유+자동 포커스(실패 시 키 입력 없이 안전 중단, 데이터 유지), **매 학생 전 재포커스**(전송 중 사용자 개입 복구, 소실 시 해당 지점 중단+안내). 버튼/다이얼로그 문구에서 수동 클릭 지시 제거. ClassManager `kakao_send.py`에도 동일 구현(매 건 재포커스, done_cb는 실제 성공 건수). 실기 검증: 트레이 숨김 카톡 복원·전면화 성공 |
 | 8.3 | 2026-06-11 | **메시지 발송 기본 빌트인 템플릿** `storage.DEFAULT_TEMPLATES` 5종(일반 공지·휴원/일정 변경·시험 안내·결석 보강 안내·교재 준비 안내, 변수 {이름}{반}{날짜}) — `templates.json` 없거나 비어 있을 때만 시드, 사용자 수정·삭제분은 재주입 안 함. CM도 동일 정책으로 6종(공통 5 + 성적 통보 score형) — `ClassManager/template_engine.DEFAULT_TEMPLATES` |
 | 8.2 | 2026-06-11 | **신뢰성 일괄 수정 (v2.2.3 개발 라인)** ① **[웹] 주간성적 입력 차단 해제** — `_canInputWeekly`가 `course.instructor` 필드로 판정했으나 과목 등록이 이 필드를 저장한 적 없어(실DB 36과목 전부 미보유) 반별 시험 저장이 전원 차단되던 버그. 담당 수업 배정(assignments) 기준으로 교체(`_canInputAchievement`와 동일 모델). ② **[웹] write 실패 표면화** — 핵심 입력 3종(과제수행도/메모·진도/과제·관찰태그)의 무음 실패(`setSync` no-op)와 설정·성적·초기화의 `.catch(()=>{})` 21곳을 `fbFail(label)` toast로 일괄 교체. 로컬 저장은 유지되므로 재시도 안내. ③ **[PC] 전송 시 특이사항 유실 가드** — `_push_history`의 history 기록+`__note__` 소거를 루트 단일 multi-path PATCH로 원자화(실패 시 둘 다 미적용 → note 보존, 경고 팝업). `_do_send` 카톡 예외 학생을 sent에서 제외하고 실패 명단 표시, 실패 존재 시 로컬 초기화 보류(재전송 가능). ④ [CM] 성적통지 nameKey/meta 버그 수정은 ClassManager repo(template_engine v2.0 스키마 대응 + 회귀 테스트 3종) 참조 |

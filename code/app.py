@@ -60,7 +60,8 @@ from firebase import (firebase_get, firebase_put, firebase_patch, fetch_tags,
 from ai_engine import AiEngine
 from message   import (today_str, get_room, nickname_suffix, build_message,
                        render, build_bulk_ctx, bulk_variables)
-from kakao_image import copy_image_to_clipboard, focus_kakao
+from kakao_image import (copy_image_to_clipboard, focus_kakao,
+                         room_opened, copy_text_verified)
 
 class App:
     def __init__(self, root):
@@ -2376,25 +2377,43 @@ class App:
         self.send_status.config(text="⏹  취소 중... (현재 학생 완료 후 중단)")
 
     def _kakao_send_one(self, m, wait, warm=0.0):
-        """단일 톡방 전송: 검색→이동→본문/이미지 송신.
+        """단일 톡방 전송: 검색→이동→**방 열림 검증**→본문/이미지 송신.
         데일리 리포트·메시지 발송 탭 공용 키 시퀀스.
         m: {room, msg, image(선택), image_first(선택)}.
+
+        v2.2.3 검증 게이트 — 간헐 연쇄 오류(단일 방 연속 전송·미전송) 차단:
+        · 클립보드 반영 검증(copy_text_verified) — 이전 내용 붙여넣기 레이스 차단
+        · 방 열림 검증(room_opened: 전면 창 제목=방 이름) — 미확인 시 본문 미발사,
+          1회 재시도(대기 증가) 후에도 실패면 예외 → 호출측이 해당 학생만 실패 처리
         이미지는 붙여넣기 미리보기 팝업 고려해 img_wait=max(wait,1.0) 사용."""
         img_wait = max(wait, 1.0)
+        room = m['room']
 
-        # 채팅방 검색·이동
-        pyperclip.copy(m['room'])
+        def _open_room(w, settle):
+            """검색창 초기화 → 방 이름 검색 → Enter → 방 열림 검증."""
+            if not copy_text_verified(room):
+                return False
+            pyautogui.hotkey(_MOD, 'f'); time.sleep(0.2 + settle)
+            pyautogui.press('esc');      time.sleep(0.2)
+            pyautogui.hotkey(_MOD, 'f'); time.sleep(w)
+            pyautogui.hotkey(_MOD, 'v'); time.sleep(max(w, 0.5))
+            pyautogui.press('enter');    time.sleep(max(w, 0.4))
+            return room_opened(room)
+
         time.sleep(warm)
-        pyautogui.hotkey(_MOD, 'f'); time.sleep(0.2 + warm)
-        pyautogui.press('esc');      time.sleep(0.2)
-        pyautogui.hotkey(_MOD, 'f'); time.sleep(wait)
-        pyautogui.hotkey(_MOD, 'v'); time.sleep(wait)
-        pyautogui.press('enter');    time.sleep(wait)
+        if not _open_room(wait, warm):
+            # 재시도 1회 — 검색 패널 정리·메인 창 재포커스 후 대기 늘려서
+            pyautogui.press('esc'); time.sleep(0.3)
+            focus_kakao(0.4)
+            if not _open_room(max(wait, 1.0), 0.3):
+                pyautogui.press('esc')
+                raise RuntimeError(f"채팅방 열기 실패(검색 미일치/응답 지연): {room}")
 
         def _send_text():
             if not m.get('msg'):
                 return
-            pyperclip.copy(m['msg'])
+            if not copy_text_verified(m['msg']):
+                raise RuntimeError(f"본문 클립보드 복사 실패: {room}")
             pyautogui.hotkey(_MOD, 'v'); time.sleep(0.2)
             pyautogui.press('enter');    time.sleep(0.3)
 
