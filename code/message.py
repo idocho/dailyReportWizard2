@@ -33,9 +33,12 @@ def today_str():
 
 
 def get_room(cfg, name):
-    """학생 이름으로 톡방 검색어 생성."""
-    prefix = cfg.get('room_prefix', '오직 ')
-    return f"{prefix}{name}"
+    """학생 이름으로 톡방 검색어 생성.
+
+    방 이름 규칙은 '오직 XXX' — prefix 설정값의 공백 유무와 무관하게
+    prefix와 이름 사이 공백 1개를 보장한다(설정 "오직"/"오직 " 모두 동일 결과)."""
+    prefix = (cfg.get('room_prefix') or '오직').strip()
+    return f"{prefix} {name}" if prefix else name
 
 
 def nickname_suffix(full_name):
