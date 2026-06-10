@@ -82,6 +82,7 @@ send_debug = _dbg  # 외부(app.py)에서 전송 단계 기록용 공개 별칭
 # 기존: 전송 시작 후 3초 안에 사용자가 직접 카톡 창을 클릭해야 했음 — 실패 시
 # 키 입력이 엉뚱한 창으로 들어가는 간헐 오류의 최다 원인. 자동 포커스로 대체.
 _KAKAO_TITLES = ("카카오톡", "KakaoTalk")
+WIN_VERIFY = _IS_WIN  # 창 제목 기반 검증 가능 여부 (비 Windows 는 레거시 고정 대기 경로 사용)
 
 
 def _find_kakao_hwnd():

@@ -62,7 +62,7 @@ from message   import (today_str, get_room, nickname_suffix, build_message,
                        render, build_bulk_ctx, bulk_variables)
 from kakao_image import (copy_image_to_clipboard, focus_kakao,
                          room_opened, copy_text_verified,
-                         set_debug_log, send_debug)
+                         set_debug_log, send_debug, WIN_VERIFY, foreground_title)
 
 class App:
     def __init__(self, root):
@@ -2428,20 +2428,55 @@ class App:
             pyautogui.hotkey(_MOD, 'v'); time.sleep(0.15)
             pyautogui.press('enter');    time.sleep(0.2)
 
+        def _in_room():
+            """전면이 이 방인가 — 팝업이 뜨면 전면 제목이 방을 벗어남(상태 센서)."""
+            return room_opened(room, tries=1, interval=0)
+
         def _send_image():
             img = m.get('image')
             if not img:
                 return
             if not copy_image_to_clipboard(img):
                 return
-            pyautogui.hotkey(_MOD, 'v'); time.sleep(img_wait)
-            pyautogui.press('enter');    time.sleep(img_wait)
+            if not WIN_VERIFY:
+                # 레거시 경로(비 Windows): 고정 대기
+                pyautogui.hotkey(_MOD, 'v'); time.sleep(img_wait)
+                pyautogui.press('enter');    time.sleep(img_wait)
+                return
+            # 이미지 붙여넣기 → 확인 팝업 흐름 (간헐적으로 로딩이 김 — 이벤트 대기로 흡수)
+            pyautogui.hotkey(_MOD, 'v')
+            deadline = time.time() + 8.0          # ① 팝업 등장 대기 (대용량 이미지 대비)
+            while time.time() < deadline and _in_room():
+                time.sleep(0.15)
+            if _in_room():
+                # 팝업이 끝내 안 뜸 = 붙여넣기 미동작 — Enter 미발사(스트레이 입력 방지)
+                send_debug(f"이미지 팝업 미표시 room={room!r} fg={foreground_title()!r}")
+                raise RuntimeError(f"이미지 팝업 미표시(붙여넣기 실패 추정): {room}")
+            send_debug(f"이미지 팝업 확인 → 전송 room={room!r}")
+            pyautogui.press('enter')              # 팝업 확인 = 전송
+            deadline = time.time() + 8.0          # ② 팝업 닫힘(전송 시작) 검증
+            while time.time() < deadline and not _in_room():
+                time.sleep(0.15)
+            if not _in_room():
+                send_debug(f"이미지 팝업 미종료 room={room!r} fg={foreground_title()!r}")
+                pyautogui.press('esc')            # 팝업 잔존 → 취소 후 실패 처리
+                raise RuntimeError(f"이미지 전송 확인 실패(팝업 미종료): {room}")
 
         if m.get('image_first'):
             _send_image(); _send_text()
         else:
             _send_text(); _send_image()
-        pyautogui.press('esc')
+        # 방 탈출 보장 — 팝업/지연으로 esc가 방 아닌 곳에 먹혀 한 방에 갇히는 문제 차단.
+        # 전면이 이 방을 벗어날 때까지 esc 반복(최대 4회).
+        if WIN_VERIFY:
+            for _ in range(4):
+                pyautogui.press('esc'); time.sleep(0.2)
+                if not _in_room():
+                    break
+            else:
+                send_debug(f"방 탈출 실패(esc 4회) room={room!r}")
+        else:
+            pyautogui.press('esc')
 
     def _do_send(self, msgs):
         cancel = self._send_cancel
