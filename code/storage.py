@@ -81,17 +81,33 @@ def save_config(cfg):
         json.dump(cfg, f, ensure_ascii=False, indent=2)
 
 
+# 기본 빌트인 템플릿 — templates.json 이 없거나 비어 있을 때 시드.
+# 사용자가 수정·삭제하면 그대로 유지(재주입 안 함). 발송 탭 변수: {이름} {반} {날짜}.
+DEFAULT_TEMPLATES = [
+    {"name": "일반 공지",
+     "body": "안녕하세요, {이름} 학부모님.\n{반} 반 안내 말씀드립니다.\n\n(내용을 입력하세요)\n\n감사합니다."},
+    {"name": "휴원/일정 변경",
+     "body": "안녕하세요, {이름} 학부모님.\n\n학원 일정 안내드립니다.\n○월 ○일(○)은 휴원입니다.\n보강 일정은 정해지는 대로 다시 안내드리겠습니다.\n\n감사합니다."},
+    {"name": "시험 안내",
+     "body": "안녕하세요, {이름} 학부모님.\n\n{반} 반 시험 일정을 안내드립니다.\n• 일시: ○월 ○일(○) 수업 시간\n• 범위: (범위를 입력하세요)\n\n가정에서도 격려 부탁드립니다.\n감사합니다."},
+    {"name": "결석 보강 안내",
+     "body": "안녕하세요, {이름} 학부모님.\n\n{날짜} {이름} 학생 결석 관련 안내드립니다.\n보강 일정: ○월 ○일(○) ○시\n\n일정 조율이 필요하시면 회신 부탁드립니다.\n감사합니다."},
+    {"name": "교재 준비 안내",
+     "body": "안녕하세요, {이름} 학부모님.\n\n{반} 반 교재 안내드립니다.\n다음 수업부터 「(교재명)」 교재를 사용합니다.\n수업 전까지 준비 부탁드립니다.\n\n감사합니다."},
+]
+
+
 def load_templates():
-    """메시지 발송 탭 템플릿 목록 로드 → [{name, body}, ...]. 없으면 빈 리스트."""
+    """메시지 발송 탭 템플릿 목록 로드 → [{name, body}, ...]. 없거나 비면 기본 빌트인 시드."""
     if os.path.exists(TEMPLATES_PATH):
         try:
             with open(TEMPLATES_PATH, 'r', encoding='utf-8') as f:
                 data = json.load(f)
-            if isinstance(data, list):
+            if isinstance(data, list) and data:
                 return data
         except Exception:
             pass
-    return []
+    return [dict(t) for t in DEFAULT_TEMPLATES]
 
 
 def save_templates(templates):
