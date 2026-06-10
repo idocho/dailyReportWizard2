@@ -62,7 +62,8 @@ from message   import (today_str, get_room, nickname_suffix, build_message,
                        render, build_bulk_ctx, bulk_variables)
 from kakao_image import (copy_image_to_clipboard, focus_kakao,
                          room_opened, copy_text_verified,
-                         set_debug_log, send_debug, WIN_VERIFY, foreground_title)
+                         set_debug_log, send_debug, WIN_VERIFY, foreground_title,
+                         prefetch_image)
 
 class App:
     def __init__(self, root):
@@ -1268,6 +1269,9 @@ class App:
                     "카카오톡 실행·로그인 상태를 확인한 뒤 다시 전송하세요.")
             self.root.after(0, _no_kakao)
             return
+        # 이미지 DIB 선행 변환 — 학생별 PowerShell 재기동(1~2s) 제거, 첫 학생부터 무지연
+        for _img in {m['image'] for m in msgs if m.get('image')}:
+            prefetch_image(_img)
         sent = 0
         failed = []
         focus_lost = False

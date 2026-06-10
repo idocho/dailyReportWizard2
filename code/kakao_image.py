@@ -16,17 +16,108 @@ _IS_MAC = sys.platform == "darwin"
 _CREATE_NO_WINDOW = 0x08000000  # Windows: 콘솔 창 깜빡임 방지
 
 
+# ── 이미지 → DIB 캐시 (v2.2.3 속도 최적화) ──────────────────────────
+# 일괄 전송은 같은 이미지를 학생 수만큼 반복 복사 — 매번 PowerShell 기동(1~2s)이
+# 텍스트→이미지 사이 체감 지연의 원인. 1회 BMP 변환 후 DIB 바이트를 캐시하고
+# 이후엔 ctypes 로 즉시 클립보드 세팅(~ms).
+_DIB_CACHE = {}  # path -> (mtime, dib_bytes)
+
+
+def _image_to_dib(path: str):
+    """이미지 파일 → 클립보드용 DIB 바이트 (BMP 변환 1회 + mtime 캐시)."""
+    mtime = os.path.getmtime(path)
+    cached = _DIB_CACHE.get(path)
+    if cached and cached[0] == mtime:
+        return cached[1]
+    import tempfile
+    bmp_path = os.path.join(tempfile.gettempdir(), f"_drw_clip_{os.getpid()}.bmp")
+    safe_in  = path.replace("'", "''")
+    safe_out = bmp_path.replace("'", "''")
+    ps = (
+        "Add-Type -AssemblyName System.Drawing;"
+        f"$img=[System.Drawing.Image]::FromFile('{safe_in}');"
+        "$bmp=New-Object System.Drawing.Bitmap $img;"
+        f"$bmp.Save('{safe_out}',[System.Drawing.Imaging.ImageFormat]::Bmp);"
+        "$bmp.Dispose();$img.Dispose()"
+    )
+    subprocess.run(["powershell", "-NoProfile", "-Command", ps],
+                   check=True, capture_output=True, creationflags=_CREATE_NO_WINDOW)
+    with open(bmp_path, 'rb') as f:
+        data = f.read()
+    try:
+        os.remove(bmp_path)
+    except OSError:
+        pass
+    dib = data[14:]  # BITMAPFILEHEADER(14B) 제거 → CF_DIB 페이로드
+    _DIB_CACHE.clear()          # 단일 캐시(일괄 전송은 이미지 1장) — 메모리 무한 적재 방지
+    _DIB_CACHE[path] = (mtime, dib)
+    return dib
+
+
+def prefetch_image(path: str) -> bool:
+    """전송 루프 시작 전 이미지 DIB 변환을 선행 — 첫 학생도 무지연. 실패해도 무해(폴백)."""
+    if not (_IS_WIN and path and os.path.exists(path)):
+        return False
+    try:
+        _image_to_dib(path)
+        return True
+    except Exception as e:
+        _dbg(f"prefetch_image 실패 {path!r}: {e}")
+        return False
+
+
+def _set_clipboard_dib(dib: bytes) -> bool:
+    """CF_DIB 를 ctypes 로 클립보드에 세팅 (64bit 핸들 안전)."""
+    import ctypes
+    from ctypes import wintypes
+    k32, u32 = ctypes.windll.kernel32, ctypes.windll.user32
+    k32.GlobalAlloc.restype = wintypes.HGLOBAL
+    k32.GlobalLock.restype = ctypes.c_void_p
+    k32.GlobalLock.argtypes = [wintypes.HGLOBAL]
+    k32.GlobalUnlock.argtypes = [wintypes.HGLOBAL]
+    u32.SetClipboardData.restype = wintypes.HANDLE
+    u32.SetClipboardData.argtypes = [wintypes.UINT, wintypes.HANDLE]
+    GMEM_MOVEABLE, CF_DIB = 0x0002, 8
+    h = k32.GlobalAlloc(GMEM_MOVEABLE, len(dib))
+    if not h:
+        return False
+    p = k32.GlobalLock(h)
+    ctypes.memmove(p, dib, len(dib))
+    k32.GlobalUnlock(h)
+    for _ in range(10):                      # 클립보드 점유 경합 재시도
+        if u32.OpenClipboard(0):
+            break
+        time.sleep(0.05)
+    else:
+        k32.GlobalFree(h)
+        return False
+    try:
+        u32.EmptyClipboard()
+        ok = bool(u32.SetClipboardData(CF_DIB, h))  # 성공 시 소유권 시스템 이전
+        if not ok:
+            k32.GlobalFree(h)
+        return ok
+    finally:
+        u32.CloseClipboard()
+
+
 def copy_image_to_clipboard(path: str) -> bool:
     """
     이미지 파일을 OS 클립보드에 비트맵으로 복사. 성공 시 True.
 
-    Windows: PowerShell + .NET Clipboard.SetImage (추가 pip 의존성 없음).
-             Clipboard.SetImage 는 STA 스레드를 요구하므로 -STA 로 실행.
+    Windows: DIB 캐시 + ctypes (반복 복사 ~ms). 실패 시 PowerShell SetImage 폴백.
     macOS:   osascript 로 PNG 데이터를 클립보드에 설정.
     """
     if not path or not os.path.exists(path):
         print(f"이미지 없음: {path}")
         return False
+    if _IS_WIN:
+        try:
+            if _set_clipboard_dib(_image_to_dib(path)):
+                return True
+            _dbg(f"DIB 클립보드 세팅 실패 → PowerShell 폴백: {path!r}")
+        except Exception as e:
+            _dbg(f"DIB 경로 실패 → PowerShell 폴백: {path!r} {e!r}")
     try:
         if _IS_WIN:
             safe = path.replace("'", "''")
