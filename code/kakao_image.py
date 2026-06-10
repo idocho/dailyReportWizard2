@@ -133,12 +133,17 @@ def room_opened(room: str, tries: int = 6, interval: float = 0.25) -> bool:
     if not _IS_WIN:
         return True
     import re
+    # 공백 무시 비교 — 카톡 검색이 공백을 무시하므로 room_prefix 공백 유무("오직조이도" vs
+    # 창 제목 "오직 조이도")로 검증만 실패하던 실측 사례 대응. 잔여부 숫자/괄호는 허용(인원수).
+    norm = lambda s: re.sub(r'\s+', '', s)
+    nr = norm(room)
     titles = []
     for _ in range(tries):
         t = foreground_title().strip()
         titles.append(t)
-        if t == room or (t.startswith(room) and re.fullmatch(r'[\s\d()]*', t[len(room):])):
-            _dbg(f"room_opened OK room={room!r}")
+        nt = norm(t)
+        if nt == nr or (nt.startswith(nr) and re.fullmatch(r'[\d()]*', nt[len(nr):])):
+            _dbg(f"room_opened OK room={room!r} title={t!r}")
             return True
         time.sleep(interval)
     _dbg(f"room_opened FAIL room={room!r} seen={titles!r}")
