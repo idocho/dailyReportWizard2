@@ -165,6 +165,14 @@ async function wzAddCourse(){
   if(!config.classes[wzCls].courses)config.classes[wzCls].courses={};
   const wzPrev=config.classes[wzCls].courses[subject];
   if(wzPrev&&!wzPrev.archived){toast('이미 추가된 과목입니다.');return;}
+  const wzTwin=_findCourseTwin(config.classes[wzCls].courses,curriculum,textbook,subject);
+  if(wzTwin){
+    const tc=config.classes[wzCls].courses[wzTwin];
+    if(!tc.archived){toast('이미 추가된 과목입니다.');return;}
+    delete tc.archived;saveLocal();renderMain(); // 보관된 구형 키 복원 — 새 키 생성 대신 (중복 방지)
+    if(dbUrl&&dbPath){try{await fbPatch(`classes/${wzCls}/courses/${wzTwin}`,{archived:null});_registerTbName(tc.textbook||textbook);toast('보관 과목 복원됨 ✅');}catch(e){toast('저장 실패: '+e,4000);}}
+    return;
+  }
   const wzRestoring=!!(wzPrev&&wzPrev.archived); // 보관 과목 재추가 = 복원
   const courseData={textbook,curriculum};
   config.classes[wzCls].courses[subject]=courseData;
@@ -452,6 +460,17 @@ function renderClsMgmtClass(classId){
   </div>`;
 }
 
+// 표시 동일 과목(과정·교재 필드 일치, 키 상이) 탐색 — 구형 키(교재명만)와 신형 복합 키의
+// 중복 등록 방지. 칩 표시가 필드 기반이라 키가 달라도 똑같이 보이는 중복이 생길 수 있음(3MSM 사례)
+function _findCourseTwin(courses,curriculum,textbook,excludeKey){
+  const nc=_normGradeSem(curriculum),nt=_normTbName(textbook);
+  for(const[k,c]of Object.entries(courses||{})){
+    if(k===excludeKey||!c)continue;
+    if(_normGradeSem(c.curriculum||'')===nc&&_normTbName(c.textbook||'')===nt)return k;
+  }
+  return null;
+}
+
 // 과목 칩 1개 (활성) — 과정 라벨 + 교재명 + 보관(×)
 function _courseChipHtml(classId,subj,course){
   const curriculum=course.curriculum||'';
@@ -630,6 +649,13 @@ function addCourseInline(classId,btnEl){
     const existingCourses=config?.classes?.[classId]?.courses||{};
     const prev=existingCourses[subject];
     if(prev&&!prev.archived){toast('이미 추가된 과목입니다 (같은 과정·교재).');return;}
+    const twin=_findCourseTwin(existingCourses,curriculum,textbook,subject);
+    if(twin){
+      if(!existingCourses[twin].archived){toast('이미 추가된 과목입니다 (같은 과정·교재).');return;}
+      wrapper.remove();
+      restoreCourse(classId,twin); // 보관된 구형 키 → 새 키 생성 대신 그 키 그대로 복원 (중복 방지)
+      return;
+    }
     const restoring=!!(prev&&prev.archived); // 보관 과목 재추가 = 복원 (기존 기록 그대로 연결)
     if(!config.classes)config.classes={};
     if(!config.classes[classId])config.classes[classId]={group:'',courses:{}};
