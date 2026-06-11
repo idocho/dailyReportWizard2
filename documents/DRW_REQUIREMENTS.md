@@ -1,7 +1,7 @@
 # DailyReportWizard — 요구사항 명세서
 
 **Crafted by IDO(idocho@kakao.com) · Powered by Claude AI**  
-**문서 버전**: 8.16 · **앱 버전**: v2.2.3(개발)/v2.2.2(안정) · **최종 수정**: 2026-06-11
+**문서 버전**: 8.17 · **앱 버전**: v2.2.3(개발)/v2.2.2(안정) · **최종 수정**: 2026-06-11
 
 > Firebase 스키마 전체 명세: [ClassManager/documents/DB_SCHEMA.md](../../ClassManager/documents/DB_SCHEMA.md)
 
@@ -11,6 +11,7 @@
 
 | 문서 버전 | 날짜 | 주요 변경 |
 |-----------|------|-----------|
+| 8.17 | 2026-06-11 | **[웹] 보관 과목 원클릭 복원 + 교재 표시 정렬** ① 학급 관리 과목 칩에 **보관 행** 신설 — 보관 과목 있을 때만 「▸ 보관 N」 토글(기본 접힘) 표시, 펼치면 빗금·흐림 칩 + **↩ 복원** 버튼. `restoreCourse()`: 확인 → `archived:null` PATCH(기존 obs/scores/history 그대로 연결, 로컬 롤백+toast) — 종전 "같은 과정·교재 재입력" 복원 방식의 사용성 개선(재입력 복원도 그대로 동작). 담당 배정은 보관 시 제거되므로 복원 후 「수업 추가」에서 재배정. 권한은 과목 등록과 동일(강사 가능). 마크업은 `_courseChipsBlockHtml()` 단일 헬퍼로 통합(아코디언·드릴인·refresh 3곳 발산 방지) ② **교재 표시 정렬** — 과목 칩(과정→교재명)·담당 수업 목록(설정/위저드, 학급→과정→교재명)·수업 입력 과목 알약 모두 ko 오름차순. `_sortedAsgns()` 원본 인덱스 보존으로 removeA/selA 인덱스 핸들러 무영향(저장 순서 불변, 표시만 정렬) |
 | 8.16 | 2026-06-11 | **Security Rules 전환 사전 배선 (#15 — 룰 미배포, 운영 무영향)** ① **4클라 DB Secret(`?auth=`) 옵션 지원** — 웹 `fbE()`(+설정·위저드 「DB 시크릿」 입력란, `drw_db_secret`), PC `firebase.py _fb_url`(+`config.json firebase_secret`, constants 기본키), CM `_fb_url`(+설정 탭 「Firebase Secret」, `dbSecret`), Analyzer `fbE()`(+설정 패널, `drw_fb_secret`, 「DRW 설정 가져오기」가 시크릿도 복사). **시크릿 미설정 시 종전과 100% 동일(no-op)**. 백업/복원 스크립트(backup_db.py·restore_db.py)도 동일 지원 — 룰 배포 후 안전망 유지. ② **schema_version 게이트** — DB `{path}/schema_version`(정수, 스키마 v1.4=14)이 클라 `SCHEMA_MAX` 초과 시 차단(웹=차단 화면, PC·CM=에러 후 종료, Analyzer=경고만/read-only). 노드 부재·읽기 실패=통과(전환 전 호환·가용성 우선). ③ `database.rules.json` deny-by-default 초안(의도적으로 firebase.json 미연결 — 오발 배포 방지) + 전환 런북 `documents/SECURITY_RULES_PLAN.md`(클라 먼저 무장→노드 생성→룰 배포→검증→롤백 절차) |
 | 8.15 | 2026-06-11 | **신뢰성/정합 일괄** ① **[웹] obs 동시쓰기 race 완화(C3)** — `pushObs(…,field)`가 날짜 객체 통째가 아니라 변경된 필드만 `obs/{nk}/{subj}/{date}` 키 단위 PATCH. 두 강사 동시 입력 시 서로 다른 태그 필드 충돌·유실 방지. ② **[웹·PC] 동명이인 오발송 가드(B4)** — 전송 직전 표시이름 중복 검사, 겹치는 이름 전원 자동 제외+안내(같은 '오직 {이름}' 방으로 합쳐져 타 학부모 발송되던 위험). DRW `_dedup_same_name`(데일리·발송 탭), CM `_send` 동일. ③ **[운영] 백업 월간 영구 스냅샷** — 매월 1일 백업은 30일 경과해도 보존(반 소속 등 장기 이력 소급 조회). ④ **잔재 정리(C4)** — DB `lastSent` 노드 삭제, 본문 lastSent 잔재·assignments 형식 정정(DRW_REQ §5, DB_SCHEMA v1.4 객체배열). Analyzer v0.3(nameKey-first 종단 비교)은 별도 repo |
 | 8.14 | 2026-06-11 | **교재 명단 — 전역 레지스트리 + 관리자 관리 UI** `config/textbooks/{교재명}: true` 부활(문서 v3.3 노드) — classes와 독립이라 **반 전체 삭제에도 교재명 자동완성 보존**(학기 개편 대비). ① 과목 등록(addCourseInline/wzAddCourse) 시 `_registerTbName()` 자동 등록(공백 정규화·idempotent), ② 자동완성 datalist = 레지스트리 ∪ 현존 courses, **ko 오름차순 정렬**, ③ 관리자 설정 「📚 교재 명단」 섹션 — 목록(오름차순)+직접 추가+✕ 제거(자동완성 후보에서만 제외, 과목·기록 무영향), admin 가드. 기존 DB 과목(보관 포함)에서 15개 시드 완료 — 철자 변형 중복(SIGNATURE 100+/Signature100+/시그니처 100+ 등)은 관리자 UI로 정리 가능 |

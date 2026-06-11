@@ -38,7 +38,7 @@ function renderInput(mc){
       }).join('');
       groupTabHtml='<div style="display:flex;gap:0;background:var(--panel);border-bottom:1px solid var(--border)">'+grBtns+'</div>';
     }
-    const grAsgns=asgns.filter(function(a){return (a.group||'')===activeGroup;});
+    const grAsgns=_sortedAsgns(asgns).map(function(p){return p.a;}).filter(function(a){return (a.group||'')===activeGroup;});
     const tabs=grAsgns.map(function(x){
       const i=asgns.indexOf(x);
       const sel=i===curAI;

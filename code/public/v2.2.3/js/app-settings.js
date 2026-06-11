@@ -110,7 +110,7 @@ function _wzPane(){
   const asgns=instructor?.assignments||[];
   const rows=asgns.length
     ?`<div class="wz-list"><div class="wz-list-r hd"><span>반</span><span>과목</span><span>역할</span><span></span></div>`
-      +asgns.map((a,i)=>`<div class="wz-list-r"><span style="font-weight:700">${esc(a.classId)}</span><span style="color:var(--sub)">${esc(a.subject)}</span><span style="color:var(--indigo)">${esc(a.role||'담임')}</span><button class="wz-rm" onclick="removeA(${i})">✕</button></div>`).join('')+`</div>`
+      +_sortedAsgns(asgns).map(({a,i})=>`<div class="wz-list-r"><span style="font-weight:700">${esc(a.classId)}</span><span style="color:var(--sub)">${esc(a.subject)}</span><span style="color:var(--indigo)">${esc(a.role||'담임')}</span><button class="wz-rm" onclick="removeA(${i})">✕</button></div>`).join('')+`</div>`
     :`<div style="font-size:12px;color:var(--gray);text-align:center;padding:6px 0 12px">아직 배정된 수업이 없어요.</div>`;
   const clsList=Object.keys(config?.classes||{});
   if(!clsList.length)return rows+`<div class="wz-hint" style="text-align:center;padding:10px 0">⚠️ 학급이 없습니다. 이전 단계에서 학생 명단을 먼저 불러오세요.</div>`;
@@ -185,7 +185,7 @@ function renderSettings(mc){
   const asgRows=!asgns.length
     ?`<div style="padding:10px 12px;font-size:12px;color:var(--gray)">담당 수업이 없습니다.</div>`
     :`<div class="ar" style="grid-template-columns:1fr 1fr 52px 30px;background:#F8FAFC;font-size:10px;font-weight:700;color:var(--sub)"><span>반</span><span>과목</span><span>역할</span><span></span></div>`
-      +asgns.map((a,i)=>`<div class="ar" style="grid-template-columns:1fr 1fr 52px 30px"><span style="font-weight:700">${esc(a.classId)}</span><span style="color:var(--sub);font-size:11px">${esc(a.subject)}</span><span style="font-size:10px;color:var(--indigo)">${esc(a.role||'담임')}</span><button style="background:none;border:none;cursor:pointer;color:var(--red);font-size:14px;padding:0" onclick="removeA(${i})">✕</button></div>`).join('');
+      +_sortedAsgns(asgns).map(({a,i})=>`<div class="ar" style="grid-template-columns:1fr 1fr 52px 30px"><span style="font-weight:700">${esc(a.classId)}</span><span style="color:var(--sub);font-size:11px">${esc(a.subject)}</span><span style="font-size:10px;color:var(--indigo)">${esc(a.role||'담임')}</span><button style="background:none;border:none;cursor:pointer;color:var(--red);font-size:14px;padding:0" onclick="removeA(${i})">✕</button></div>`).join('');
   let addAsgn='';
   if(config){
     // 신규: classes/ 에서 반 목록 구성
@@ -452,25 +452,48 @@ function renderClsMgmtClass(classId){
   </div>`;
 }
 
+// 과목 칩 1개 (활성) — 과정 라벨 + 교재명 + 보관(×)
+function _courseChipHtml(classId,subj,course){
+  const curriculum=course.curriculum||'';
+  const tbLabel=course.textbook||subj;
+  const subLabel=curriculum?`<span style="color:var(--indigo);font-size:9px;font-weight:700;margin-right:3px">${esc(curriculum)}</span>`:'';
+  return`<span class="chip" onclick="rmCourse('${esc(classId)}','${esc(subj)}')">${subLabel}${esc(tbLabel)} <span style="display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;margin-left:4px;border-radius:50%;background:#FEE2E2;color:#B91C1C;font-size:10px;font-weight:700;line-height:1">×</span></span>`;
+}
+// 과목 칩 블록 — 활성 행(과정→교재명 오름차순) + 보관 행(기본 접힘, ↩ 원클릭 복원).
+// subject 키 = "{과정} {교재}" 복합이라 키 ko 정렬이 곧 과정→교재명 순.
+// 아코디언 본문·드릴인 상세·refreshCourseChips 3곳 공용 (마크업 발산 방지)
+function _courseChipsBlockHtml(classId,clsD){
+  const all=(clsD||{}).courses||{};
+  const ko=(a,b)=>a.localeCompare(b,'ko');
+  const act=Object.keys(all).filter(s=>!(all[s]&&all[s].archived)).sort(ko);
+  const arch=Object.keys(all).filter(s=>all[s]&&all[s].archived).sort(ko);
+  const actChips=act.map(s=>_courseChipHtml(classId,s,all[s]||{})).join('');
+  const archChips=arch.map(s=>{
+    const c=all[s]||{};
+    const subLabel=c.curriculum?`<span style="color:var(--indigo);font-size:9px;font-weight:700;margin-right:3px">${esc(c.curriculum)}</span>`:'';
+    return`<span class="chip arch"><span class="arch-badge">보관</span>${subLabel}${esc(c.textbook||s)} <span class="restore" onclick="restoreCourse('${esc(classId)}','${esc(s)}')">↩ 복원</span></span>`;
+  }).join('');
+  return`<div class="chips" data-classid="${esc(classId)}" data-chip-type="course">${actChips}<span class="chip" style="background:var(--indigo-l);border-color:var(--indigo);color:var(--indigo);cursor:pointer" onclick="addCourseInline('${esc(classId)}',this)">+ 과목 추가</span></div>`
+    +(arch.length?`<button class="arch-tg" onclick="toggleArchRow(this)">▸ 보관 ${arch.length}</button><div class="chips" style="display:none">${archChips}</div>`:'');
+}
+function toggleArchRow(btn){
+  const row=btn.nextElementSibling;if(!row)return;
+  const open=row.style.display!=='none';
+  row.style.display=open?'none':'flex';
+  btn.textContent=(open?'▸':'▾')+btn.textContent.slice(1);
+}
+
 // 학급의 학생/과목 칩 섹션 (아코디언 본문과 드릴인 상세에서 공용)
 function _clsSectionsHtml(classId,clsD){
   const students=(config?._classStudents||{})[classId]||[];
-  const courses=activeCourses(clsD);
-  const subjects=Object.keys(courses);
   // 학급·학생 정보 변경은 관리자 전용 (강사는 조회만) — 명단 소유권 분리
   const stuChips=students.map(s=>adminOn
     ?`<span class="chip" onclick="rmStu('${esc(classId)}','${esc(s.nameKey)}')">${esc(s.name||s.nameKey)} <span>×</span></span>`
     :`<span class="chip" style="cursor:default">${esc(s.name||s.nameKey)}</span>`).join('');
-  const courseChips=subjects.map(subj=>{
-    const course=courses[subj]||{};
-    const curriculum=course.curriculum||'';
-    const tbLabel=course.textbook||subj;
-    const subLabel=curriculum?`<span style="color:var(--indigo);font-size:9px;font-weight:700;margin-right:3px">${esc(curriculum)}</span>`:'';
-    return`<span class="chip" onclick="rmCourse('${esc(classId)}','${esc(subj)}')">${subLabel}${esc(tbLabel)} <span style="display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;margin-left:4px;border-radius:50%;background:#FEE2E2;color:#B91C1C;font-size:10px;font-weight:700;line-height:1">×</span></span>`;}).join('');
   return `<div class="sl">학생</div>
       <div class="chips" data-classid="${esc(classId)}" data-chip-type="stu">${stuChips}${adminOn?`<span class="chip" style="background:var(--indigo-l);border-color:var(--indigo);color:var(--indigo);cursor:pointer" onclick="addStuInline('${esc(classId)}',this)">+ 추가</span>`:''}</div>
       <div class="sl" style="margin-top:10px">과목</div>
-      <div class="chips" data-classid="${esc(classId)}" data-chip-type="course">${courseChips}<span class="chip" style="background:var(--indigo-l);border-color:var(--indigo);color:var(--indigo);cursor:pointer" onclick="addCourseInline('${esc(classId)}',this)">+ 과목 추가</span></div>`;
+      <div data-course-block="${esc(classId)}">${_courseChipsBlockHtml(classId,clsD)}</div>`;
 }
 
 function buildClsAccordion(classId,clsD,myRole){
@@ -632,17 +655,9 @@ function addCourseInline(classId,btnEl){
 
 function refreshCourseChips(classId){
   const sCls=classId.replace(/\\/g,'\\\\').replace(/"/g,'\\"');
-  const el=document.querySelector(`[data-chip-type="course"][data-classid="${sCls}"]`);
+  const el=document.querySelector(`[data-course-block="${sCls}"]`);
   if(!el)return;
-  const courses=activeCourses(config?.classes?.[classId]);
-  const courseChips=Object.keys(courses).map(subj=>{
-    const course=courses[subj]||{};
-    const curriculum=course.curriculum||'';
-    const tbLabel=course.textbook||subj;
-    const subLabel=curriculum?`<span style="color:var(--indigo);font-size:9px;font-weight:700;margin-right:3px">${esc(curriculum)}</span>`:'';
-    return`<span class="chip" onclick="rmCourse('${esc(classId)}','${esc(subj)}')">${subLabel}${esc(tbLabel)} <span style="display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;margin-left:4px;border-radius:50%;background:#FEE2E2;color:#B91C1C;font-size:10px;font-weight:700;line-height:1">×</span></span>`;
-  }).join('');
-  el.innerHTML=courseChips+`<span class="chip" style="background:var(--indigo-l);border-color:var(--indigo);color:var(--indigo);cursor:pointer" onclick="addCourseInline('${esc(classId)}',this)">+ 과목 추가</span>`;
+  el.innerHTML=_courseChipsBlockHtml(classId,config?.classes?.[classId]);
 }
 
 // ── 교재 명단(전역 레지스트리) 관리 — 관리자 전용 ─────────────────
@@ -849,6 +864,31 @@ async function rmStu(classId,nameKey){
   if(dbUrl&&dbPath){
     try{await fbPut(`students/${nameKey}`,null);}catch(e){}
   }
+}
+
+async function restoreCourse(classId,subject){
+  // 보관 해제(v2.2.3): 같은 과정·교재 재입력 없이 원클릭 복원 — 기존 obs/scores/history 그대로 연결.
+  // 담당 배정은 보관 시 _syncAssignments로 제거됐으므로 복원 후 「수업 추가」에서 재배정.
+  const c=config?.classes?.[classId]?.courses?.[subject];
+  if(!c||!c.archived){toast('이미 활성 과목입니다.');return;}
+  if(!confirm(`"${subject}" 과목을 복원합니까?\n기존 수업 기록이 그대로 연결됩니다.`))return;
+  delete c.archived;
+  try{refreshCourseChips(classId);}catch(e){}
+  if(dbUrl&&dbPath){
+    try{
+      await fbPatch(`classes/${classId}/courses/${subject}`,{archived:null});
+      if(c.textbook)_registerTbName(c.textbook);
+      toast('과목 복원됨 ✅ (기존 기록 연결)');
+    }catch(e){
+      c.archived=true; // DB 반영 실패 → 로컬 롤백 + 사용자에게 표면화
+      toast('과목 복원 실패: '+e,4000);
+      try{refreshCourseChips(classId);}catch(_){}
+      renderMain();
+      return;
+    }
+  }
+  saveLocal();
+  renderMain();
 }
 
 async function rmCourse(classId,subject){

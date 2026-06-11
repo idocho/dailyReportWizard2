@@ -188,6 +188,13 @@ function sortStu(arr){return (arr||[]).sort((a,b)=>(a.name||'').localeCompare(b.
 function setSync(ok){/* syncBadge 제거됨 (v0.9.4) */}
 // v2.2.3: Firebase write 실패 표면화 — 무음 catch 일괄 대체용. 로컬엔 저장돼 있으니 재시도 안내.
 function fbFail(label){return e=>toast(`⚠️ ${label} 서버 저장 실패 — 네트워크 확인 후 다시 시도하세요`,4000);}
+// 담당 수업 표시 정렬: 학급→과정→교재명 오름차순 (subject="{과정} {교재}" 복합 키라 subject ko 정렬로 충분).
+// 원본 배열 인덱스(i)를 보존해 반환 — removeA(i)/selA(i) 등 인덱스 기반 핸들러와 호환 (저장 순서는 불변, 표시만 정렬)
+function _sortedAsgns(asgns){
+  return (asgns||[]).map((a,i)=>({a,i})).sort((x,y)=>
+    (x.a.classId||'').localeCompare(y.a.classId||'','ko')||
+    (x.a.subject||'').localeCompare(y.a.subject||'','ko'));
+}
 // 소프트 삭제: archived 과목 제외. 과목 "삭제"는 archived:true 마킹 — obs/scores/history/session 데이터는 DB에 보존되고 노출만 차단. 같은 키로 재추가 시 복원.
 function activeCourses(clsD){const out={};for(const[s,c]of Object.entries((clsD||{}).courses||{})){if(!(c&&c.archived))out[s]=c;}return out;}
 function _normWs(s){return String(s||'').replace(/\s+/g,' ').trim();}

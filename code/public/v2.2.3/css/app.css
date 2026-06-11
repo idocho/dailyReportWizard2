@@ -122,6 +122,13 @@ body{font-family:'Pretendard','Malgun Gothic','맑은 고딕',-apple-system,sans
 .chip{font-size:11px;background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:2px 8px;cursor:pointer;display:inline-flex;align-items:center;gap:4px}
 .chip:hover{border-color:var(--red);color:var(--red)}
 .chips{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px}
+/* 보관 과목 행 (v2.2.3) — 흐림+빗금 휴면 표시, ↩ 원클릭 복원 */
+.chip.arch{opacity:.6;background:repeating-linear-gradient(45deg,var(--bg),var(--bg) 4px,#F1F5F9 4px,#F1F5F9 8px);cursor:default}
+.chip.arch:hover{border-color:var(--border);color:inherit}
+.arch-badge{font-size:8px;background:#F1F5F9;color:#64748B;border-radius:6px;padding:0 4px;font-weight:700}
+.chip .restore{display:inline-flex;align-items:center;height:15px;margin-left:2px;border-radius:8px;background:#DCFCE7;color:#15803D;font-size:9px;font-weight:700;padding:0 6px;cursor:pointer}
+.arch-tg{font-size:10px;color:var(--gray);cursor:pointer;background:none;border:none;font-family:inherit;padding:4px 2px 0;display:block}
+.arch-tg:hover{color:var(--indigo)}
 .modal{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:200;display:none;align-items:center;justify-content:center;padding:16px}
 .modal.show{display:flex}
 .mbox{background:var(--panel);border-radius:var(--r);width:100%;max-width:400px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.2)}
