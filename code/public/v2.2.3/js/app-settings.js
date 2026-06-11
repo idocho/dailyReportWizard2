@@ -864,10 +864,10 @@ const _RESET_ITEMS=[
   {id:'input',    icon:'📋', label:'특이사항 메모',        desc:'오늘 작성한 메모만 초기화',      admin:false},
   {id:'progress', icon:'📚', label:'진도 & 과제',          desc:'내 수업 진도·과제 데이터',      admin:false},
   {id:'presets',  icon:'⚙️', label:'자주 쓰는 문구 초기화', desc:'기본 문구 목록으로 복원',      admin:false},
-  {id:'all-input',    icon:'🗂',  label:'전체 입력 삭제',   desc:'모든 강사 수행도·태그·노트',    admin:true},
+  {id:'all-input',    icon:'🗂',  label:'전체 오늘 입력 삭제', desc:'모든 강사의 오늘 수행도·태그·노트 (누적 이력은 보존)', admin:true},
   {id:'all-progress', icon:'📊', label:'전체 진도 삭제',   desc:'모든 강사 진도·과제',           admin:true},
   {id:'assignments',  icon:'👤', label:'강사 배정 초기화', desc:'모든 강사 수업 배정 삭제',      admin:true},
-  {id:'config',       icon:'💥', label:'명단 & 설정 삭제', desc:'학생명단·강사·문구 전체',       admin:true},
+  {id:'config',       icon:'💥', label:'강사 & 설정 삭제', desc:'강사·문구·설정 (학생 명단·관찰 이력·성적은 보존 — Analyzer 원료 불가침)', admin:true},
 ];
 function _renderResetHtml(){
   const hasAdmin=adminOn;
@@ -982,14 +982,34 @@ async function clrSelected(){
       if(Object.keys(p).length)ops.push(fbPatch('session/class_data',p));
     }
     if(sel.includes('presets'))ops.push(_doResetPresets());
-    if(sel.includes('all-input')){inputData={};tagData={};ops.push(fbPut('input',null));ops.push(fbPut('obs',null));}
+    if(sel.includes('all-input')){
+      // Analyzer 스탯 원료 불가침: obs 누적은 절대 통삭제하지 않는다 — 오늘 날짜키만 전 학생 정리.
+      // (기존 fbPut('obs',null)은 전체 관찰 이력을 파괴해 월간 리포트 원료를 소멸시키던 위험 동작)
+      inputData={};
+      ops.push(fbPut('input',null));
+      const dk=todayKey();
+      const obsAll=await fbGet('obs').catch(()=>null);
+      if(obsAll&&typeof obsAll==='object'){
+        for(const[nk,subjMap] of Object.entries(obsAll)){
+          if(!subjMap||typeof subjMap!=='object')continue;
+          for(const subj of Object.keys(subjMap)){
+            if(subjMap[subj]&&subjMap[subj][dk]!==undefined){
+              ops.push(fbPatch(`obs/${nk}/${subj}`,{[dk]:null}).catch(fbFail('초기화')));
+              if(tagData?.[nk]?.[subj]?.[dk])delete tagData[nk][subj][dk];
+            }
+          }
+        }
+      }
+    }
     if(sel.includes('all-progress')){progressData={};ops.push(fbPut('session',null));}
     if(sel.includes('assignments')){
       const instrs=await fbGet('config/instructors').catch(()=>null);
       if(instrs)for(const id of Object.keys(instrs))ops.push(fbPatch(`config/instructors/${id}`,{assignments:[]}).catch(fbFail('초기화')));
     }
     if(sel.includes('config')){
-      ops.push(fbPut('config',null));ops.push(fbPut('input',null));ops.push(fbPut('session',null));ops.push(fbPut('students',null));
+      // 학생 명단(students/)은 삭제하지 않는다 — 이력(obs/history)의 이름 해석 원료.
+      // 명단 관리는 ClassManager 소관. (기존 fbPut('students',null) 제거)
+      ops.push(fbPut('config',null));ops.push(fbPut('input',null));ops.push(fbPut('session',null));
       inputData={};progressData={};config=null;instructor=null;adminOn=false;
       SS('drw_input','{}');SS('drw_prog','{}');SS('drw_config','');SS('drw_instr','');
     }
