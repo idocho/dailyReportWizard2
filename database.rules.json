@@ -1,0 +1,20 @@
+{
+  // ⚠️ 이 파일은 아직 배포되지 않음 — 의도적으로 firebase.json에 미연결.
+  //    배포 즉시 무인증 접근이 전부 차단되므로, 4개 클라이언트에 DB Secret(?auth=)
+  //    설정이 끝난 "전환 창"에만 배포한다. 절차: documents/SECURITY_RULES_PLAN.md
+  //
+  // 1차 전략(현 단계): deny-by-default 전면 봉인.
+  //   - 모든 클라이언트(웹/PC/CM/Analyzer/백업스크립트)는 DB Secret을 ?auth= 로 전달
+  //   - 레거시 DB Secret 인증은 Rules를 우회(admin)하므로 아래 규칙은
+  //     "시크릿 없는 공개 접근 차단"만 담당한다
+  //
+  // 2차 전략(CBT 종료 후): Firebase Auth 승격 시 아래 화이트리스트로 교체 예정.
+  //   web      = input/ obs/ scores/ session/ config/ classes(courses)/ students(admin)
+  //   PC(DRW)  = history/ + input/{nameKey}/__note__ 소거
+  //   CM       = students/ classes/
+  //   Analyzer = read-only
+  "rules": {
+    ".read": false,
+    ".write": false
+  }
+}

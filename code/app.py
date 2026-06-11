@@ -56,7 +56,7 @@ from storage  import (load_config, save_config, has_students,
                       save_daily_cache, load_daily_cache, set_runtime_cwd, RUNTIME_DIR,
                       load_templates, save_templates)
 from firebase import (firebase_get, firebase_put, firebase_patch, fetch_tags,
-                      today_key, active_courses)
+                      today_key, active_courses, check_schema)
 from ai_engine import AiEngine
 from message   import (today_str, get_room, nickname_suffix, build_message,
                        render, build_bulk_ctx, bulk_variables)
@@ -124,6 +124,16 @@ class App:
         if not self.config.get('firebase_url') or not self.config.get('firebase_path'):
             self._run_setup_wizard()
         else:
+            # 스키마 버전 게이트(#15): DB가 이 앱보다 새 스키마면 쓰기 오염 방지 위해 차단
+            ok, db_ver = check_schema(self.config)
+            if not ok:
+                from firebase import SCHEMA_MAX
+                messagebox.showerror(
+                    "앱 버전 낮음",
+                    f"DB 스키마 v{db_ver} > 지원 v{SCHEMA_MAX}\n"
+                    "데이터 보호를 위해 실행을 중단합니다.\n최신 버전 앱으로 교체해 주세요.")
+                self.root.destroy()
+                return
             self._build_main_ui()
             # 공용 교재/학급 목록은 Firebase students/+classes를 단일 원본으로 사용
             self.root.after(300, self._sync_shared_sheets_from_firebase)

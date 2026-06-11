@@ -84,6 +84,9 @@ function _wzPane(){
       <div class="wz-fld"><label class="wz-fl">경로 (Secret Path)</label>
         <input class="inp" id="sPth" value="${esc(dbPath)}" placeholder="drw_a7f3k9x2">
         <div class="wz-hint">💡 관리자에게 전달받은 비밀 경로입니다.</div></div>
+      <div class="wz-fld"><label class="wz-fl">DB 시크릿 (선택)</label>
+        <input class="inp" id="sSec" value="${esc(dbSecret)}" placeholder="보안 전환 후 관리자에게 전달받아 입력" type="password">
+        <div class="wz-hint">💡 보안 잠금 전환 전에는 비워 두어도 됩니다.</div></div>
       <button class="btn bp" style="width:100%" onclick="saveFb()">💾 연결 정보 저장</button>`;
   }
   if(wzStep===1){
@@ -292,6 +295,7 @@ function renderSettings(mc){
       <div class="sa-body${openSaIds.has('sa-fb')?' open':''}">
         <div class="sr"><div class="sl">DB URL</div><input class="inp" id="sUrl" value="${esc(dbUrl)}" placeholder="https://your-project.firebaseio.com" type="url" onkeydown="if(event.key==='Enter')saveFb()"></div>
         <div class="sr"><div class="sl">경로 (Secret Path)</div><input class="inp" id="sPth" value="${esc(dbPath)}" placeholder="drw_a7f3k9x2" onkeydown="if(event.key==='Enter')saveFb()"></div>
+        <div class="sr"><div class="sl">DB 시크릿 (선택)</div><input class="inp" id="sSec" value="${esc(dbSecret)}" placeholder="보안 전환 후 입력" type="password" onkeydown="if(event.key==='Enter')saveFb()"></div>
         <div style="padding:10px 14px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn bp bsm" onclick="saveFb()">💾 저장</button><button class="btn bsm" onclick="loadCfg()">📥 학생 명단 불러오기</button></div>
         <div style="padding:0 14px 10px;font-size:10px;color:var(--sub)">💡 다른 기기에서 입력한 데이터는 위 버튼으로 수동 갱신하세요.</div>
       </div>
@@ -703,7 +707,8 @@ function savePreset(i){
 function saveFb(){
   dbUrl=document.getElementById('sUrl')?.value.trim()||'';
   dbPath=document.getElementById('sPth')?.value.trim()||'';
-  SS('drw_db_url',dbUrl);SS('drw_db_path',dbPath);
+  dbSecret=document.getElementById('sSec')?.value.trim()||'';
+  SS('drw_db_url',dbUrl);SS('drw_db_path',dbPath);SS('drw_db_secret',dbSecret);
   saveLocal();toast('Firebase 설정 저장됨 ✅');
 }
 

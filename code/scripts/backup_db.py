@@ -16,6 +16,7 @@ backup_db.py — Firebase RTDB 전체 스냅샷 일일 백업 (액션아이템 A
 import json
 import sys
 import datetime
+import urllib.parse
 import urllib.request
 from pathlib import Path
 
@@ -47,6 +48,9 @@ def main():
         sys.exit(1)
 
     url = f"{base}/{path}.json"
+    secret = (cfg.get("firebase_secret") or "").strip()
+    if secret:  # Security Rules 전환 후에도 백업 동작 유지(#15)
+        url += "?auth=" + urllib.parse.quote(secret, safe="")
     log(f"GET {path} 시작")
     with urllib.request.urlopen(url, timeout=60) as r:
         raw = r.read()

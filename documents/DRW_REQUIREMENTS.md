@@ -1,7 +1,7 @@
 # DailyReportWizard — 요구사항 명세서
 
 **Crafted by IDO(idocho@kakao.com) · Powered by Claude AI**  
-**문서 버전**: 8.15 · **앱 버전**: v2.2.3(개발)/v2.2.2(안정) · **최종 수정**: 2026-06-11
+**문서 버전**: 8.16 · **앱 버전**: v2.2.3(개발)/v2.2.2(안정) · **최종 수정**: 2026-06-11
 
 > Firebase 스키마 전체 명세: [ClassManager/documents/DB_SCHEMA.md](../../ClassManager/documents/DB_SCHEMA.md)
 
@@ -11,6 +11,7 @@
 
 | 문서 버전 | 날짜 | 주요 변경 |
 |-----------|------|-----------|
+| 8.16 | 2026-06-11 | **Security Rules 전환 사전 배선 (#15 — 룰 미배포, 운영 무영향)** ① **4클라 DB Secret(`?auth=`) 옵션 지원** — 웹 `fbE()`(+설정·위저드 「DB 시크릿」 입력란, `drw_db_secret`), PC `firebase.py _fb_url`(+`config.json firebase_secret`, constants 기본키), CM `_fb_url`(+설정 탭 「Firebase Secret」, `dbSecret`), Analyzer `fbE()`(+설정 패널, `drw_fb_secret`, 「DRW 설정 가져오기」가 시크릿도 복사). **시크릿 미설정 시 종전과 100% 동일(no-op)**. 백업/복원 스크립트(backup_db.py·restore_db.py)도 동일 지원 — 룰 배포 후 안전망 유지. ② **schema_version 게이트** — DB `{path}/schema_version`(정수, 스키마 v1.4=14)이 클라 `SCHEMA_MAX` 초과 시 차단(웹=차단 화면, PC·CM=에러 후 종료, Analyzer=경고만/read-only). 노드 부재·읽기 실패=통과(전환 전 호환·가용성 우선). ③ `database.rules.json` deny-by-default 초안(의도적으로 firebase.json 미연결 — 오발 배포 방지) + 전환 런북 `documents/SECURITY_RULES_PLAN.md`(클라 먼저 무장→노드 생성→룰 배포→검증→롤백 절차) |
 | 8.15 | 2026-06-11 | **신뢰성/정합 일괄** ① **[웹] obs 동시쓰기 race 완화(C3)** — `pushObs(…,field)`가 날짜 객체 통째가 아니라 변경된 필드만 `obs/{nk}/{subj}/{date}` 키 단위 PATCH. 두 강사 동시 입력 시 서로 다른 태그 필드 충돌·유실 방지. ② **[웹·PC] 동명이인 오발송 가드(B4)** — 전송 직전 표시이름 중복 검사, 겹치는 이름 전원 자동 제외+안내(같은 '오직 {이름}' 방으로 합쳐져 타 학부모 발송되던 위험). DRW `_dedup_same_name`(데일리·발송 탭), CM `_send` 동일. ③ **[운영] 백업 월간 영구 스냅샷** — 매월 1일 백업은 30일 경과해도 보존(반 소속 등 장기 이력 소급 조회). ④ **잔재 정리(C4)** — DB `lastSent` 노드 삭제, 본문 lastSent 잔재·assignments 형식 정정(DRW_REQ §5, DB_SCHEMA v1.4 객체배열). Analyzer v0.3(nameKey-first 종단 비교)은 별도 repo |
 | 8.14 | 2026-06-11 | **교재 명단 — 전역 레지스트리 + 관리자 관리 UI** `config/textbooks/{교재명}: true` 부활(문서 v3.3 노드) — classes와 독립이라 **반 전체 삭제에도 교재명 자동완성 보존**(학기 개편 대비). ① 과목 등록(addCourseInline/wzAddCourse) 시 `_registerTbName()` 자동 등록(공백 정규화·idempotent), ② 자동완성 datalist = 레지스트리 ∪ 현존 courses, **ko 오름차순 정렬**, ③ 관리자 설정 「📚 교재 명단」 섹션 — 목록(오름차순)+직접 추가+✕ 제거(자동완성 후보에서만 제외, 과목·기록 무영향), admin 가드. 기존 DB 과목(보관 포함)에서 15개 시드 완료 — 철자 변형 중복(SIGNATURE 100+/Signature100+/시그니처 100+ 등)은 관리자 UI로 정리 가능 |
 | 8.13 | 2026-06-11 | **명단 권한 분리 — 학급·학생 CRUD 관리자 전용 (웹)** 관리자 시나리오 정리에 따라: 강사는 학급·학생 정보를 조회만, 추가/삭제는 관리자(`adminOn`)만. ① 학생 칩 ×(rmStu)·「+ 추가」(addStuInline)·「학급 삭제」(rmCls) UI를 admin 조건부 렌더, ② 함수 자체에 admin 가드 이중화(toast 안내), ③ **dev 도구(🔧 날짜 변경·🎲 더미) admin 게이트(A4)** — 일반 강사 오조작에 의한 운영 obs 오염 차단. 과목(교재) 등록·보관은 수업 소관이라 강사 유지. 역할 정리: 웹 일반=수업 운영(입력·성적·과목·본인 배정), 웹 관리자=교무 정정(오늘 입력/진도 정리·강사 관리·dev 도구), CM=명단 단일 소유(반·학생 CRUD·CSV·개편·일괄 발송). 이 분리는 C1 Security Rules 화이트리스트의 기준이 됨 |
@@ -895,8 +896,17 @@ cfg.sheets.M.classes.중1A.tb_grade  = { "최상위수학": "중1-1", "우공비
   history/                  ← PC 쓰기(전송 시 동기) / Analyzer 읽기  ★v2.1.2 신규 누적
     {nameKey}/{YYYY-MM-DD}: { note: "전송된 최종 특이사항", instructor: "{id}" }
 
+  schema_version: 14        ← 정수, DB_SCHEMA 버전×10 (v1.4=14). Security Rules 전환 창에 생성(v8.16).
+                              클라 SCHEMA_MAX 초과 시: 웹·PC·CM 차단, Analyzer 경고. 부재 시 통과.
+
   (lastSent/ — v2.1.2 폐기)
 ```
+
+**접근 인증 (v8.16, Security Rules 전환 대비)**: 모든 클라이언트 REST 요청은 시크릿 설정 시
+`?auth={DB Secret}`을 부가(레거시 admin 토큰 — 룰 우회). 미설정 시 무인증(전환 전 동작).
+저장 위치 — 웹 `drw_db_secret`(localStorage) / PC `config.json firebase_secret` /
+CM `settings.json dbSecret` / Analyzer `drw_fb_secret`(localStorage).
+룰·전환 절차는 `documents/SECURITY_RULES_PLAN.md`, 룰 본문은 `database.rules.json`(미배포 초안).
 
 **누적 vs 휘발**: 누적 = `obs/`·`scores/`·`history/` (Analyzer 소스, 날짜키 YYYY-MM-DD). 휘발(당일 덮어쓰기) = `input/`·`session/`.
 **날짜 포맷**: 누적 노드·testKey = `YYYY-MM-DD`(todayKey). session.date = `M/D(요일)`(표시용).

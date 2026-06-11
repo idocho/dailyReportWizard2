@@ -389,6 +389,7 @@ function init(){
     return;
   }
   if(dbUrl&&dbPath){
+    checkSchemaVersion(); // 스키마 게이트(#15) — 비차단 호출, 초과 시 화면 차단
     // classes는 최상위 classes/ 노드가 정본 (config/classes 아님)
     Promise.all([
       fbGet('config').catch(()=>null),

@@ -14,6 +14,7 @@ restore_db.py — 백업 스냅샷에서 Firebase RTDB 복원 (파괴적 — 신
 import argparse
 import json
 import datetime
+import urllib.parse
 import urllib.request
 from pathlib import Path
 
@@ -26,7 +27,11 @@ def fb_url(cfg, node=""):
     base = cfg["firebase_url"].rstrip("/")
     path = cfg["firebase_path"].strip("/")
     suffix = f"/{node}" if node else ""
-    return f"{base}/{path}{suffix}.json"
+    url = f"{base}/{path}{suffix}.json"
+    secret = (cfg.get("firebase_secret") or "").strip()
+    if secret:  # Security Rules 전환 후에도 복원 동작 유지(#15)
+        url += "?auth=" + urllib.parse.quote(secret, safe="")
+    return url
 
 
 def http(method, url, payload=None):

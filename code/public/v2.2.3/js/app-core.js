@@ -116,7 +116,7 @@ const TAGS = {
 
 // config: { classes: {classId: {group, courses: {subject: {textbook, curriculum, instructor}}}}, instructors: {...} }
 let config=null,inputData={},progressData={},tagData={},instructor=null;
-let activeTab='input',curAI=0,dbUrl='',dbPath='',activeGroup='';
+let activeTab='input',curAI=0,dbUrl='',dbPath='',dbSecret='',activeGroup='';
 let _devDate=null; // 🔧 테스트용 날짜 오버라이드 (null=오늘)
 let clsDrillSh=null; // 학급 관리 드릴다운 상태 (null=최상위, classId)
 let adminOn=false;   // 관리자 세션 상태 (새로고침 시 해제)
@@ -139,7 +139,7 @@ const ADMIN_HASH='f3fd1456b2db60728b102561496c156e4c4adf0e537d4c45fa0add381fdd9a
 const LS=k=>localStorage.getItem(k);
 const SS=(k,v)=>localStorage.setItem(k,v);
 function loadLocal(){
-  dbUrl=LS('drw_db_url')||'';dbPath=LS('drw_db_path')||'';
+  dbUrl=LS('drw_db_url')||'';dbPath=LS('drw_db_path')||'';dbSecret=LS('drw_db_secret')||'';
   try{inputData=JSON.parse(LS('drw_input')||'{}');}catch(e){inputData={};}
   try{progressData=JSON.parse(LS('drw_prog')||'{}');}catch(e){progressData={};}
   try{tagData=JSON.parse(LS('drw_tags')||LS('drw_obs')||'{}');}catch(e){tagData={};}
@@ -147,7 +147,7 @@ function loadLocal(){
   try{config=JSON.parse(LS('drw_config')||'null');}catch(e){config=null;}
 }
 function saveLocal(){
-  SS('drw_db_url',dbUrl);SS('drw_db_path',dbPath);
+  SS('drw_db_url',dbUrl);SS('drw_db_path',dbPath);SS('drw_db_secret',dbSecret);
   SS('drw_input',JSON.stringify(inputData));
   SS('drw_prog',JSON.stringify(progressData));
   SS('drw_tags',JSON.stringify(tagData));
@@ -155,7 +155,23 @@ function saveLocal(){
   if(config)SS('drw_config',JSON.stringify(config));
 }
 
-function fbE(n){return `${dbUrl.replace(/\/$/,'')}/${dbPath.replace(/^\/|\/$/g,'')}/${n}.json`;}
+// Security Rules 전환 대비(#15): dbSecret 설정 시 ?auth= 전달. 미설정이면 종전과 동일(no-op).
+function fbE(n){const u=`${dbUrl.replace(/\/$/,'')}/${dbPath.replace(/^\/|\/$/g,'')}/${n}.json`;return dbSecret?`${u}?auth=${encodeURIComponent(dbSecret)}`:u;}
+// 스키마 버전 게이트: DB의 schema_version(정수)이 이 클라 지원 최대치보다 크면 차단.
+// 노드 부재·읽기 실패 = 통과(전환 전 DB·일시 네트워크 오류에 가용성 우선).
+const SCHEMA_MAX=14; // DB_SCHEMA v1.4
+async function checkSchemaVersion(){
+  try{
+    const v=await fbGet('schema_version');
+    if(typeof v==='number'&&v>SCHEMA_MAX){
+      document.body.innerHTML=`<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;gap:14px;padding:24px;text-align:center;font-family:inherit">
+        <div style="font-size:42px">⛔</div>
+        <div style="font-size:18px;font-weight:700">앱 버전이 낮아 사용할 수 없습니다</div>
+        <div style="color:#888">DB 스키마 v${v} &gt; 지원 v${SCHEMA_MAX} — 데이터 보호를 위해 차단되었습니다.<br>최신 버전으로 접속해 주세요.</div>
+        <button class="btn bp" onclick="location.reload(true)" style="padding:10px 22px">새로고침</button></div>`;
+    }
+  }catch(e){}
+}
 async function fbGet(n){const r=await fetch(fbE(n));if(!r.ok)throw n+':'+r.status;return r.json();}
 async function fbPut(n,d){const r=await fetch(fbE(n),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)});if(!r.ok)throw n+':'+r.status;return r.json();}
 async function fbPatch(n,d){const r=await fetch(fbE(n),{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)});if(!r.ok)throw n+':'+r.status;return r.json();}

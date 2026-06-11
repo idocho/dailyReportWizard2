@@ -150,6 +150,7 @@ DEFAULT_CONFIG = {
     "room_prefix":    "오직 ",
     "firebase_url":   "",
     "firebase_path":  "",
+    "firebase_secret": "",  # DB Secret (?auth=) — Security Rules 전환 후 사용(#15)
     "ai_engine_type":  "groq",
     "groq_api_key":    "",
     "openai_api_key":  "",
