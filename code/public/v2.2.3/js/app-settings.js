@@ -522,15 +522,16 @@ function buildClsAccordion(classId,clsD,myRole){
   const subjects=Object.keys(activeCourses(clsD));
   const isSub=myRole==='부담임';
   const subBadge=isSub?`<span style="font-size:9px;background:#FEF3C7;color:#92400E;border-radius:8px;padding:1px 6px;font-weight:700;flex-shrink:0">부담임</span>`:'';
+  const open=!!clsAccOpen[classId]; // 펼침 상태 세션 보존 — 보관/복원 등 renderMain 후에도 유지
   return `<div style="border-bottom:1px solid var(--border)">
-    <div class="acc-hdr" onclick="toggleAcc(this)">
-      <span class="acc-arr" style="font-size:10px;color:var(--gray);width:14px;flex-shrink:0">▶</span>
+    <div class="acc-hdr" onclick="toggleAcc(this,'${esc(classId)}')">
+      <span class="acc-arr" style="font-size:10px;color:var(--gray);width:14px;flex-shrink:0">${open?'▼':'▶'}</span>
       <span style="font-size:13px;font-weight:700;flex:1">${esc(classId)}</span>
       ${subBadge}
       <span style="font-size:10px;color:var(--gray);margin:0 6px;white-space:nowrap">학생 ${students.length} · 과목 ${subjects.length}</span>
       ${adminOn?`<button class="btn br bsm" onclick="rmCls('${esc(classId)}');event.stopPropagation()" style="padding:2px 7px;font-size:11px;flex-shrink:0">✕</button>`:''}
     </div>
-    <div class="acc-body">${_clsSectionsHtml(classId,clsD)}</div>
+    <div class="acc-body${open?' open':''}">${_clsSectionsHtml(classId,clsD)}</div>
   </div>`;
 }
 
@@ -1237,9 +1238,10 @@ function rmPreset(i){
 }
 
 function closeIM(){document.getElementById('iModal').classList.remove('show');}
-function toggleAcc(hdr){
+function toggleAcc(hdr,classId){
   const body=hdr.nextElementSibling;
   const arrow=hdr.querySelector('.acc-arr');
   const open=body.classList.toggle('open');
   if(arrow)arrow.textContent=open?'▼':'▶';
+  if(classId!==undefined)clsAccOpen[classId]=open; // 세션 보존 — renderMain 재빌드 시 복원
 }

@@ -122,6 +122,7 @@ let clsDrillSh=null; // 학급 관리 드릴다운 상태 (null=최상위, class
 let adminOn=false;   // 관리자 세션 상태 (새로고침 시 해제)
 let sbFolded={};     // 사이드바 그룹 섹션 접힘 상태 {그룹명: true/false}
 let archOpen={};     // 학급 관리 보관 과목 행 펼침 상태 {classId: true} — 재렌더에도 유지(세션)
+let clsAccOpen={};   // 학급 관리 학급 아코디언 펼침 상태 {classId: true} — renderMain마다 접히는 문제 방지(세션)
 let _resetSel=new Set(); // 초기화 다중 선택 상태
 let openSaIds=new Set(['sa-fb']); // 설정 아코디언 열림 상태 — renderMain() 재렌더 후 복원용
 // 초기 설정 위저드 (온보딩) — 강사 미설정 신규 사용자에게 4단계 가이드
