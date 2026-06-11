@@ -431,7 +431,7 @@ class App:
 
         cls_data  = self.all_classes.get(classId, {})
         courses   = active_courses(cls_data)
-        subjects  = list(courses.keys())
+        subjects  = sorted(courses.keys())  # 과정→교재명 오름차순 (subject="{과정} {교재}" 복합 키)
         tb_grade  = {subj: courses[subj].get('curriculum', '') for subj in subjects}
         display_name = self.all_students.get(nameKey, {}).get('name', nameKey)
         room      = get_room(self.config, display_name)
@@ -828,7 +828,7 @@ class App:
         if not nameKey: return
         cls_data  = self.all_classes.get(classId, {})
         courses   = active_courses(cls_data)
-        subjects  = list(courses.keys())
+        subjects  = sorted(courses.keys())  # 과정→교재명 오름차순 (subject="{과정} {교재}" 복합 키)
         tb_grade  = {subj: courses[subj].get('curriculum', '') for subj in subjects}
         display_name = self.all_students.get(nameKey, {}).get('name', nameKey)
         room      = get_room(self.config, display_name)
@@ -864,7 +864,7 @@ class App:
                          if cd.get('group') == group}
         if not assignments:
             if not self.config.get("instructor_id"):
-                return list(group_classes.items())  # 계정 미설정 → 전체 표시
+                return sorted(group_classes.items())  # 계정 미설정 → 전체 표시 (반 이름 오름차순)
             return []  # 계정 있고 담당 없음 → 빈 목록
         # cls/classId 둘 다 허용, sheet 없으면 classes group으로 판단
         def _cid(a): return a.get('cls') or a.get('classId', '')
@@ -873,7 +873,8 @@ class App:
             if s: return s == group
             return self.all_classes.get(_cid(a), {}).get('group') == group
         assigned_cls = {_cid(a) for a in assignments if _grp_ok(a)}
-        return [(cid, cd) for cid, cd in group_classes.items() if cid in assigned_cls]
+        # 반 이름 오름차순 — 좌측 패널·전송·상태바 등 모든 순회가 등록 순 아닌 정렬 순으로 일관
+        return sorted(((cid, cd) for cid, cd in group_classes.items() if cid in assigned_cls))
 
     def _student_status(self, classId, nameKey):
         # 강제 완료 플래그 우선

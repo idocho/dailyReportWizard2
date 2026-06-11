@@ -433,7 +433,7 @@ function renderSb(){
     } else {
       const groups=[...new Set(asgns.map(a=>a.group||''))];
       groups.forEach(gr=>{
-        const grAsgns=asgns.filter(a=>(a.group||'')===gr);
+        const grAsgns=_sortedAsgns(asgns).map(p=>p.a).filter(a=>(a.group||'')===gr); // 학급→과정→교재명 표시 정렬
         const folded=sbFolded[gr]===true;
         const arrow=folded?'▸':'▾';
         aHtml+=`<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 13px 2px;font-size:9px;font-weight:700;color:rgba(255,255,255,.4);letter-spacing:.08em;cursor:pointer;user-select:none" onclick="sbToggle('${esc(gr)}')">${esc(gr||'기타')} <span style="font-size:11px;opacity:.7">${arrow}</span></div>`;
