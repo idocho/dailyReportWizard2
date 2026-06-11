@@ -473,12 +473,14 @@ function _courseChipsBlockHtml(classId,clsD){
     const subLabel=c.curriculum?`<span style="color:var(--indigo);font-size:9px;font-weight:700;margin-right:3px">${esc(c.curriculum)}</span>`:'';
     return`<span class="chip arch"><span class="arch-badge">보관</span>${subLabel}${esc(c.textbook||s)} <span class="restore" onclick="restoreCourse('${esc(classId)}','${esc(s)}')">↩ 복원</span></span>`;
   }).join('');
+  const open=!!archOpen[classId]; // 펼침 상태 세션 보존 — 보관/복원 재렌더마다 접히는 불편 방지
   return`<div class="chips" data-classid="${esc(classId)}" data-chip-type="course">${actChips}<span class="chip" style="background:var(--indigo-l);border-color:var(--indigo);color:var(--indigo);cursor:pointer" onclick="addCourseInline('${esc(classId)}',this)">+ 과목 추가</span></div>`
-    +(arch.length?`<button class="arch-tg" onclick="toggleArchRow(this)">▸ 보관 ${arch.length}</button><div class="chips" style="display:none">${archChips}</div>`:'');
+    +(arch.length?`<button class="arch-tg" onclick="toggleArchRow(this,'${esc(classId)}')">${open?'▾':'▸'} 보관 ${arch.length}</button><div class="chips" style="display:${open?'flex':'none'}">${archChips}</div>`:'');
 }
-function toggleArchRow(btn){
+function toggleArchRow(btn,classId){
   const row=btn.nextElementSibling;if(!row)return;
   const open=row.style.display!=='none';
+  archOpen[classId]=!open;
   row.style.display=open?'none':'flex';
   btn.textContent=(open?'▸':'▾')+btn.textContent.slice(1);
 }
@@ -897,6 +899,7 @@ async function rmCourse(classId,subject){
   if(!confirm(`"${subject}" 과목을 보관(숨김) 처리합니까?\n수업 기록은 유지되며, 같은 과정·교재를 다시 추가하면 복원됩니다.`))return;
   const c=config?.classes?.[classId]?.courses?.[subject];
   if(c)c.archived=true;
+  archOpen[classId]=true; // 방금 보관한 과목이 어디로 갔는지 보이게 보관 행 자동 펼침
   try{refreshCourseChips(classId);}catch(e){}
   if(dbUrl&&dbPath){
     try{
