@@ -72,16 +72,17 @@ class App:
         self.root.configure(bg=BG)
         # 전송 게이트 진단 로그 (exe는 콘솔이 없어 print 유실 — 파일 기록)
         set_debug_log(os.path.join(RUNTIME_DIR, 'send_debug.log'))
-        # 스마트 전송 속도 상태 — 학습된 wait 는 config에 영속(다음 실행 이어받음)
-        self._smart_wait        = float(self.config.get('smart_wait', 0.5) or 0.5)
-        self._smart_fast_streak = 0
-        self._open_ema          = None   # "Enter→방 열림" 실측 지연 EMA
-        self._last_open_stats   = None   # (t_open, retried) — 직전 학생 측정값
         self.root.geometry("1100x780")
         self.root.minsize(920, 680)
         self.root.resizable(True, True)
 
         self.config    = load_config()
+        # 스마트 전송 속도 상태 — 학습된 wait 는 config에 영속(다음 실행 이어받음)
+        # ※ 반드시 self.config 로드 이후에 초기화
+        self._smart_wait        = float(self.config.get('smart_wait', 0.5) or 0.5)
+        self._smart_fast_streak = 0
+        self._open_ema          = None   # "Enter→방 열림" 실측 지연 EMA
+        self._last_open_stats   = None   # (t_open, retried) — 직전 학생 측정값
         self.date_str  = today_str()
         # v3.0: 학생 수행도·특이사항은 웹에서 입력 → Firebase 가져오기로만 로드
         self.progress_data, _, _, _ = load_daily_cache()  # 진도/과제 캐시만 복원
