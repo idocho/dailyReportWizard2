@@ -413,7 +413,7 @@ function renderClsMgmtClass(classId){
     <div class="sh" style="display:flex;align-items:center;gap:8px;padding:7px 10px 7px 14px">
       <button class="btn bsm" onclick="clsDrillSh=null;renderMain()" style="flex-shrink:0;font-size:11px">← 뒤로</button>
       <span style="flex:1">🏫 ${esc(classId)} 학급 관리</span>
-      <button class="btn br bsm" onclick="rmCls('${esc(classId)}')" style="padding:2px 7px;font-size:11px;flex-shrink:0">학급 삭제</button>
+      ${adminOn?`<button class="btn br bsm" onclick="rmCls('${esc(classId)}')" style="padding:2px 7px;font-size:11px;flex-shrink:0">학급 삭제</button>`:''}
     </div>
     <div style="padding:12px 14px">${_clsSectionsHtml(classId,clsD)}</div>
   </div>`;
@@ -424,7 +424,10 @@ function _clsSectionsHtml(classId,clsD){
   const students=(config?._classStudents||{})[classId]||[];
   const courses=activeCourses(clsD);
   const subjects=Object.keys(courses);
-  const stuChips=students.map(s=>`<span class="chip" onclick="rmStu('${esc(classId)}','${esc(s.nameKey)}')">${esc(s.name||s.nameKey)} <span>×</span></span>`).join('');
+  // 학급·학생 정보 변경은 관리자 전용 (강사는 조회만) — 명단 소유권 분리
+  const stuChips=students.map(s=>adminOn
+    ?`<span class="chip" onclick="rmStu('${esc(classId)}','${esc(s.nameKey)}')">${esc(s.name||s.nameKey)} <span>×</span></span>`
+    :`<span class="chip" style="cursor:default">${esc(s.name||s.nameKey)}</span>`).join('');
   const courseChips=subjects.map(subj=>{
     const course=courses[subj]||{};
     const curriculum=course.curriculum||'';
@@ -432,7 +435,7 @@ function _clsSectionsHtml(classId,clsD){
     const subLabel=curriculum?`<span style="color:var(--indigo);font-size:9px;font-weight:700;margin-right:3px">${esc(curriculum)}</span>`:'';
     return`<span class="chip" onclick="rmCourse('${esc(classId)}','${esc(subj)}')">${subLabel}${esc(tbLabel)} <span style="display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;margin-left:4px;border-radius:50%;background:#FEE2E2;color:#B91C1C;font-size:10px;font-weight:700;line-height:1">×</span></span>`;}).join('');
   return `<div class="sl">학생</div>
-      <div class="chips" data-classid="${esc(classId)}" data-chip-type="stu">${stuChips}<span class="chip" style="background:var(--indigo-l);border-color:var(--indigo);color:var(--indigo);cursor:pointer" onclick="addStuInline('${esc(classId)}',this)">+ 추가</span></div>
+      <div class="chips" data-classid="${esc(classId)}" data-chip-type="stu">${stuChips}${adminOn?`<span class="chip" style="background:var(--indigo-l);border-color:var(--indigo);color:var(--indigo);cursor:pointer" onclick="addStuInline('${esc(classId)}',this)">+ 추가</span>`:''}</div>
       <div class="sl" style="margin-top:10px">과목</div>
       <div class="chips" data-classid="${esc(classId)}" data-chip-type="course">${courseChips}<span class="chip" style="background:var(--indigo-l);border-color:var(--indigo);color:var(--indigo);cursor:pointer" onclick="addCourseInline('${esc(classId)}',this)">+ 과목 추가</span></div>`;
 }
@@ -448,7 +451,7 @@ function buildClsAccordion(classId,clsD,myRole){
       <span style="font-size:13px;font-weight:700;flex:1">${esc(classId)}</span>
       ${subBadge}
       <span style="font-size:10px;color:var(--gray);margin:0 6px;white-space:nowrap">학생 ${students.length} · 과목 ${subjects.length}</span>
-      <button class="btn br bsm" onclick="rmCls('${esc(classId)}');event.stopPropagation()" style="padding:2px 7px;font-size:11px;flex-shrink:0">✕</button>
+      ${adminOn?`<button class="btn br bsm" onclick="rmCls('${esc(classId)}');event.stopPropagation()" style="padding:2px 7px;font-size:11px;flex-shrink:0">✕</button>`:''}
     </div>
     <div class="acc-body">${_clsSectionsHtml(classId,clsD)}</div>
   </div>`;
@@ -456,6 +459,7 @@ function buildClsAccordion(classId,clsD,myRole){
 
 // ── 학생 인라인 추가 ─────────────────────────────────────────────
 function addStuInline(classId,btnEl){
+  if(!adminOn){toast('학생 추가는 관리자만 가능합니다.');return;}
   const chips=btnEl.parentElement;
   if(chips.querySelector('.stu-new-inp')){chips.querySelector('.stu-new-inp').focus();return;}
 
@@ -513,8 +517,10 @@ function refreshStuChips(classId){
   const el=document.querySelector(`[data-chip-type="stu"][data-classid="${sCls}"]`);
   if(!el)return;
   const students=(config?._classStudents||{})[classId]||[];
-  const stuChips=students.map(s=>`<span class="chip" onclick="rmStu('${esc(classId)}','${esc(s.nameKey)}')">${esc(s.name||s.nameKey)} <span>×</span></span>`).join('');
-  el.innerHTML=stuChips+`<span class="chip" style="background:var(--indigo-l);border-color:var(--indigo);color:var(--indigo);cursor:pointer" onclick="addStuInline('${esc(classId)}',this)">+ 추가</span>`;
+  const stuChips=students.map(s=>adminOn
+    ?`<span class="chip" onclick="rmStu('${esc(classId)}','${esc(s.nameKey)}')">${esc(s.name||s.nameKey)} <span>×</span></span>`
+    :`<span class="chip" style="cursor:default">${esc(s.name||s.nameKey)}</span>`).join('');
+  el.innerHTML=stuChips+(adminOn?`<span class="chip" style="background:var(--indigo-l);border-color:var(--indigo);color:var(--indigo);cursor:pointer" onclick="addStuInline('${esc(classId)}',this)">+ 추가</span>`:'');
 }
 
 // ── 과목 인라인 추가 ─────────────────────────────────────────────
@@ -747,6 +753,7 @@ function _syncAssignments(){
 }
 
 function rmCls(classId){
+  if(!adminOn){toast('학급 삭제는 관리자만 가능합니다.');return;}
   if(!confirm(`${classId} 학급을 삭제합니까?`))return;
   delete config.classes[classId];
   if(config._classStudents)delete config._classStudents[classId];
@@ -765,6 +772,7 @@ function rmCls(classId){
 }
 
 async function rmStu(classId,nameKey){
+  if(!adminOn){toast('학생 삭제는 관리자만 가능합니다.');return;}
   const stu=((config?._classStudents||{})[classId]||[]).find(s=>s.nameKey===nameKey);
   const displayName=stu?.name||nameKey;
   if(!confirm(`${displayName}을(를) 삭제합니까?`))return;

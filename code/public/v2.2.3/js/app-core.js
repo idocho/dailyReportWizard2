@@ -436,6 +436,9 @@ function renderSb(){
 
 function renderMhdr(title){/* PC 전용 — 모바일 헤더 미사용 */}
 function makeTb(title,sub=''){
+  // 🔧 dev 도구(날짜 변경·더미 생성)는 관리자 전용 — 일반 강사 오조작으로
+  // 운영 obs 누적이 오염되던 경로 차단 (액션아이템 A4)
+  if(!adminOn)return `<div class="topbar"><div><div style="font-size:14px;font-weight:700">${esc(title)}</div>${sub?`<div style="font-size:11px;color:var(--sub);margin-top:1px">${esc(sub)}</div>`:''}</div></div>`;
   const devBadge=_devDate
     ?`<div style="display:flex;align-items:center;gap:6px;background:#7c3a00;border:1px solid #f97316;border-radius:8px;padding:4px 8px">
         <span style="font-size:10px;color:#fb923c;font-weight:700;white-space:nowrap">🔧 테스트</span>
