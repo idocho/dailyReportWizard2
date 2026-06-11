@@ -252,7 +252,7 @@ function onAssignGrade(el,classId,nameKey,subject){
     const cnt=students.filter(s=>tagData?.[s.nameKey]?.[a.subject]?.[todayKey()]?.assign_grade).length;
     const dc=document.getElementById('doneCount');if(dc)dc.textContent=`${cnt}/${students.length}명 완료`;
   }
-  pushObs(classId,nameKey,subject);
+  pushObs(classId,nameKey,subject,'assign_grade');
 }
 
 // ── 과제 추가 프리셋 (복수선택) ───────────────────────────────────
@@ -263,7 +263,7 @@ function onAssignTag(el,classId,nameKey,subject){
   const idx=tags.assign_tags.indexOf(p);
   if(idx>=0)tags.assign_tags.splice(idx,1); else tags.assign_tags.push(p);
   el.classList.toggle('sel-m',tags.assign_tags.includes(p));
-  pushObs(classId,nameKey,subject);
+  pushObs(classId,nameKey,subject,'assign_tags');
 }
 
 // ── 특이사항 읽기 (학생별 단일) ───────────────────────────────────

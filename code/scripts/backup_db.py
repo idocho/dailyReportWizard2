@@ -62,13 +62,16 @@ def main():
     top = {k: len(v) if isinstance(v, dict) else 1 for k, v in data.items()}
     log(f"저장 완료: {out.name} ({out.stat().st_size/1024:.0f}KB) 최상위 노드 {top}")
 
-    # 보존 기간 경과분 삭제
+    # 보존 기간 경과분 삭제 — 단, 매월 1일 스냅샷은 영구 보존
+    # (반 소속 등 장기 이력의 월 단위 소급 조회용 — class_history 노드 대체)
     cutoff = now - datetime.timedelta(days=RETENTION_DAYS)
     removed = 0
     for f in BACKUP_DIR.glob("drw2_*.json"):
         try:
             stamp = datetime.datetime.strptime(f.name[5:15], "%Y-%m-%d")
         except ValueError:
+            continue
+        if stamp.day == 1:
             continue
         if stamp < cutoff:
             f.unlink()

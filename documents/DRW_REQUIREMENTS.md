@@ -1,7 +1,7 @@
 # DailyReportWizard — 요구사항 명세서
 
 **Crafted by IDO(idocho@kakao.com) · Powered by Claude AI**  
-**문서 버전**: 8.14 · **앱 버전**: v2.2.3(개발)/v2.2.2(안정) · **최종 수정**: 2026-06-11
+**문서 버전**: 8.15 · **앱 버전**: v2.2.3(개발)/v2.2.2(안정) · **최종 수정**: 2026-06-11
 
 > Firebase 스키마 전체 명세: [ClassManager/documents/DB_SCHEMA.md](../../ClassManager/documents/DB_SCHEMA.md)
 
@@ -11,6 +11,7 @@
 
 | 문서 버전 | 날짜 | 주요 변경 |
 |-----------|------|-----------|
+| 8.15 | 2026-06-11 | **신뢰성/정합 일괄** ① **[웹] obs 동시쓰기 race 완화(C3)** — `pushObs(…,field)`가 날짜 객체 통째가 아니라 변경된 필드만 `obs/{nk}/{subj}/{date}` 키 단위 PATCH. 두 강사 동시 입력 시 서로 다른 태그 필드 충돌·유실 방지. ② **[웹·PC] 동명이인 오발송 가드(B4)** — 전송 직전 표시이름 중복 검사, 겹치는 이름 전원 자동 제외+안내(같은 '오직 {이름}' 방으로 합쳐져 타 학부모 발송되던 위험). DRW `_dedup_same_name`(데일리·발송 탭), CM `_send` 동일. ③ **[운영] 백업 월간 영구 스냅샷** — 매월 1일 백업은 30일 경과해도 보존(반 소속 등 장기 이력 소급 조회). ④ **잔재 정리(C4)** — DB `lastSent` 노드 삭제, 본문 lastSent 잔재·assignments 형식 정정(DRW_REQ §5, DB_SCHEMA v1.4 객체배열). Analyzer v0.3(nameKey-first 종단 비교)은 별도 repo |
 | 8.14 | 2026-06-11 | **교재 명단 — 전역 레지스트리 + 관리자 관리 UI** `config/textbooks/{교재명}: true` 부활(문서 v3.3 노드) — classes와 독립이라 **반 전체 삭제에도 교재명 자동완성 보존**(학기 개편 대비). ① 과목 등록(addCourseInline/wzAddCourse) 시 `_registerTbName()` 자동 등록(공백 정규화·idempotent), ② 자동완성 datalist = 레지스트리 ∪ 현존 courses, **ko 오름차순 정렬**, ③ 관리자 설정 「📚 교재 명단」 섹션 — 목록(오름차순)+직접 추가+✕ 제거(자동완성 후보에서만 제외, 과목·기록 무영향), admin 가드. 기존 DB 과목(보관 포함)에서 15개 시드 완료 — 철자 변형 중복(SIGNATURE 100+/Signature100+/시그니처 100+ 등)은 관리자 UI로 정리 가능 |
 | 8.13 | 2026-06-11 | **명단 권한 분리 — 학급·학생 CRUD 관리자 전용 (웹)** 관리자 시나리오 정리에 따라: 강사는 학급·학생 정보를 조회만, 추가/삭제는 관리자(`adminOn`)만. ① 학생 칩 ×(rmStu)·「+ 추가」(addStuInline)·「학급 삭제」(rmCls) UI를 admin 조건부 렌더, ② 함수 자체에 admin 가드 이중화(toast 안내), ③ **dev 도구(🔧 날짜 변경·🎲 더미) admin 게이트(A4)** — 일반 강사 오조작에 의한 운영 obs 오염 차단. 과목(교재) 등록·보관은 수업 소관이라 강사 유지. 역할 정리: 웹 일반=수업 운영(입력·성적·과목·본인 배정), 웹 관리자=교무 정정(오늘 입력/진도 정리·강사 관리·dev 도구), CM=명단 단일 소유(반·학생 CRUD·CSV·개편·일괄 발송). 이 분리는 C1 Security Rules 화이트리스트의 기준이 됨 |
 | 8.12 | 2026-06-11 | **Analyzer 스탯 원료 불가침 원칙 — 관리자 초기화 파괴 동작 제거** 학기 개편(학급 삭제 후 재편성) 대비 점검에서 발견: ① 관리자 「전체 입력 삭제」가 `fbPut('obs',null)`로 **관찰 누적 전체를 파괴**(레이더/월간 리포트 원료 소멸) → 「전체 오늘 입력 삭제」로 재정의: input/ 전체 + obs는 **오늘 날짜키만** 전 학생·전 과목 정리, 누적 보존. ② 「명단 & 설정 삭제」의 `fbPut('students',null)` 제거 → 「강사 & 설정 삭제」로 재정의(명단은 CM 소관, 이력의 이름 해석 원료 보존). 불변식 확립: **obs/scores/history/students = Analyzer 원료, 웹·PC 어디서도 일괄 삭제 경로 없음.** 학급 삭제 개편 시에도 학생 grain 이력 전체 보존(반 이력 추적은 불요 결정 — 종단 비교는 nameKey 기준). 구형 과목 키 표시 문제는 known issue(개편 시 자연 해소) |
@@ -137,7 +138,7 @@ v2.0부터는 DailyReportAnalyzer가 월간 학부모 리포트를 생성할 수
 - KakaoTalk 데일리 리포트 발송: 담임 (PC 앱)
 
 ※ **로컬 전용 시나리오 폐기** — Firebase 연결 필수  
-※ **PC 앱 쓰기 제한**: Firebase 쓰기는 `lastSent/` 기록 + 강사 신규 등록만 허용  
+※ **PC 앱 쓰기 제한**: Firebase 쓰기는 `history/` 기록 + 전송 학생 `input/{nameKey}/__note__` 소거 + 강사 신규 등록만 허용 (v2.1.2~)  
 ※ **진도/과제 입력**: 웹 전용 (v3.0 이후 PC 직접 입력 UI 제거)
 
 ### 1.4 연계 프로젝트
@@ -274,7 +275,7 @@ DRW 2.0이 저장하는 수업 관찰 데이터(`obs/`)와 성적 데이터(`sco
 ③ config/instructors/{id} 로드 → 강사별 assignments 우선 적용
 ④ input/ 로드   → student_data, note_data 채움
 ⑤ obs/ 로드     → tag_data 채움 (v2.0 신규)
-⑥ session/class_data/ 로드 → progress_data (없으면 lastSent/ 폴백)
+⑥ session/class_data/ 로드 → progress_data (lastSent 폴백은 v2.1.2 폐기 — 노드 없으면 빈 데이터)
 ```
 
 **가져오기 고정 정책** (v5.1~)
@@ -298,9 +299,9 @@ DRW 2.0이 저장하는 수업 관찰 데이터(`obs/`)와 성적 데이터(`sco
 - **부담임 반 제외**: `assignments[cls].role == "부담임"` → 전송 제외. 폴백: `config/sheets/.../is_sub: true`
 - **대상자 선택 (개별 제외)**: 🚀 전송 클릭 시 `_open_send_dialog()` 체크박스 모달. 준비 완료 학생 전체 기본 체크, 체크 해제 = **이번 전송만 제외**(상태 미변경, 다음 전송엔 재포함). [전체 선택]/[전체 해제] 버튼. 선택 0명 시 전송 차단
 - **첫 학생 워밍업**: 카운트다운 종료 직후 첫 학생(`i==0`)은 `warm=0.6s` 지연 추가(`room` 복사 후 + 첫 `ctrl+f` 후) — 카톡 창 포커스/검색 정착 전 발사로 인한 첫 명 오작동 방지. 2번째부터 `warm=0`
-- **순차 전송 취소**: 전송 시작 후 `send_btn` → "⏹ 전송 취소" 토글. `self._send_cancel`(`threading.Event`) set → 3초 카운트다운 및 루프 매 학생 진입 시 검사, **현재 학생 완료 후 중단**. 취소 시 전송된 N명만 발송, **로컬 데이터 초기화 안 함**(미전송분 유지). 완료 시에만 기존 초기화 + `lastSent/` push
+- **순차 전송 취소**: 전송 시작 후 `send_btn` → "⏹ 전송 취소" 토글. `self._send_cancel`(`threading.Event`) set → 3초 카운트다운 및 루프 매 학생 진입 시 검사, **현재 학생 완료 후 중단**. 취소 시 전송된 N명만 발송, **로컬 데이터 초기화 안 함**(미전송분 유지). 완료 시에만 기존 초기화 (history 기록은 전송 확정 시점에 선행)
 - `pyautogui` 미설치 시: `AUTOMATION=False`, 전송 버튼 비활성화
-- 전송 **완료** 후: `student_data`, `note_data`, `force_data` 초기화 / `progress_data` 유지 / Firebase `lastSent/` push
+- 전송 **완료** 후: `student_data`, `note_data`, `force_data` 초기화 / `progress_data` 유지 (`history/` 기록·`__note__` 소거는 전송 확정 시점 단일 multi-path PATCH로 선행)
 - **스레드 안전**: `_do_send`는 별도 스레드 실행. UI 업데이트 전체를 `root.after(0, ...)` 로 메인 스레드에 위임
 
 ### 2.9 설정 창
@@ -836,8 +837,8 @@ cfg.sheets.M.classes.중1A.tb_grade  = { "최상위수학": "중1-1", "우공비
       {name}/
         name: "IDO"
         assignments:           ← list (웹에서 배정)
-          - { sheet: "M", cls: "3MGM", tb: "3-1 우공비", role: "담임" }
-          - { sheet: "T", cls: "3TGM", tb: "3-1 우공비", role: "부담임" }
+          - { classId: "3MGM", subject: "중3-1 SIGNATURE 100+", group: "M", role: "담임" }   ← 실제 저장 형식
+          - { classId: "3TGM", subject: "중3-1 SIGNATURE 100+", group: "T", role: "부담임" } (구형 sheet/cls/tb 키는 PC 폴백만)
         presets: ["과제 완벽 수행 ✅", ...]
     textbooks/                 ← 전역 교재 이름 레지스트리 (관리자 전용, v3.3~)
       최상위수학: true

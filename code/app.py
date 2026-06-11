@@ -1221,6 +1221,15 @@ class App:
         if not body.strip() and not img_path:
             messagebox.showinfo("알림", "본문 또는 첨부 이미지가 필요합니다."); return
 
+        # 동명이인 가드 — 같은 이름은 같은 방으로 검색돼 오발송 위험
+        sel, dups = self._dedup_same_name(sel)
+        if dups:
+            messagebox.showwarning("동명이인 제외",
+                "동명이인이 있어 다음 학생은 자동 전송에서 제외했습니다:\n"
+                f"{', '.join(dups)}\n\n개별 전송하세요.")
+            if not sel:
+                return
+
         msgs = []
         for s in sel:
             ctx = build_bulk_ctx(s['name'], s['classId'])
@@ -2309,6 +2318,16 @@ class App:
         if not sel:
             messagebox.showinfo("알림", "선택된 전송 대상이 없습니다."); return
 
+        # 동명이인 가드 — 같은 표시이름은 같은 카톡방으로 합쳐져 오발송 위험 → 제외+안내
+        sel, dups = self._dedup_same_name(sel)
+        if dups:
+            messagebox.showwarning("동명이인 제외",
+                "동명이인이 있어 다음 학생은 자동 전송에서 제외했습니다:\n"
+                f"{', '.join(dups)}\n\n"
+                "카톡방 이름을 구분(예: 이름+번호)한 뒤 개별 전송하세요.")
+            if not sel:
+                return
+
         # 특이사항 이력은 메시지 확정 시점에 기록 — 카톡 전송 성패/abort 와 무관 (전송 루프 이전 1회 원자적)
         self._push_history(sel)
 
@@ -2385,6 +2404,21 @@ class App:
 
         win.wait_window()
         return result['sel']
+
+    @staticmethod
+    def _dedup_same_name(items):
+        """동명이인 오발송 가드(B4) — 표시이름이 겹치는 학생은 전송에서 제외하고 명단 반환.
+
+        카톡방 매칭이 '오직 {이름}' 검색이라 동명이인은 같은 방으로 합쳐져
+        타 학부모에게 내용이 갈 수 있음. 겹치는 이름 전원 제외 → 수동 전송 안내.
+        items: [{'name': 표시이름, ...}] → (safe_items, dup_names)"""
+        from collections import Counter
+        cnt = Counter(it.get('name', '') for it in items)
+        dups = sorted({n for n, c in cnt.items() if n and c > 1})
+        if not dups:
+            return items, []
+        safe = [it for it in items if it.get('name') not in dups]
+        return safe, dups
 
     # 전송 속도 프리셋 → 단계 대기(초). 검증 게이트가 실패를 흡수하므로
     # 프리셋은 "1차 시도 마진"만 결정 — 안정은 저사양/카톡 응답 지연 환경용.

@@ -308,14 +308,23 @@ function getTags(classId,nameKey,subject){
   if(!tagData[nameKey][subject][todayKey()])tagData[nameKey][subject][todayKey()]={};
   return tagData[nameKey][subject][todayKey()];
 }
-async function pushObs(classId,nameKey,subject){
+async function pushObs(classId,nameKey,subject,field){
   saveLocal();
   if(!dbUrl||!dbPath)return;
   if(!_canWrite(classId,subject))return;
   const dateKey=todayKey();
   const val=tagData?.[nameKey]?.[subject]?.[dateKey]||{};
-  // Firebase 경로: obs/{nameKey}/{subject}/{YYYY-MM-DD}
-  try{await fbPatch(`obs/${nameKey}/${subject}`,{[dateKey]:val});}catch(e){fbFail('관찰 태그')(e);}
+  try{
+    if(field!==undefined){
+      // v2.2.3: 동시쓰기 race 완화 — 날짜 객체 통째가 아니라 변경된 필드만 PATCH.
+      // 두 강사가 같은 학생을 동시에 입력해도 서로 다른 필드는 충돌하지 않음 (검수 C3).
+      const fv=val[field];
+      await fbPatch(`obs/${nameKey}/${subject}/${dateKey}`,{[field]:fv===undefined?null:fv});
+    }else{
+      // 필드 미지정(레거시/일괄) — 날짜 객체 통째 (devPushDummy 등)
+      await fbPatch(`obs/${nameKey}/${subject}`,{[dateKey]:val});
+    }
+  }catch(e){fbFail('관찰 태그')(e);}
 }
 
 // ── 태그 토글 핸들러 ─────────────────────────────────────────────
@@ -327,7 +336,7 @@ function onTagCondition(el,classId,nameKey,subject){
   if(cell)cell.querySelectorAll('.tg-radio[data-g="condition"]').forEach(b=>{
     b.classList.toggle('sel-c', b.dataset.k===tags.condition);
   });
-  pushObs(classId,nameKey,subject);
+  pushObs(classId,nameKey,subject,'condition');
 }
 function onTagUnderstand(el,classId,nameKey,subject){
   const k=el.dataset.k;
@@ -337,7 +346,7 @@ function onTagUnderstand(el,classId,nameKey,subject){
   if(cell)cell.querySelectorAll('.tg-radio[data-g="understand"]').forEach(b=>{
     b.classList.toggle('sel-c', b.dataset.k===tags.understand);
   });
-  pushObs(classId,nameKey,subject);
+  pushObs(classId,nameKey,subject,'understand');
 }
 function onTagMulti(el,classId,nameKey,field,subject){
   const k=el.dataset.k;
@@ -346,7 +355,7 @@ function onTagMulti(el,classId,nameKey,field,subject){
   const idx=tags[field].indexOf(k);
   if(idx>=0)tags[field].splice(idx,1); else tags[field].push(k);
   el.classList.toggle('sel-m', tags[field].includes(k));
-  pushObs(classId,nameKey,subject);
+  pushObs(classId,nameKey,subject,field);
 }
 
 /**
