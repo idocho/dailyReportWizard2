@@ -166,7 +166,7 @@ async function wzAddCourse(){
   const courseData={textbook,curriculum};
   config.classes[wzCls].courses[subject]=courseData;
   saveLocal();renderMain();
-  if(dbUrl&&dbPath){try{await fbPatch(`classes/${wzCls}/courses/${subject}`,{...courseData,archived:null});toast(wzRestoring?'보관 과목 복원됨 ✅':'과목 추가됨 ✅');}catch(e){toast('저장 실패: '+e,4000);}}
+  if(dbUrl&&dbPath){try{await fbPatch(`classes/${wzCls}/courses/${subject}`,{...courseData,archived:null});_registerTbName(textbook);toast(wzRestoring?'보관 과목 복원됨 ✅':'과목 추가됨 ✅');}catch(e){toast('저장 실패: '+e,4000);}}
 }
 
 function renderSettings(mc){
@@ -237,6 +237,33 @@ function renderSettings(mc){
       </div>
       <div class="sa-body${openSaIds.has('sa-tbmgmt')?' open':''}">
         ${tbRows}
+      </div>
+    </div>`;
+  })() : '';
+
+  // ── 관리자: 교재 명단 (전역 레지스트리 config/textbooks — 반 삭제와 무관하게 보존) ──
+  const tbListHtml = adminOn ? (()=>{
+    const names=Object.keys(config?.textbooks||{}).sort((a,b)=>a.localeCompare(b,'ko'));
+    const rows=names.map(n=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 12px;border-bottom:1px solid var(--border)">
+        <span style="font-size:12px;font-weight:600">${esc(n)}</span>
+        <button style="background:none;border:none;cursor:pointer;color:var(--red);font-size:13px;padding:0 2px;line-height:1" onclick="rmTbName('${esc(n)}')">✕</button>
+      </div>`).join('')||'<div style="padding:8px 12px;font-size:11px;color:var(--gray)">등록된 교재명 없음 — 과목 등록 시 자동 추가됩니다</div>';
+    return `<div class="sa admin-sec" id="sa-tblist">
+      <div class="sa-hdr${openSaIds.has('sa-tblist')?' open':''}" onclick="_saToggle('sa-tblist')">
+        <span class="sa-ico">📚</span>
+        <span class="sa-lbl">교재 명단</span>
+        <span style="font-size:10px;background:#FEF3C7;color:#92400E;border-radius:8px;padding:1px 6px;font-weight:700;margin-right:4px">관리자</span>
+        <span class="sa-chv">›</span>
+      </div>
+      <div class="sa-body${openSaIds.has('sa-tblist')?' open':''}">
+        <div style="padding:6px 12px;font-size:11px;color:var(--gray)">반을 삭제해도 보존되는 전역 교재 목록 — 과목 등록 자동완성에 사용. 과목 등록 시 새 교재명은 자동 추가됩니다.</div>
+        ${rows}
+        <div style="display:flex;gap:6px;padding:10px 12px 4px">
+          <input class="inp sm" id="newTbName" placeholder="교재명 직접 추가" style="flex:1"
+            onkeydown="if(event.key==='Enter'){event.preventDefault();addTbName();}">
+          <button class="btn bp bsm" onclick="addTbName()">+ 추가</button>
+        </div>
+        <div style="padding:4px 12px 8px;font-size:10px;color:var(--gray)">✕ 제거는 자동완성 후보에서만 제외 — 등록된 과목·기록에는 영향 없음</div>
       </div>
     </div>`;
   })() : '';
@@ -342,6 +369,8 @@ function renderSettings(mc){
     </div>
 
     ${tbMgmtHtml}
+
+    ${tbListHtml}
 
     ${instrMgmt}
 
@@ -542,11 +571,11 @@ function addCourseInline(classId,btnEl){
   const tbDlId='tb-dl-'+classId.replace(/[^a-z0-9]/gi,'_');
   const tbDl=document.createElement('datalist');
   tbDl.id=tbDlId;
-  const existingTbs=new Set();
+  const existingTbs=new Set(Object.keys(config?.textbooks||{}));  // 전역 레지스트리 (반 삭제와 무관)
   for(const clsD of Object.values(config?.classes||{}))
     for(const c of Object.values(clsD.courses||{}))
       if(c.textbook)existingTbs.add(c.textbook);
-  existingTbs.forEach(t=>{const o=document.createElement('option');o.value=t;tbDl.appendChild(o);});
+  [...existingTbs].sort((a,b)=>a.localeCompare(b,'ko')).forEach(t=>{const o=document.createElement('option');o.value=t;tbDl.appendChild(o);});
   wrapper.appendChild(tbDl);
 
   const tbInp=document.createElement('input');
@@ -583,6 +612,7 @@ function addCourseInline(classId,btnEl){
     if(dbUrl&&dbPath){
       try{
         await fbPatch(`classes/${classId}/courses/${subject}`,{...courseData,archived:null});
+        _registerTbName(textbook);
         toast(restoring?'보관 과목 복원됨 ✅ (기존 기록 연결)':'과목 추가됨 ✅');
       }catch(e){toast('저장 실패: '+e,4000);}
     }
@@ -609,6 +639,36 @@ function refreshCourseChips(classId){
     return`<span class="chip" onclick="rmCourse('${esc(classId)}','${esc(subj)}')">${subLabel}${esc(tbLabel)} <span style="display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;margin-left:4px;border-radius:50%;background:#FEE2E2;color:#B91C1C;font-size:10px;font-weight:700;line-height:1">×</span></span>`;
   }).join('');
   el.innerHTML=courseChips+`<span class="chip" style="background:var(--indigo-l);border-color:var(--indigo);color:var(--indigo);cursor:pointer" onclick="addCourseInline('${esc(classId)}',this)">+ 과목 추가</span>`;
+}
+
+// ── 교재 명단(전역 레지스트리) 관리 — 관리자 전용 ─────────────────
+function addTbName(){
+  if(!adminOn){toast('관리자만 가능합니다.');return;}
+  const name=_normTbName(document.getElementById('newTbName')?.value||'');
+  if(!name){toast('교재명을 입력해 주세요.');return;}
+  if(!config.textbooks)config.textbooks={};
+  if(config.textbooks[name]){toast('이미 있는 교재명입니다.');return;}
+  config.textbooks[name]=true;saveLocal();
+  if(dbUrl&&dbPath)fbPatch('config/textbooks',{[name]:true}).then(()=>toast('교재명 추가됨 ✅')).catch(fbFail('교재 명단'));
+  renderMain();
+}
+function rmTbName(name){
+  if(!adminOn){toast('관리자만 가능합니다.');return;}
+  if(!confirm(`"${name}" 을(를) 교재 명단에서 제거합니까?
+(등록된 과목·기록에는 영향 없음 — 자동완성 후보에서만 제외)`))return;
+  if(config?.textbooks)delete config.textbooks[name];
+  saveLocal();
+  if(dbUrl&&dbPath)fbPatch('config/textbooks',{[name]:null}).then(()=>toast('제거됨')).catch(fbFail('교재 명단'));
+  renderMain();
+}
+function _registerTbName(textbook){
+  // 과목 등록 시 전역 레지스트리에 자동 등록 (idempotent) — 반 삭제 후에도 교재명 보존
+  const name=_normTbName(textbook||'');
+  if(!name)return;
+  if(!config.textbooks)config.textbooks={};
+  if(config.textbooks[name])return;
+  config.textbooks[name]=true;
+  if(dbUrl&&dbPath)fbPatch('config/textbooks',{[name]:true}).catch(fbFail('교재 명단'));
 }
 
 // ── 프리셋 편집 (인플레이스) ──────────────────────────────────────
