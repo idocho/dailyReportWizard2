@@ -147,7 +147,7 @@ function _renderScoreList(mc,a,classId,subject){
   <div class="score-card-top">
     <div style="display:flex;align-items:center;flex-wrap:wrap;gap:4px">
       <span class="score-type-badge">${esc(meta.type||'')}</span>
-      ${meta.round?`<span class="score-round">${esc(meta.round)}회</span>`:''}
+      ${meta.round?`<span class="score-round">${esc(String(meta.round).replace(/\s*회$/,''))}회</span>`:''}
       ${scopeBadge}
       <span class="score-date">${esc(meta.date||'')}</span>
     </div>
@@ -347,9 +347,11 @@ async function _saveScore(classId, subject){
   const typeEl=document.getElementById('sc-type');
   const customEl=document.getElementById('sc-type-custom');
   const typeVal=typeEl?.value==='직접입력'?(customEl?.value.trim()||'직접입력'):typeEl?.value||'주간Test';
-  const round=(document.getElementById('sc-round')?.value.trim())||'';
+  // 회차는 저장 시점에 정규화("1회"→"1") — 카드 "N회" 표기 중복("1회회") 방지, 키와 일치
+  const round=_normRound((document.getElementById('sc-round')?.value.trim())||'');
   const date=document.getElementById('sc-date')?.value||todayKey();
   const maxScore=Number(document.getElementById('sc-max')?.value)||100;
+  if(!(maxScore>=1)){toast('만점은 1 이상이어야 합니다.');return;}
   const memo=document.getElementById('sc-memo')?.value.trim()||'';
 
   // 점수 수집 + 범위 검증 (0~만점)
