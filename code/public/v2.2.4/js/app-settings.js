@@ -392,6 +392,7 @@ function renderSettings(mc){
       <span>${adminOn?'🔓':'🔒'}</span>
       <span id="admBtnLbl">${adminOn?'관리자 모드 해제':'관리자 모드'}</span>
     </button>
+    ${adminOn?`<button class="btn bsm" style="width:100%;justify-content:center" onclick="changeAdminPw()">🔑 관리자 암호 변경</button>`:''}
 
     <div style="font-size:10px;color:var(--gray);text-align:center">`+`DailyReportWizard ${APP_VERSION} · Crafted by IDO(idocho@kakao.com) · Powered by Claude AI`+`</div>
   </div>`;
@@ -752,8 +753,25 @@ async function toggleAdmin(){
   const pw=prompt('관리자 암호를 입력하세요');
   if(pw===null)return;
   const h=await hashPw(pw);
-  if(h===ADMIN_HASH){adminOn=true;toast('관리자 모드 활성화 🔓 — 전체 수업 접근');renderSb();renderMain();}
+  // DB(config/admin_hash) 우선, 코드 상수 폴백 — 암호 회전 시 재배포 불요
+  if(h===(config?.admin_hash||ADMIN_HASH)){adminOn=true;toast('관리자 모드 활성화 🔓 — 전체 수업 접근');renderSb();renderMain();}
   else toast('암호가 올바르지 않습니다.');
+}
+
+// 관리자 암호 변경 — SHA-256 해시를 config/admin_hash에 저장(전 버전·전 기기 즉시 적용)
+async function changeAdminPw(){
+  if(!adminOn){toast('관리자 모드가 필요합니다.');return;}
+  const pw1=prompt('새 관리자 암호 (8자 이상)');
+  if(pw1===null)return;
+  if((pw1||'').length<8){toast('암호는 8자 이상이어야 합니다.');return;}
+  const pw2=prompt('새 암호 다시 입력');
+  if(pw2===null)return;
+  if(pw1!==pw2){toast('암호가 서로 다릅니다.');return;}
+  const h=await hashPw(pw1);
+  if(!config)config={};
+  config.admin_hash=h;saveLocal();
+  if(dbUrl&&dbPath)await fbPatch('config',{admin_hash:h}).catch(fbFail('암호 변경'));
+  toast('관리자 암호 변경됨 🔑');
 }
 
 function onCC(){

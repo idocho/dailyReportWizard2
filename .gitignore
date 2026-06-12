@@ -16,3 +16,11 @@ code/*.spec
 .firebase/
 code/scripts/backup/
 migration_backup_*.json
+
+# AI 도구 로컬 설정 (커밋 제외)
+.codex/
+.agents/
+code/.agents/
+AGENTS.md
+code/skills-lock.json
+.claude/launch.json
