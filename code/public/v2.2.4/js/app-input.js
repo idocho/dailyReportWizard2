@@ -22,7 +22,7 @@ function renderInput(mc){
   const students = (config._classStudents||{})[classId] || [];
 
   // 프리셋 소스: instructor.presets 우선
-  const presets=instructor?.presets||config?.presets?.['과제수행도']||[];
+  const presets=instructor?.presets||config?.presets?.['과제수행도']||DEFAULT_ASSIGN_PRESETS;
   const pkey=`${classId}|${subject}`;
   const pd=progressData[pkey]||{};
 
@@ -204,15 +204,15 @@ function renderInput(mc){
         </div>
         <div class="si-row">
           <span class="si-lbl">이해도</span>
-          <div class="si-btns tg-cell">${undBtns}<div class="tg-sep"></div>${undSubBtns}<div class="tg-sep"></div>${hlBtns}</div>
+          <div class="si-btns tg-cell">${undBtns}<div class="tg-sep"></div>${hlBtns}</div>
         </div>
         <div class="si-row">
-          <span class="si-lbl">참여</span>
-          <div class="si-btns tg-cell">${engBtns}</div>
+          <span class="si-lbl">참여·풀이</span>
+          <div class="si-btns tg-cell">${engBtns}<div class="tg-sep"></div>${undSubBtns}<div class="tg-sep"></div>${extraBtns}</div>
         </div>
         <div class="si-row">
-          <span class="si-lbl">기타</span>
-          <div class="si-btns tg-cell">${extraBtns}${cauBtns}</div>
+          <span class="si-lbl">주의</span>
+          <div class="si-btns tg-cell">${cauBtns}</div>
         </div>
         <div class="si-row">
           <span class="si-lbl">메모</span>

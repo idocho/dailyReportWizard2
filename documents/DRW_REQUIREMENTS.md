@@ -1,7 +1,7 @@
 # DailyReportWizard — 요구사항 명세서
 
 **Crafted by IDO(idocho@kakao.com) · Powered by Claude AI**  
-**문서 버전**: 8.29 · **앱 버전**: v2.2.4(개발)/v2.2.3(안정) · **최종 수정**: 2026-06-12
+**문서 버전**: 8.30 · **앱 버전**: v2.2.4(개발)/v2.2.3(안정) · **최종 수정**: 2026-06-12
 
 > Firebase 스키마 전체 명세: [ClassManager/documents/DB_SCHEMA.md](../../ClassManager/documents/DB_SCHEMA.md)
 
@@ -11,6 +11,7 @@
 
 | 문서 버전 | 날짜 | 주요 변경 |
 |-----------|------|-----------|
+| 8.30 | 2026-06-12 | **[v2.2.4·브랜치 feature/obs-tag-restructure] obs 태그 재구조화** — 실데이터 1,019세션·노트 267건 분석 기반. ① **폐기 9종**(UI만, 데이터 보존): understand_sub:confused(8건)·engage:present(6)/help(7)/preview(2)/error_fix(3)·caution:attitude(4)·extra:weekly_test(0)/retest(1)·highlight:perfect(3)/improved(1) ② **신설 4종**: engage:deep_try 🧗심화도전(노트 94건)·highlight:process_good 📝풀이과정우수(55)·caution:slow ⏳풀이느림(37)·calc_miss ➗계산실수(11) — slow·calc_miss는 관찰용(Analyzer 패널티 미반영) ③ **UI 행 재편**: 이해도+하이라이트 / 참여·풀이(engage+understand_sub+extra 통합) / 주의 ④ **기본 과제 프리셋** `DEFAULT_ASSIGN_PRESETS`(결석·보강등원·채점미실시·오답풀이안함·교재미지참 — 자작 프리셋 상위 빈도 정식화) ⑤ PC `ai_engine.py` 신설 4종 문구 추가(폐기 키 매핑은 과거 데이터 호환 유지) ⑥ 더미 생성기 신태그 전환. **알려진 기존 이슈(별도)**: 같은 필드 태그 연타 시 PATCH 도착 순서 역전으로 마지막 토글 유실 가능(간격 클릭은 정상) |
 | 8.29 | 2026-06-12 | **[v2.2.4] 관리자 암호 회전 가능화** — `toggleAdmin` 검증을 `config/admin_hash`(DB) 우선·코드 상수(`ADMIN_HASH`) 폴백으로 변경. 관리자 모드 on 상태에서 「🔑 관리자 암호 변경」(8자 이상, 2회 확인) → SHA-256 해시를 `config/admin_hash`에 저장 — 전 버전·전 기기 즉시 적용, 재배포 불요. **[정리]** 구 firebase init 잔재 삭제(`code/firebase.json`·`code/.firebaserc` — 오발 deploy 시 ignore/redirect 없이 공개되는 위험 사본, `code/.gitignore`, 구 스키마 `gen_dummy.js`), AI 도구 로컬 설정 gitignore 추가 |
 | 8.28 | 2026-06-12 | **[v2.2.4] 몽키 테스트 검증 + 픽스 2건** — 격리 dbPath(mtest1) 시드 후 브라우저 자동 조작으로 사용자 시나리오 11종 + 무작위 30액션 검증(JS 에러 0). 픽스: ① 회차 "1회" 입력 시 카드 "1회회" 중복 표기 — 저장 시 회차 정규화(meta.round도 "1") + 잔존 데이터 표시 방어(trailing 회 제거) ② 점수 전부 빈칸이면 만점 음수/0 저장되던 검증 우회 — `만점≥1` 강제. 관찰(수정 안 함): 학년→반별 유형 격하 시 타 반 점수가 새 weekly 노드에 잔류(유실 아님·보존 우선), 격하 시 만점 자동 변경이 기존 점수와 충돌하면 검증이 차단(만점 수동 재조정으로 해결) |
 | 8.27 | 2026-06-12 | **[v2.2.4] 학생 추가 CM 일원화** — 웹 인라인 학생 추가(addStuInline) 제거. 종전 웹 추가는 `nameKey=이름(+숫자)`로 생성해 스키마 정본(nameKey=출결번호, v2.1)을 위반 — Analyzer 종단 비교·CM CSV와 이질. 「+ 추가」 칩 → 「＋ CM에서 추가」 안내(클릭 시 toast). 명단 CRUD는 CM 단일 소유(v8.13) 원칙 완성. 학생 삭제(rmStu)·조회는 웹 관리자 유지. **실DB 이름 키 4명 마이그레이션 완료(2026-06-12)** — 권서림→6247·박소이→5015·박현서→62484·윤서빈→32621. students/obs/input/history 동반 이동(scores 해당 없음), 백업→신규 기록→검증→구 키 삭제 절차, 로컬 백업 보관(migration_backup_namekeys_20260612.json, gitignore) |

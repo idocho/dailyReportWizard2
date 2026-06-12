@@ -41,18 +41,24 @@ _UNDERSTAND_SUB_TEXT = {
     "retry":      "틀린 문제를 다시 풀며 오답을 점검함",
     "confused":   "이전에 배운 개념과 혼동하는 부분이 관찰됨",
 }
+# v8.30 태그 재구조화: deep_try·slow·calc_miss·process_good 신설.
+# 폐기 태그(present·help·preview·error_fix·weekly_test·retest·perfect·improved·attitude)는
+# UI에서만 제거 — 과거 날짜 데이터 호환을 위해 매핑은 유지.
 _ENGAGE_TEXT = {
-    "present":  "수업 중 발표에 적극 참여함",
     "question": "모르는 부분을 스스로 질문함",
+    "deep_try": "심화·복합 유형 문제에 적극적으로 도전함",
+    "present":  "수업 중 발표에 적극 참여함",
     "help":     "친구의 이해를 도와주는 모습이 있었음",
     "preview":  "미리 예습하고 수업에 참여함",
     "error_fix": "풀이 오류를 스스로 발견하고 정정함",
 }
 _CAUTION_TEXT = {
-    "sleepy":   "수업 중 졸음 증상",
-    "chat":     "잡담으로 수업 참여도 저하",
-    "attitude": "수업 태도 개선 필요",
-    "late":     "지각",
+    "sleepy":    "수업 중 졸음 증상",
+    "chat":      "잡담으로 수업 참여도 저하",
+    "late":      "지각",
+    "slow":      "문제 풀이에 시간이 다소 오래 걸리는 편이었음",
+    "calc_miss": "계산 실수가 반복적으로 관찰됨",
+    "attitude":  "수업 태도 개선 필요",
 }
 _EXTRA_TEXT = {
     "self_study":  "자율학습을 실시함",
@@ -60,10 +66,11 @@ _EXTRA_TEXT = {
     "retest":      "재시험을 실시함",
 }
 _HIGHLIGHT_TEXT = {
-    "perfect":  "오늘 만점 또는 완벽에 가까운 풀이 성취",
-    "improved": "지난 수업 대비 눈에 띄게 향상된 모습",
-    "mastered": "오늘 다룬 개념을 완전히 습득함",
-    "effort":   "어려운 문제에도 끝까지 포기하지 않는 집념을 보임",
+    "mastered":     "오늘 다룬 개념을 완전히 습득함",
+    "effort":       "어려운 문제에도 끝까지 포기하지 않는 집념을 보임",
+    "process_good": "풀이 과정을 논리적이고 깔끔하게 서술함",
+    "perfect":      "오늘 만점 또는 완벽에 가까운 풀이 성취",
+    "improved":     "지난 수업 대비 눈에 띄게 향상된 모습",
 }
 
 

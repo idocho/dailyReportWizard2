@@ -83,36 +83,41 @@ const TAGS = {
     {key:'confused', label:'헷갈림'},
     {key:'hard',     label:'어려워함'},
   ],
+  // ── v8.30 재구조화 (실데이터 1,019세션 + 노트 267건 분석) ──
+  // 폐기: understand_sub:confused(8건, understand:confused와 중복) /
+  //       engage:present(6)·help(7)·preview(2)·error_fix(3) /
+  //       caution:attitude(4) / extra:weekly_test(0)·retest(1, 성적탭 중복) /
+  //       highlight:perfect(3, 성적탭 중복)·improved(1, 점수 추이가 자동 판정)
+  // 신설: deep_try(노트 94건)·process_good(55건)·slow(37건)·calc_miss(11건)
+  // 폐기 키의 기존 데이터는 보존 — UI 미노출일 뿐, Analyzer는 legacy 키도 계속 집계
   understand_sub: [
     {key:'self_solve', label:'💪 혼자해결'},
     {key:'retry',      label:'🔁 오답재풀이'},
-    {key:'confused',   label:'😵 개념혼동'},
   ],
   engage: [
-    {key:'present',   label:'📣 발표'},
-    {key:'question',  label:'🙋 질문'},
-    {key:'help',      label:'🤝 도움'},
-    {key:'preview',   label:'📖 예습'},
-    {key:'error_fix', label:'💡 오류정정'},
+    {key:'question', label:'🙋 질문'},
+    {key:'deep_try', label:'🧗 심화도전'},
   ],
   caution: [
-    {key:'sleepy',   label:'💤 졸음'},
-    {key:'chat',     label:'🗣 잡담'},
-    {key:'attitude', label:'😤 태도불량'},
-    {key:'late',     label:'⏰ 지각'},
+    {key:'sleepy',    label:'💤 졸음'},
+    {key:'chat',      label:'🗣 잡담'},
+    {key:'late',      label:'⏰ 지각'},
+    {key:'slow',      label:'⏳ 풀이 느림'},
+    {key:'calc_miss', label:'➗ 계산실수'},
   ],
   extra: [
-    {key:'self_study',  label:'📚 자율학습'},
-    {key:'weekly_test', label:'📝 주간Test'},
-    {key:'retest',      label:'🔄 재시험'},
+    {key:'self_study', label:'📚 자율학습'},
   ],
   highlight: [
-    {key:'perfect',  label:'🏆 만점·완벽'},
-    {key:'improved', label:'📈 큰 향상'},
-    {key:'mastered', label:'✅ 개념완전습득'},
-    {key:'effort',   label:'💎 끝까지도전'},
+    {key:'mastered',     label:'✅ 개념완전습득'},
+    {key:'effort',       label:'💎 끝까지도전'},
+    {key:'process_good', label:'📝 풀이과정 우수'},
   ],
 };
+
+// 과제 추가 프리셋 기본값 — 강사 미설정 시 노출.
+// 실DB 자작 프리셋 상위 빈도(결석 52·완벽수행 50·채점미실시 38·오답풀이안함 29·교재미지참 10)의 정식화
+const DEFAULT_ASSIGN_PRESETS=['결석','보강 등원','채점 미실시','오답 풀이 안함','교재 미지참'];
 
 // config: { classes: {classId: {group, courses: {subject: {textbook, curriculum, instructor}}}}, instructors: {...} }
 let config=null,inputData={},progressData={},tagData={},instructor=null;
@@ -313,10 +318,10 @@ async function devPushDummy(){
       condition: _r(['great','good','good','normal','normal','normal','low','bad']),
       understand: _r(['top','good','good','normal_u','normal_u','normal_u','confused','hard']),
       assign_grade: _r(['done','done','done','most','most','half','little','none']),
-      understand_sub: _pick(['self_solve','retry','confused'],Math.random()<0.5?1:0),
-      engage: _pick(['present','question','help','preview','error_fix'],Math.random()<0.4?1:0),
-      caution: _pick(['sleepy','chat','attitude','late'],Math.random()<0.15?1:0),
-      highlight: _pick(['perfect','improved','mastered','effort'],Math.random()<0.1?1:0),
+      understand_sub: _pick(['self_solve','retry'],Math.random()<0.5?1:0),
+      engage: _pick(['question','deep_try'],Math.random()<0.4?1:0),
+      caution: _pick(['sleepy','chat','late','slow','calc_miss'],Math.random()<0.15?1:0),
+      highlight: _pick(['mastered','effort','process_good'],Math.random()<0.1?1:0),
     };
     if(!tagData[nameKey])tagData[nameKey]={};
     if(!tagData[nameKey][a.subject])tagData[nameKey][a.subject]={};
