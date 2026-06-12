@@ -512,7 +512,7 @@ function _clsSectionsHtml(classId,clsD){
     ?`<span class="chip" onclick="rmStu('${esc(classId)}','${esc(s.nameKey)}')">${esc(s.name||s.nameKey)} <span>×</span></span>`
     :`<span class="chip" style="cursor:default">${esc(s.name||s.nameKey)}</span>`).join('');
   return `<div class="sl">학생</div>
-      <div class="chips" data-classid="${esc(classId)}" data-chip-type="stu">${stuChips}${adminOn?`<span class="chip" style="background:var(--indigo-l);border-color:var(--indigo);color:var(--indigo);cursor:pointer" onclick="addStuInline('${esc(classId)}',this)">+ 추가</span>`:''}</div>
+      <div class="chips" data-classid="${esc(classId)}" data-chip-type="stu">${stuChips}${adminOn?`<span class="chip" style="color:var(--gray);cursor:pointer" onclick="addStuInline()" title="명단 추가는 ClassManager에서 (nameKey=출결번호)">＋ CM에서 추가</span>`:''}</div>
       <div class="sl" style="margin-top:10px">과목</div>
       <div data-course-block="${esc(classId)}">${_courseChipsBlockHtml(classId,clsD)}</div>`;
 }
@@ -535,59 +535,11 @@ function buildClsAccordion(classId,clsD,myRole){
   </div>`;
 }
 
-// ── 학생 인라인 추가 ─────────────────────────────────────────────
-function addStuInline(classId,btnEl){
-  if(!adminOn){toast('학생 추가는 관리자만 가능합니다.');return;}
-  const chips=btnEl.parentElement;
-  if(chips.querySelector('.stu-new-inp')){chips.querySelector('.stu-new-inp').focus();return;}
-
-  const wrapper=document.createElement('span');
-  wrapper.style.cssText='display:inline-flex;align-items:center;border:1px solid var(--indigo);border-radius:12px;padding:2px 6px;background:var(--indigo-l);gap:2px;vertical-align:middle;';
-  const inp=document.createElement('input');
-  inp.className='stu-new-inp';
-  inp.style.cssText='border:none;background:transparent;font-size:11px;width:64px;color:var(--text);font-family:inherit;outline:none;';
-  inp.placeholder='이름';
-  const ok=document.createElement('span');
-  ok.textContent='✓';ok.title='추가';
-  ok.style.cssText='cursor:pointer;color:var(--indigo);font-weight:700;font-size:13px;line-height:1;padding:0 2px;';
-  const cancel=document.createElement('span');
-  cancel.textContent='×';
-  cancel.style.cssText='cursor:pointer;color:var(--gray);font-size:13px;line-height:1;';
-  cancel.onclick=()=>wrapper.remove();
-
-  async function doAdd(){
-    const n=inp.value.trim();
-    if(!n){wrapper.remove();return;}
-    // 신규: students/{nameKey} = {name, class: classId}
-    // nameKey = 이름 (동명이인은 이름+숫자)
-    let nameKey=n;
-    // 중복 체크: config._classStudents 전체에서 nameKey 확인
-    const allStudents=config._classStudents||{};
-    const allKeys=Object.values(allStudents).flat().map(s=>s.nameKey);
-    if(allKeys.includes(nameKey)){
-      let i=0;
-      while(allKeys.includes(nameKey+i))i++;
-      nameKey=nameKey+i;
-    }
-    if(!config._classStudents)config._classStudents={};
-    if(!config._classStudents[classId])config._classStudents[classId]=[];
-    config._classStudents[classId].push({nameKey,name:n,class:classId});
-    sortStu(config._classStudents[classId]);
-    wrapper.remove();
-    refreshStuChips(classId);
-    // Firebase 저장: students/{nameKey}
-    if(dbUrl&&dbPath){
-      try{await fbPatch(`students/${nameKey}`,{name:n,class:classId});toast(`${n} 추가됨 ✅`);}catch(e){toast('저장 실패: '+e);}
-    }
-  }
-  ok.onclick=doAdd;
-  inp.addEventListener('keydown',e=>{
-    if(e.key==='Enter'){e.preventDefault();doAdd();}
-    if(e.key==='Escape')wrapper.remove();
-  });
-  wrapper.appendChild(inp);wrapper.appendChild(ok);wrapper.appendChild(cancel);
-  chips.insertBefore(wrapper,btnEl);
-  inp.focus();
+// ── 학생 추가: ClassManager 일원화 (v8.27) ──────────────────────
+// 종전 웹 인라인 추가는 nameKey=이름(+숫자)으로 생성해 스키마 정본(nameKey=출결번호)을
+// 위반했음 — 명단 CRUD는 CM 단일 소유(v8.13)이므로 웹은 안내만 한다.
+function addStuInline(){
+  toast('학생 추가는 ClassManager에서 합니다 (출결번호 필요) 🖥️');
 }
 
 function refreshStuChips(classId){
@@ -598,7 +550,7 @@ function refreshStuChips(classId){
   const stuChips=students.map(s=>adminOn
     ?`<span class="chip" onclick="rmStu('${esc(classId)}','${esc(s.nameKey)}')">${esc(s.name||s.nameKey)} <span>×</span></span>`
     :`<span class="chip" style="cursor:default">${esc(s.name||s.nameKey)}</span>`).join('');
-  el.innerHTML=stuChips+(adminOn?`<span class="chip" style="background:var(--indigo-l);border-color:var(--indigo);color:var(--indigo);cursor:pointer" onclick="addStuInline('${esc(classId)}',this)">+ 추가</span>`:'');
+  el.innerHTML=stuChips+(adminOn?`<span class="chip" style="color:var(--gray);cursor:pointer" onclick="addStuInline()" title="명단 추가는 ClassManager에서 (nameKey=출결번호)">＋ CM에서 추가</span>`:'');
 }
 
 // ── 과목 인라인 추가 ─────────────────────────────────────────────
