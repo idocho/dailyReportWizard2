@@ -6,7 +6,7 @@ import platform as _platform
 
 # ── 앱 메타 ───────────────────────────────────────────────────────────
 APP_TITLE   = "Daily Report Wizard"
-APP_VERSION = "v2.2.3"
+APP_VERSION = "v2.3.0"
 APP_CREDIT  = "Crafted by IDO(idocho@kakao.com)  ·  Powered by Claude AI"
 
 AI_COOLDOWN_GROQ   = 30  # Groq 무료 플랜 RPM 제한 대응 (보수적)
@@ -98,6 +98,11 @@ def grade_label(grade_sem, subject):
 
 # ── 관찰 태그 정의 (key=Firebase 저장값, label=표시) ──────────────────
 # key는 불변. label만 추후 수정 가능.
+# PC는 obs를 읽기 전용 표시만(쓰기는 웹 전용) → 이 TAGS는 _obs_tag_segments 의
+# 키→라벨 LUT. v8.30 재구조화로 신키 4종(deep_try·slow·calc_miss·process_good)
+# 추가. 폐기 9종(present·help·preview·error_fix·attitude·weekly_test·retest·
+# perfect·improved·understand_sub:confused)은 과거 날짜 데이터 표시 호환 위해
+# 유지 — 웹 입력 UI에는 미노출이나 옛 기록은 계속 라벨 해석돼야 함.
 TAGS = {
     "condition": [
         {"key": "great",  "label": "↑ 최상"},
@@ -116,31 +121,36 @@ TAGS = {
     "understand_sub": [
         {"key": "self_solve", "label": "💪 혼자해결"},
         {"key": "retry",      "label": "🔁 오답재풀이"},
-        {"key": "confused",   "label": "😵 개념혼동"},
+        {"key": "confused",   "label": "😵 개념혼동"},      # legacy(표시 호환)
     ],
     "engage": [
-        {"key": "present",   "label": "📣 발표"},
         {"key": "question",  "label": "🙋 질문"},
-        {"key": "help",      "label": "🤝 도움"},
-        {"key": "preview",   "label": "📖 예습"},
-        {"key": "error_fix", "label": "💡 오류정정"},
+        {"key": "deep_try",  "label": "🧗 심화도전"},
+        {"key": "present",   "label": "📣 발표"},          # legacy
+        {"key": "help",      "label": "🤝 도움"},          # legacy
+        {"key": "preview",   "label": "📖 예습"},          # legacy
+        {"key": "error_fix", "label": "💡 오류정정"},       # legacy
     ],
     "caution": [
-        {"key": "sleepy",   "label": "💤 졸음"},
-        {"key": "chat",     "label": "🗣 잡담"},
-        {"key": "attitude", "label": "😤 태도불량"},
-        {"key": "late",     "label": "⏰ 지각"},
+        {"key": "sleepy",    "label": "💤 졸음"},
+        {"key": "chat",      "label": "🗣 잡담"},
+        {"key": "late",      "label": "⏰ 지각"},
+        {"key": "slow",         "label": "⏳ 풀이 느림"},
+        {"key": "calc_miss",    "label": "➗ 계산실수"},
+        {"key": "writeup_weak", "label": "✍️ 서술 미흡"},
+        {"key": "attitude",     "label": "😤 태도불량"},       # legacy
     ],
     "extra": [
         {"key": "self_study",  "label": "📚 자율학습"},
-        {"key": "weekly_test", "label": "📝 주간Test"},
-        {"key": "retest",      "label": "🔄 재시험"},
+        {"key": "weekly_test", "label": "📝 주간Test"},    # legacy
+        {"key": "retest",      "label": "🔄 재시험"},       # legacy
     ],
     "highlight": [
-        {"key": "perfect",  "label": "🏆 만점·완벽"},
-        {"key": "improved", "label": "📈 큰 향상"},
-        {"key": "mastered", "label": "✅ 개념완전습득"},
-        {"key": "effort",   "label": "💎 끝까지도전"},
+        {"key": "mastered",     "label": "✅ 개념완전습득"},
+        {"key": "effort",       "label": "💎 끝까지도전"},
+        {"key": "process_good", "label": "📝 풀이과정 우수"},
+        {"key": "perfect",      "label": "🏆 만점·완벽"},   # legacy
+        {"key": "improved",     "label": "📈 큰 향상"},      # legacy
     ],
 }  # TAGS 닫는 중괄호
 

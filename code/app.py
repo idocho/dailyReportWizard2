@@ -671,21 +671,47 @@ class App:
         return segs
 
     def _render_obs_tags(self, parent, nameKey, subject):
-        """관찰 태그 세그먼트를 한 줄(가로)로 색별 Label 렌더. 없으면 미표시."""
+        """관찰 태그 세그먼트를 박스 폭에 맞춰 자동 줄바꿈(flow-wrap)하여
+        색별 Label 렌더. 태그가 많아도 오른쪽으로 넘쳐 잘리지 않고, 창
+        리사이즈 시 폭 변화에 맞춰 재배치된다. 없으면 미표시."""
         segs = self._obs_tag_segments(nameKey, subject)
         if not segs:
             return
         import sys as _sys
+        import tkinter.font as _tkfont
         tag_font = ("Segoe UI Emoji", 9) if _sys.platform == "win32" else FE
         bg = parent.cget('bg')
-        rowf = tk.Frame(parent, bg=bg)
-        rowf.pack(fill='x', pady=(5, 0))
-        for i, (text, color) in enumerate(segs):
-            if i:
-                tk.Label(rowf, text="·", font=tag_font, bg=bg, fg="#D1D5DB"
-                         ).pack(side='left', padx=2)
-            tk.Label(rowf, text=text, font=tag_font, bg=bg, fg=color
-                     ).pack(side='left')
+        holder = tk.Frame(parent, bg=bg)
+        holder.pack(fill='x', pady=(5, 0))
+
+        fnt   = _tkfont.Font(font=tag_font)
+        sep_w = fnt.measure("·") + 8   # 구분점 + 좌우 padx 여유(살짝 넉넉히)
+
+        last_w = [0]
+        def _reflow(event=None):
+            # holder 실폭 기준 재배치 — 폭이 안 바뀌면 무시(자식 변경發 재귀 차단)
+            avail = event.width if event is not None else holder.winfo_width()
+            if avail <= 1 or avail == last_w[0]:
+                return
+            last_w[0] = avail
+            for w in holder.winfo_children():
+                w.destroy()
+            row = tk.Frame(holder, bg=bg); row.pack(fill='x', anchor='w')
+            used, first = 0, True
+            for text, color in segs:
+                tw   = fnt.measure(text)
+                need = tw if first else tw + sep_w
+                if not first and used + need > avail:   # 줄 넘침 → 새 줄
+                    row = tk.Frame(holder, bg=bg); row.pack(fill='x', anchor='w')
+                    used, first, need = 0, True, tw
+                if not first:
+                    tk.Label(row, text="·", font=tag_font, bg=bg,
+                             fg="#D1D5DB").pack(side='left', padx=2)
+                tk.Label(row, text=text, font=tag_font, bg=bg,
+                         fg=color).pack(side='left')
+                used, first = used + need, False
+
+        holder.bind('<Configure>', _reflow)
 
     # ── 우측 ─────────────────────────────────────────────────────────
     def _build_right(self, parent):

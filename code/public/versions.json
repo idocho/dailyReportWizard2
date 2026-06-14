@@ -2,18 +2,18 @@
   "_comment": "버전 포털 메타. DB 스키마 완전 하위호환 버전만 공개 — 구버전은 hosting ignore + 안정판 redirect (firebase.json). 새 버전 추가 시 맨 앞에 항목 추가 후 scripts/build-portal.ps1 실행. tagClass: dev|beta|old",
   "versions": [
     {
-      "v": "v2.2.4",
-      "tag": "개발중",
-      "tagClass": "dev",
-      "title": "최신 개발본",
-      "desc": "v2.2.3 기반 차기 개발 라인",
-      "exe": false
+      "v": "v2.3.0",
+      "tag": "베타",
+      "tagClass": "beta",
+      "title": "베타 릴리즈 · 최신",
+      "desc": "obs 태그 재구조화 — 실데이터 기반 신설(심화도전·풀이과정우수·풀이느림·계산실수·서술미흡)·폐기 태그 데이터 보존, 입력 UI 행 재편, 기본 과제/과제수행도 프리셋, PC obs 표시 줄바꿈",
+      "exe": true
     },
     {
       "v": "v2.2.3",
-      "tag": "베타",
-      "tagClass": "beta",
-      "title": "베타 릴리즈 · 현재 안정판",
+      "tag": "이전",
+      "tagClass": "old",
+      "title": "구 안정판",
       "desc": "성적 입력 전면 개편 — 시험 유형 7종·유형별 기본 만점(성취도/반배치 150) · 학년 시험 키 정비(날짜 제외·반 점수 분리 표시) · 삭제 휴지통 백업/복원 · 관리자 전체 수업 바운더리 · 점수 저장 머지(타 반 보존)"
     },
     {

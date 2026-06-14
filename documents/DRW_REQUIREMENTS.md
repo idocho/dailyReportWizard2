@@ -1,7 +1,7 @@
 # DailyReportWizard — 요구사항 명세서
 
 **Crafted by IDO(idocho@kakao.com) · Powered by Claude AI**  
-**문서 버전**: 8.30 · **앱 버전**: v2.2.4(개발)/v2.2.3(안정) · **최종 수정**: 2026-06-12
+**문서 버전**: 8.34 · **앱 버전**: v2.3.0(개발)/v2.2.3(안정) · **최종 수정**: 2026-06-14
 
 > Firebase 스키마 전체 명세: [ClassManager/documents/DB_SCHEMA.md](../../ClassManager/documents/DB_SCHEMA.md)
 
@@ -11,6 +11,10 @@
 
 | 문서 버전 | 날짜 | 주요 변경 |
 |-----------|------|-----------|
+| 8.34 | 2026-06-14 | **[v2.3.0] obs 신규 태그 `writeup_weak`(✍️ 서술 미흡) 추가** — 노트 마이닝(`scripts/mine_note_tags.py`) 첫 검토에서 강사 교차 반복 발굴된 후보. caution 분류(학부모 완곡 전달). 기존 highlight:process_good(풀이과정 우수)의 부정 축으로, 서술형·논술형 풀이과정 작성 미흡을 기록. 3곳 동기화: 웹 `app-core.js` TAGS.caution(입력 UI)·PC `constants.py` TAGS(표시 LUT)·`ai_engine.py` _CAUTION_TEXT("서술형·논술형 풀이 과정 작성이 미흡하여 연습이 필요함"). 더미 생성기·캐시버스트(`app-core.js?v=202606141600`) 갱신, exe 재빌드 |
+| 8.33 | 2026-06-14 | **[v2.3.0] PC obs 태그 표시 줄바꿈(flow-wrap)** — 학생 카드 obs 요약(`_render_obs_tags`)이 단일 `pack(side='left')`로만 깔려 태그가 많으면 오른쪽으로 넘쳐 잘림. 박스 실폭(`holder.winfo_width`) 기준 `tkinter.font.measure`로 누적 폭 계산해 넘치면 새 줄 생성하는 flow-wrap으로 교체. `<Configure>` 바인딩으로 창 리사이즈 시 자동 재배치(폭 불변 시 무시해 재귀 차단). 검증: 폭 260→4줄/420→3줄/640→2줄, 15태그 전부 표시 |
+| 8.32 | 2026-06-14 | **[v2.3.0] PC obs 태그 표시 신키 누락 픽스** — v8.30 재구조화가 웹 `app-core.js` TAGS·PC `ai_engine.py` 문구만 갱신하고 PC `constants.py` TAGS(읽기 전용 표시용 키→라벨 LUT, `_obs_tag_segments`)는 누락 → PC 학생 카드 obs 요약 줄에서 신키 4종(deep_try 심화도전·process_good 풀이과정우수·slow 풀이느림·calc_miss 계산실수)이 `if k in lut` 필터에 걸려 표시 안 됨. **픽스**: `constants.py` TAGS에 신키 4종 추가 + 폐기 9종은 과거 날짜 데이터 표시 호환 위해 legacy로 유지(웹 입력 UI 미노출과 무관하게 옛 기록 라벨 해석 보장). PC는 obs 쓰기 없음(표시 전용)이라 legacy 키 잔존이 입력 UI에 영향 없음. exe 재빌드 |
+| 8.31 | 2026-06-14 | **[v2.3.0] 버전 통합 갱신** — obs 태그 재구조화(8.30) 작업을 정식 라인으로 승격. PC·웹 버전 v2.3.0 통합. ① 웹 개발 라인 디렉터리 `code/public/v2.2.4/` → `v2.3.0/` rename(`index.html` `APP_VERSION`·캐시버스트 `app-core/app-input ?v=202606141400`) ② PC `constants.py` `APP_VERSION` v2.2.3→**v2.3.0**(exe `DailyReportWizard_v2.3.0.exe` 재빌드) ③ `versions.json` 최신 개발본 v2.3.0(desc obs 태그)·포털(`code/public/index.html`) 재생성 ④ `firebase.json` redirect는 dead 버전→안정판(v2.2.3) 유지(v2.3.0 정식 안정판 승격은 deploy 시점). **잔여(배포 시 수동)**: firebase deploy·gh release(exe·zip)·v2.2.3 동결 처리는 미실행 |
 | 8.30 | 2026-06-12 | **[v2.2.4·브랜치 feature/obs-tag-restructure] obs 태그 재구조화** — 실데이터 1,019세션·노트 267건 분석 기반. ① **폐기 9종**(UI만, 데이터 보존): understand_sub:confused(8건)·engage:present(6)/help(7)/preview(2)/error_fix(3)·caution:attitude(4)·extra:weekly_test(0)/retest(1)·highlight:perfect(3)/improved(1) ② **신설 4종**: engage:deep_try 🧗심화도전(노트 94건)·highlight:process_good 📝풀이과정우수(55)·caution:slow ⏳풀이느림(37)·calc_miss ➗계산실수(11) — slow·calc_miss는 관찰용(Analyzer 패널티 미반영) ③ **UI 행 재편**: 이해도+하이라이트 / 참여·풀이(engage+understand_sub+extra 통합) / 주의 ④ **기본 과제 프리셋** `DEFAULT_ASSIGN_PRESETS`(결석·보강등원·채점미실시·오답풀이안함·교재미지참 — 자작 프리셋 상위 빈도 정식화) ⑤ PC `ai_engine.py` 신설 4종 문구 추가(폐기 키 매핑은 과거 데이터 호환 유지) ⑥ 더미 생성기 신태그 전환. **알려진 기존 이슈(별도)**: 같은 필드 태그 연타 시 PATCH 도착 순서 역전으로 마지막 토글 유실 가능(간격 클릭은 정상) |
 | 8.29 | 2026-06-12 | **[v2.2.4] 관리자 암호 회전 가능화** — `toggleAdmin` 검증을 `config/admin_hash`(DB) 우선·코드 상수(`ADMIN_HASH`) 폴백으로 변경. 관리자 모드 on 상태에서 「🔑 관리자 암호 변경」(8자 이상, 2회 확인) → SHA-256 해시를 `config/admin_hash`에 저장 — 전 버전·전 기기 즉시 적용, 재배포 불요. **[정리]** 구 firebase init 잔재 삭제(`code/firebase.json`·`code/.firebaserc` — 오발 deploy 시 ignore/redirect 없이 공개되는 위험 사본, `code/.gitignore`, 구 스키마 `gen_dummy.js`), AI 도구 로컬 설정 gitignore 추가 |
 | 8.28 | 2026-06-12 | **[v2.2.4] 몽키 테스트 검증 + 픽스 2건** — 격리 dbPath(mtest1) 시드 후 브라우저 자동 조작으로 사용자 시나리오 11종 + 무작위 30액션 검증(JS 에러 0). 픽스: ① 회차 "1회" 입력 시 카드 "1회회" 중복 표기 — 저장 시 회차 정규화(meta.round도 "1") + 잔존 데이터 표시 방어(trailing 회 제거) ② 점수 전부 빈칸이면 만점 음수/0 저장되던 검증 우회 — `만점≥1` 강제. 관찰(수정 안 함): 학년→반별 유형 격하 시 타 반 점수가 새 weekly 노드에 잔류(유실 아님·보존 우선), 격하 시 만점 자동 변경이 기존 점수와 충돌하면 검증이 차단(만점 수동 재조정으로 해결) |

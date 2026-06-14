@@ -99,11 +99,12 @@ const TAGS = {
     {key:'deep_try', label:'🧗 심화도전'},
   ],
   caution: [
-    {key:'sleepy',    label:'💤 졸음'},
-    {key:'chat',      label:'🗣 잡담'},
-    {key:'late',      label:'⏰ 지각'},
-    {key:'slow',      label:'⏳ 풀이 느림'},
-    {key:'calc_miss', label:'➗ 계산실수'},
+    {key:'sleepy',       label:'💤 졸음'},
+    {key:'chat',         label:'🗣 잡담'},
+    {key:'late',         label:'⏰ 지각'},
+    {key:'slow',         label:'⏳ 풀이 느림'},
+    {key:'calc_miss',    label:'➗ 계산실수'},
+    {key:'writeup_weak', label:'✍️ 서술 미흡'},
   ],
   extra: [
     {key:'self_study', label:'📚 자율학습'},
@@ -320,7 +321,7 @@ async function devPushDummy(){
       assign_grade: _r(['done','done','done','most','most','half','little','none']),
       understand_sub: _pick(['self_solve','retry'],Math.random()<0.5?1:0),
       engage: _pick(['question','deep_try'],Math.random()<0.4?1:0),
-      caution: _pick(['sleepy','chat','late','slow','calc_miss'],Math.random()<0.15?1:0),
+      caution: _pick(['sleepy','chat','late','slow','calc_miss','writeup_weak'],Math.random()<0.15?1:0),
       highlight: _pick(['mastered','effort','process_good'],Math.random()<0.1?1:0),
     };
     if(!tagData[nameKey])tagData[nameKey]={};
