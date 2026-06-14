@@ -1,0 +1,64 @@
+<div style="padding: 0.5rem 0;">
+  <h2 class="sr-only" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);">__TITLE__ 역량 레이더. 범례 클릭으로 켜고 끄고, 호버로 강조.</h2>
+  <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:8px;flex-wrap:wrap;">
+    <span style="font-size:18px;font-weight:500;color:var(--color-text-primary);">__TITLE__ · 역량 레이더</span>
+    <span style="font-size:13px;color:var(--color-text-secondary);">이름 클릭 = 켜기/끄기 · 호버 = 강조</span>
+  </div>
+  <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
+    <button id="bAll" style="font-size:12px;">전체 켜기</button>
+    <button id="bNone" style="font-size:12px;">학생 전체 끄기</button>
+    <button id="bAvg" style="font-size:12px;">평균만 보기</button>
+  </div>
+  <div style="position: relative; width: 100%; height: 580px;">
+    <canvas id="radar" role="img" aria-label="__TITLE__ 학생들의 5축 역량 레이더 겹침 차트.">역량 레이더 겹침 차트.</canvas>
+  </div>
+  <div id="legend" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(118px,1fr));gap:5px 10px;margin-top:14px;font-size:12px;"></div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+(function(){
+  var isDark = matchMedia('(prefers-color-scheme: dark)').matches;
+  var grid = isDark ? 'rgba(255,255,255,0.14)' : 'rgba(0,0,0,0.10)';
+  var lbl  = isDark ? 'rgba(255,255,255,0.82)' : 'rgba(0,0,0,0.72)';
+  var dim  = isDark ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.45)';
+  var avgC = isDark ? '#FFFFFF' : '#16110B';
+  var axes = ['학습태도','수업참여','자기주도','이해응용','성취성장'];
+  var S = __DATA__;
+  var colors = S.map(function(_,i){ return 'hsl('+Math.round(i*360/S.length)+',68%,'+(isDark?'62%':'48%')+')'; });
+  var avg = axes.map(function(_,a){ return Math.round(S.reduce(function(s,r){return s+r[a+1];},0)/S.length); });
+  var AVG = S.length;
+  var datasets = S.map(function(r,i){ return { label:r[0], data:r.slice(1), borderColor:colors[i], backgroundColor:'transparent', borderWidth:1.4, pointRadius:0, pointHoverRadius:3, tension:0, order:2 }; });
+  datasets.push({ label:'평균', data:avg, borderColor:avgC, backgroundColor: isDark?'rgba(255,255,255,0.06)':'rgba(0,0,0,0.05)', borderWidth:3.6, pointRadius:3.5, pointBackgroundColor:avgC, tension:0, order:1 });
+  var chart = new Chart(document.getElementById('radar'), {
+    type:'radar', data:{ labels:axes, datasets:datasets },
+    options:{ responsive:true, maintainAspectRatio:false, animation:false,
+      plugins:{ legend:{display:false}, tooltip:{ callbacks:{ label:function(c){ return c.dataset.label+': '+c.formattedValue; } } } },
+      scales:{ r:{ min:0, max:100, ticks:{ stepSize:20, color:lbl, backdropColor:'transparent', font:{size:11} },
+        grid:{ color:grid }, angleLines:{ color:grid }, pointLabels:{ color:lbl, font:{size:14, weight:'500'} } } } }
+  });
+  function setEmphasis(idx){ S.forEach(function(_,i){ var d=chart.data.datasets[i];
+    if(idx===null){ d.borderColor=colors[i]; d.borderWidth=1.4; }
+    else if(i===idx){ d.borderColor=colors[i]; d.borderWidth=3.4; }
+    else { d.borderColor=dim; d.borderWidth=0.7; } }); chart.update('none'); }
+  var leg=document.getElementById('legend');
+  var avgChip=document.createElement('span');
+  avgChip.style.cssText='grid-column:1/-1;display:flex;align-items:center;gap:6px;cursor:pointer;font-weight:500;color:'+avgC+';margin-bottom:2px;';
+  avgChip.innerHTML='<span style="width:16px;height:3px;background:'+avgC+';"></span>평균 ('+avg.join(' / ')+')';
+  avgChip.onclick=function(){ var m=chart.getDatasetMeta(AVG); m.hidden=!m.hidden; avgChip.style.opacity=m.hidden?'0.4':'1'; chart.update(); };
+  leg.appendChild(avgChip);
+  var chips=[];
+  S.forEach(function(r,i){
+    var c=document.createElement('span');
+    c.style.cssText='display:flex;align-items:center;gap:6px;cursor:pointer;color:var(--color-text-secondary);user-select:none;';
+    c.innerHTML='<span style="width:9px;height:9px;border-radius:2px;background:'+colors[i]+';flex:none;"></span>'+r[0];
+    c.onclick=function(){ var m=chart.getDatasetMeta(i); m.hidden=!m.hidden; c.style.opacity=m.hidden?'0.38':'1'; c.style.textDecoration=m.hidden?'line-through':'none'; chart.update(); };
+    c.onmouseenter=function(){ if(!chart.getDatasetMeta(i).hidden) setEmphasis(i); };
+    c.onmouseleave=function(){ setEmphasis(null); };
+    chips.push(c); leg.appendChild(c);
+  });
+  function showAllStudents(v){ S.forEach(function(_,i){ chart.getDatasetMeta(i).hidden=!v; chips[i].style.opacity=v?'1':'0.38'; chips[i].style.textDecoration=v?'none':'line-through'; }); chart.update(); }
+  document.getElementById('bAll').onclick=function(){ showAllStudents(true); chart.getDatasetMeta(AVG).hidden=false; avgChip.style.opacity='1'; };
+  document.getElementById('bNone').onclick=function(){ showAllStudents(false); };
+  document.getElementById('bAvg').onclick=function(){ showAllStudents(false); chart.getDatasetMeta(AVG).hidden=false; avgChip.style.opacity='1'; };
+})();
+</script>

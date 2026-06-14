@@ -1,0 +1,104 @@
+{
+  "last_run_date": "2026-06-14",
+  "runs": 1,
+  "candidates": {
+    "errnote_missing": {
+      "theme": "오답노트 미작성/미제출",
+      "category": "caution",
+      "suggested_label": "📒 오답노트 미흡",
+      "suggested_phrase": "오답노트 작성이 미흡하여 보완이 필요함",
+      "first_seen": "2026-06-14",
+      "history": [
+        {
+          "date": "2026-06-14",
+          "freq": 32,
+          "rec": "new_tag"
+        }
+      ],
+      "streak": 1,
+      "last_seen": "2026-06-14"
+    },
+    "mock_exam": {
+      "theme": "기출/실전 모의고사 시행",
+      "category": "extra",
+      "suggested_label": "🧪 모의고사",
+      "suggested_phrase": "기출·실전 모의고사를 시행함",
+      "first_seen": "2026-06-14",
+      "history": [
+        {
+          "date": "2026-06-14",
+          "freq": 140,
+          "rec": "new_tag"
+        }
+      ],
+      "streak": 1,
+      "last_seen": "2026-06-14"
+    },
+    "writeup_weak": {
+      "theme": "서술형·논술형 풀이과정 작성 미흡",
+      "category": "caution",
+      "suggested_label": "✍️ 서술 미흡",
+      "suggested_phrase": "서술형·논술형 풀이 과정 작성이 미흡하여 연습이 필요함",
+      "first_seen": "2026-06-14",
+      "history": [
+        {
+          "date": "2026-06-14",
+          "freq": 19,
+          "rec": "new_tag"
+        }
+      ],
+      "streak": 1,
+      "last_seen": "2026-06-14",
+      "promoted": "2026-06-14",
+      "promoted_key": "writeup_weak"
+    },
+    "time_mgmt": {
+      "theme": "시험 시간 관리/시간 안배 필요",
+      "category": "caution",
+      "suggested_label": "⏱ 시간관리",
+      "suggested_phrase": "시험에서 시간 분배·관리 연습이 필요함",
+      "first_seen": "2026-06-14",
+      "history": [
+        {
+          "date": "2026-06-14",
+          "freq": 11,
+          "rec": "new_tag"
+        }
+      ],
+      "streak": 1,
+      "last_seen": "2026-06-14"
+    },
+    "condition_miss": {
+      "theme": "조건 해석·적용 실수 (단위 누락 포함)",
+      "category": "caution",
+      "suggested_label": "🔎 조건놓침",
+      "suggested_phrase": "문제의 조건 해석·적용에서 실수가 관찰됨",
+      "first_seen": "2026-06-14",
+      "history": [
+        {
+          "date": "2026-06-14",
+          "freq": 13,
+          "rec": "refine_wording"
+        }
+      ],
+      "streak": 1,
+      "last_seen": "2026-06-14"
+    },
+    "early_supplement": {
+      "theme": "조기 등원 보강·자율학습",
+      "category": "extra",
+      "suggested_label": "🌅 조기등원 보강",
+      "suggested_phrase": "일찍 등원하여 보강·자율학습을 진행함",
+      "first_seen": "2026-06-14",
+      "history": [
+        {
+          "date": "2026-06-14",
+          "freq": 12,
+          "rec": "refine_wording"
+        }
+      ],
+      "streak": 1,
+      "last_seen": "2026-06-14"
+    }
+  }
+}

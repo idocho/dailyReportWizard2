@@ -17,6 +17,11 @@ code/*.spec
 code/scripts/backup/
 migration_backup_*.json
 
+# 노트 태그 마이닝 — 전체 노트(PII)·자격은 추적 제외, REPORT.md·state.json만 커밋
+documents/tag-mining/PROMPT.md
+documents/tag-mining/.pending.json
+scripts/.mine-creds.json
+
 # AI 도구 로컬 설정 (커밋 제외)
 .codex/
 .agents/
