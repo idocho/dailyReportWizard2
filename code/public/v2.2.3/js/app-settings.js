@@ -124,16 +124,11 @@ function _wzPane(){
     canAdd=false;
     subjArea=`<div><label class="wz-fl">과목</label><div style="font-size:11px;color:var(--red);padding:8px 0">⚠️ 이 반에 등록된 교재 없음</div></div>`;
     const gsOpts='<option value="">과정 선택</option>'+GRADE_SEM_LIST.map(g=>`<option value="${esc(g.val)}">${esc(g.label)}</option>`).join('');
-    // 스텔스 백포트(v2.3.0→v2.2.3): 기존 교재명 datalist 자동완성 — 재입력 중복·파편화 방지
-    const _tbs=new Set(Object.keys(config?.textbooks||{}));
-    for(const cl of Object.values(config?.classes||{}))for(const c of Object.values(cl.courses||{}))if(c.textbook)_tbs.add(c.textbook);
-    const _tbDl=[..._tbs].sort((a,b)=>a.localeCompare(b,'ko')).map(t=>`<option value="${esc(t)}"></option>`).join('');
     addCourse=`<div class="wz-addc">
       <div class="wz-fl" style="color:var(--indigo);margin-bottom:7px">＋ 이 반에 과목(교재) 등록</div>
-      <datalist id="wzTbDl">${_tbDl}</datalist>
       <div style="display:grid;grid-template-columns:1fr 1.3fr 40px;gap:6px;align-items:center">
         <select class="inp sm" id="wzGs">${gsOpts}</select>
-        <input class="inp sm" id="wzTb" list="wzTbDl" placeholder="${_tbs.size?'교재 선택/입력':'교재명 (예: 개념원리)'}">
+        <input class="inp sm" id="wzTb" placeholder="교재명 (예: 개념원리)">
         <button class="btn bp" style="padding:7px 0" onclick="wzAddCourse()">✓</button>
       </div></div>`;
   }

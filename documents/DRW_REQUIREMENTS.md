@@ -1,7 +1,7 @@
 # DailyReportWizard — 요구사항 명세서
 
 **Crafted by IDO(idocho@kakao.com) · Powered by Claude AI**  
-**문서 버전**: 8.36 · **앱 버전**: v2.3.0(베타·최신)/v2.2.3(이전) · **최종 수정**: 2026-06-14
+**문서 버전**: 8.35 · **앱 버전**: v2.3.0(베타·최신)/v2.2.3(이전) · **최종 수정**: 2026-06-14
 
 > Firebase 스키마 전체 명세: [ClassManager/documents/DB_SCHEMA.md](../../ClassManager/documents/DB_SCHEMA.md)
 
@@ -11,7 +11,6 @@
 
 | 문서 버전 | 날짜 | 주요 변경 |
 |-----------|------|-----------|
-| 8.36 | 2026-06-14 | **[v2.2.3 스텔스 백포트] 위저드 교재 datalist** — 아직 라이브인 동결판 v2.2.3에도 위저드 교재 입력 datalist 픽스 백포트(버전·공지 없이 조용히, 캐시버스트만 갱신). 동일 onboarding 버그가 v2.2.3에도 있어 사용자 일관성 위해. **동결 버전 수정 금지 규칙의 예외**(스텔스 버그픽스 한정, 사용자 승인). 코드 외 동작 스펙 변화 없음 |
 | 8.35 | 2026-06-14 | **[v2.3.0] 위저드 교재 입력 datalist + 교재명 통일 마이그레이션** — ① 최초 설정 위저드 교재 입력(`#wzTb`)이 평문이라 기존 교재 재선택 불가→중복·오타 파편화. 설정 경로와 동일하게 `config.textbooks ∪ 모든 반 courses` 소스 datalist 연결(자동완성). ② DB 파편화 교재명 통일(활성 course + obs): `Signature100+`·`시그니처 100+`→`SIGNATURE 100+`, `유형해결의 법칙`→`유형해결의법칙`, `쏀`→`쎈` 등. 18 course rename + 84 obs 이동(충돌 0), `config/textbooks` 레지스트리 정리. 백업 `migration_backup_textbooks_20260614.json`(gitignore). **앱 버전 라벨**: v2.3.0 베타 승격·v2.2.3 이전 강등(versions.json) |
 | 8.34 | 2026-06-14 | **[v2.3.0] obs 신규 태그 `writeup_weak`(✍️ 서술 미흡) 추가** — 노트 마이닝(`scripts/mine_note_tags.py`) 첫 검토에서 강사 교차 반복 발굴된 후보. caution 분류(학부모 완곡 전달). 기존 highlight:process_good(풀이과정 우수)의 부정 축으로, 서술형·논술형 풀이과정 작성 미흡을 기록. 3곳 동기화: 웹 `app-core.js` TAGS.caution(입력 UI)·PC `constants.py` TAGS(표시 LUT)·`ai_engine.py` _CAUTION_TEXT("서술형·논술형 풀이 과정 작성이 미흡하여 연습이 필요함"). 더미 생성기·캐시버스트(`app-core.js?v=202606141600`) 갱신, exe 재빌드 |
 | 8.33 | 2026-06-14 | **[v2.3.0] PC obs 태그 표시 줄바꿈(flow-wrap)** — 학생 카드 obs 요약(`_render_obs_tags`)이 단일 `pack(side='left')`로만 깔려 태그가 많으면 오른쪽으로 넘쳐 잘림. 박스 실폭(`holder.winfo_width`) 기준 `tkinter.font.measure`로 누적 폭 계산해 넘치면 새 줄 생성하는 flow-wrap으로 교체. `<Configure>` 바인딩으로 창 리사이즈 시 자동 재배치(폭 불변 시 무시해 재귀 차단). 검증: 폭 260→4줄/420→3줄/640→2줄, 15태그 전부 표시 |
