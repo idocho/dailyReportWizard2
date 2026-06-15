@@ -63,7 +63,7 @@ from message   import (today_str, get_room, nickname_suffix, build_message,
 from kakao_image import (copy_image_to_clipboard, focus_kakao,
                          room_opened, copy_text_verified,
                          set_debug_log, send_debug, WIN_VERIFY, foreground_title,
-                         prefetch_image)
+                         prefetch_image, close_rooms)
 
 class App:
     def __init__(self, root):
@@ -1327,6 +1327,7 @@ class App:
         sent = 0
         failed = []
         focus_lost = False
+        lingering = []   # 정리 대상 잔류 방 — 이미지 방(의도적 미닫음) + 오류 중단 방
         for i, m in enumerate(msgs):
             if cancel.is_set(): break
             self.root.after(0, lambda t=f"전송 중... ({i+1}/{total})  {m['name']}":
@@ -1339,16 +1340,21 @@ class App:
             try:
                 self._kakao_send_one(m, wait, warm)
                 sent += 1
+                if m.get('image'):
+                    lingering.append(m['room'])   # 이미지 방은 미닫음 — 종료 후 일괄 정리
             except Exception as e:
                 print(f"오류 [{m['name']}]: {e}")
                 send_debug(f"학생 실패 [{m['name']}]: {e}")
                 failed.append(m.get('name', '?'))
+                if m.get('room'):
+                    lingering.append(m['room'])   # 오류 중단 방도 열려 있을 수 있음
             if self._last_open_stats:
                 self._smart_adjust(*self._last_open_stats)
                 self._last_open_stats = None
             time.sleep(0.3)  # 학생 간 간격 — 게이트 검증으로 단축(기존 0.8)
         cancelled = cancel.is_set()
         self._smart_persist()   # 스마트 모드 학습값 저장 — 다음 실행 이어받기
+        self._cleanup_rooms(lingering, lambda t: self.bulk_status.config(text=t))
         def _done():
             self._bulk_set_cancel(False)
             fail_line = f"\n⚠ 실패 {len(failed)}명: {', '.join(failed)}" if failed else ""
@@ -2504,6 +2510,27 @@ class App:
             except Exception:
                 pass
 
+    def _cleanup_rooms(self, lingering, status_cb=None):
+        """전체 전송 완료 후 자동화로 열어둔 잔류 톡방 일괄 닫기 (이미지 방·오류 중단 방).
+
+        2초 유예: 마지막 이미지 업로드 여유 — 그래도 진행 중이면 카톡이 닫기를
+        보류하므로 그 창만 남고 업로드는 보호됨(자동 확인 안 함). 비치명 — 실패 최악도 현행(누적).
+        status_cb: 메인 스레드에서 실행할 상태 라벨 갱신 콜백(text 1개 인자). 데일리·발송 탭 공용."""
+        if not lingering:
+            return
+        if status_cb:
+            self.root.after(0, lambda: status_cb("🧹 열린 톡방 정리 중..."))
+        time.sleep(2.0)
+        try:
+            closed = close_rooms(lingering)
+        except Exception as e:
+            send_debug(f"close_rooms 오류: {e}")
+            return
+        if status_cb:
+            left = len(set(lingering)) - closed
+            msg = f"🧹 톡방 {closed}개 정리" + (f" · {left}개는 업로드 중이라 유지" if left > 0 else "")
+            self.root.after(0, lambda t=msg: status_cb(t))
+
     def _set_send_btn_cancel(self, on):
         """전송 중 send_btn → 취소 버튼 토글."""
         if on:
@@ -2653,6 +2680,7 @@ class App:
         sent = 0
         failed = []   # v2.2.3: 카톡 전송 예외 학생 집계 — 기존엔 실패도 sent로 합산돼 유실이 가려짐
         focus_lost = False
+        lingering = []   # 정리 대상 잔류 방 — 이미지 방(의도적 미닫음) + 오류 중단 방
         for i, m in enumerate(msgs):
             if cancel.is_set(): break
             self.root.after(0, lambda t=f"전송 중... ({i+1}/{total})  {m['name']}":
@@ -2667,10 +2695,14 @@ class App:
             try:
                 self._kakao_send_one(m, wait, warm)
                 sent += 1
+                if m.get('image'):
+                    lingering.append(m['room'])   # 이미지 방은 미닫음 — 종료 후 일괄 정리
             except Exception as e:
                 print(f"오류 [{m['name']}]: {e}")
                 send_debug(f"학생 실패 [{m['name']}]: {e}")
                 failed.append(m.get('name', '?'))
+                if m.get('room'):
+                    lingering.append(m['room'])   # 오류 중단 방도 열려 있을 수 있음
             if self._last_open_stats:
                 self._smart_adjust(*self._last_open_stats)
                 self._last_open_stats = None
@@ -2678,6 +2710,7 @@ class App:
 
         cancelled = cancel.is_set()
         self._smart_persist()   # 스마트 모드 학습값 저장 — 다음 실행 이어받기
+        self._cleanup_rooms(lingering, lambda t: self.send_status.config(text=t))
         if focus_lost:
             def _lost():
                 self._set_send_btn_cancel(False)

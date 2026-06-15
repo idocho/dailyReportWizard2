@@ -244,6 +244,78 @@ def room_opened(room: str, tries: int = 15, interval: float = 0.1) -> bool:
     return False
 
 
+def _norm_title(s: str) -> str:
+    """제목 비교용 정규화 — 카톡 검색이 공백을 무시하므로 동일 규칙 적용."""
+    import re
+    return re.sub(r"\s+", "", s or "")
+
+
+def close_rooms(rooms) -> int:
+    """자동화로 열어둔 채팅방 창 일괄 닫기 (전체 전송 완료 후 호출).
+
+    이미지 방은 업로드 취소 위험("전송 중인 파일" 팝업) 때문에 건별 esc 정리를
+    생략하고 잔류시킴(정책 8.8) — 전송이 모두 끝난 시점에 제목 매칭으로 WM_CLOSE 발송.
+    · 키 입력이 아니라 창 메시지라 전면 포커스 불필요(다른 작업 중에도 안전)
+    · 업로드가 아직 진행 중이면 카톡이 확인 팝업으로 닫기를 보류 — 그 창은
+      그대로 두고(자동 확인 금지: 확인=업로드 취소) 미정리 개수만 반환에 반영
+    반환: 닫힌 창 수. 비 Windows 는 0 (수동 운용 유지). CM kakao_send.close_rooms 미러."""
+    if not _IS_WIN or not rooms:
+        return 0
+    import ctypes
+    from ctypes import wintypes
+    user32 = ctypes.windll.user32
+    WM_CLOSE = 0x0010
+    targets = {_norm_title(r) for r in rooms if _norm_title(r)}
+    if not targets:
+        return 0
+
+    # 오폐쇄 방지 2중 가드:
+    # ① 카카오톡 프로세스 소속 창만 — 학생 이름이 제목에 들어간 타 앱(메모장·브라우저 탭
+    #    등)이 매칭돼 닫히는 사고 차단
+    # ② 제목 전방일치 — 방 이름으로 시작하는 창만(허용 잔여부 = 인원수 "(3)" 등).
+    #    room_opened()의 포함 비교보다 엄격(그쪽은 읽기 검증, 여기는 파괴 동작)
+    main_hwnd = _find_kakao_hwnd()
+    if not main_hwnd:
+        return 0
+    kakao_pid = wintypes.DWORD()
+    user32.GetWindowThreadProcessId(main_hwnd, ctypes.byref(kakao_pid))
+
+    def _matched():
+        found = []
+
+        @ctypes.WINFUNCTYPE(ctypes.c_bool, wintypes.HWND, wintypes.LPARAM)
+        def _enum(hwnd, _):
+            if not user32.IsWindowVisible(hwnd):
+                return True
+            pid = wintypes.DWORD()
+            user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+            if pid.value != kakao_pid.value:   # ① 카톡 프로세스 외 제외
+                return True
+            t = ctypes.create_unicode_buffer(256)
+            user32.GetWindowTextW(hwnd, t, 256)
+            title = t.value.strip()
+            if title in _KAKAO_TITLES:         # 메인 창 제외
+                return True
+            nt = _norm_title(title)
+            if nt and any(nt.startswith(r) for r in targets):   # ② 전방일치
+                found.append(hwnd)
+            return True
+
+        user32.EnumWindows(_enum, 0)
+        return found
+
+    before = _matched()
+    for hwnd in before:
+        # WM_CLOSE = 사용자의 X 클릭과 동일 경로 — 업로드 진행 중이면 카톡이
+        # "전송 중인 파일" 확인을 띄우고 닫기를 보류함. 그 팝업은 절대 자동 조작하지
+        # 않음(확인=업로드 취소). 기존 수동 닫기 습관과 동일한 보호 수준.
+        user32.PostMessageW(hwnd, WM_CLOSE, 0, 0)
+    time.sleep(0.5)
+    closed = max(0, len(before) - len(_matched()))
+    _dbg(f"close_rooms 대상={len(targets)} 발견={len(before)} 닫힘={closed}")
+    return closed
+
+
 def copy_text_verified(text: str, timeout: float = 1.5) -> bool:
     """클립보드에 텍스트 복사 후 실제 반영을 확인. 클립보드 레이스(이전 내용 붙여넣기) 차단."""
     try:
