@@ -58,6 +58,8 @@ from storage  import (load_config, save_config, has_students,
 from firebase import (firebase_get, firebase_put, firebase_patch, fetch_tags,
                       today_key, active_courses, check_schema)
 from ai_engine import AiEngine
+import ai_style
+from errors import humanize_error
 from message   import (today_str, get_room, nickname_suffix, build_message,
                        render, build_bulk_ctx, bulk_variables)
 from kakao_image import (copy_image_to_clipboard, focus_kakao,
@@ -574,7 +576,7 @@ class App:
                           bg="#F7F7F9", fg=GRAY, cursor='arrow')
         else:
             # 쿨다운 잔여 시간에 따라 초기 상태 설정
-            _engine = self.config.get('ai_engine_type', 'groq').strip().lower()
+            _engine = self.config.get('ai_engine_type', 'gemini').strip().lower()
             _cooldown = AI_COOLDOWNS.get(_engine, AI_COOLDOWN_PAID)
             _rem = max(0, _cooldown - (time.time() - self._ai_last_call))
             if _rem > 0:
@@ -1651,7 +1653,7 @@ class App:
                 f"과제수행도: 웹 데이터로 교체 / 진도·과제: {applied_prog}개 반영\n"
                 "메모: 웹 데이터로 교체")
         except Exception as e:
-            messagebox.showerror("오류", f"가져오기 실패:\n{e}")
+            messagebox.showerror("오류", humanize_error(e, "데이터를 가져오지 못했습니다."))
 
     def _import_mobile_data(self, data):
         """Firebase input/ 노드에서 특이사항(note) 반영 (v2.1.2 스키마)
@@ -1864,7 +1866,7 @@ class App:
             else:
                 messagebox.showinfo("성공", "Firebase 연결 테스트에 성공했습니다!", parent=self.root)
         except Exception as e:
-            messagebox.showerror("실패", f"연결 실패:\n{e}", parent=self.root)
+            messagebox.showerror("실패", humanize_error(e, "Firebase에 연결하지 못했습니다."), parent=self.root)
 
     def _wz_pane_account(self, b):
         cur = self.config.get('instructor_id', '')
@@ -1913,7 +1915,7 @@ class App:
                 self.root.after(0, lambda: [
                     self._wz_acct_status.config(text="조회 실패", fg=YELLOW),
                     self._wz_lookup_btn.config(state='normal'),
-                    messagebox.showerror("오류", f"계정 처리 실패:\n{e}", parent=self.root),
+                    messagebox.showerror("오류", humanize_error(e, "강사 계정 처리에 실패했습니다."), parent=self.root),
                 ])
         threading.Thread(target=_fetch, daemon=True).start()
 
@@ -2133,7 +2135,7 @@ class App:
                 else:
                     messagebox.showinfo("성공", "Firebase 연결 테스트에 성공했습니다!", parent=win)
             except Exception as e:
-                messagebox.showerror("실패", f"연결 실패:\n{e}", parent=win)
+                messagebox.showerror("실패", humanize_error(e, "Firebase에 연결하지 못했습니다."), parent=win)
 
         test_row = tk.Frame(inner, bg=BG)
         test_row.pack(fill='x', padx=16, pady=(0,10))
@@ -2200,7 +2202,7 @@ class App:
                     ])
                 except Exception as e:
                     win.after(0, lambda: [
-                        messagebox.showerror("오류", f"계정 처리 실패:\n{e}", parent=win),
+                        messagebox.showerror("오류", humanize_error(e, "강사 계정 처리에 실패했습니다."), parent=win),
                         status_lbl.config(text="조회 실패", fg=YELLOW),
                         lookup_btn.config(state='normal')
                     ])
@@ -2232,7 +2234,7 @@ class App:
                 self._switch_sheet(self.activeGroup)
                 messagebox.showinfo("성공", "Firebase로부터 학급 명단 동기화 완료!", parent=win)
             except Exception as e:
-                messagebox.showerror("오류", f"명단 가져오기 실패:\n{e}", parent=win)
+                messagebox.showerror("오류", humanize_error(e, "명단을 가져오지 못했습니다."), parent=win)
 
         tk.Button(fetch_row, text="🔄 학급/명단 동기화", font=FS, bg="#F7F7F9", fg=TEXT, relief='solid', bd=1, padx=10, pady=4, cursor='hand2', command=_fetch_class_data).pack(side='left')
         tk.Label(fetch_row, text="계정 조회 후 클릭하세요", font=FS, bg=BG, fg=GRAY).pack(side='left', padx=8)
@@ -2251,15 +2253,6 @@ class App:
         _cur_id = self.config.get('ai_engine_type', 'gemini').strip().lower()
         if _cur_id not in AI_ENGINE_LABELS:
             _cur_id = 'gemini'
-        tk.Label(ai_grid, text="AI 엔진 종류", font=FS, bg=BG, fg=SUBTEXT).grid(row=0, column=0, sticky='w', pady=6, padx=(0,8))
-        engine_var = tk.StringVar(value=AI_ENGINE_LABELS[_cur_id])
-        cmb_engine = ttk.Combobox(ai_grid, textvariable=engine_var, state="readonly", font=FS)
-        cmb_engine['values'] = tuple(AI_ENGINE_LABELS[i] for i in AI_ENGINE_ORDER)
-        cmb_engine.grid(row=0, column=1, sticky='ew', pady=6)
-
-        # API Key 입력 폼
-        tk.Label(ai_grid, text="API Key", font=FS, bg=BG, fg=SUBTEXT).grid(row=1, column=0, sticky='w', pady=3, padx=(0,8))
-
         def _selected_engine_id():
             return _label2id.get(engine_var.get(), 'gemini')
 
@@ -2267,18 +2260,105 @@ class App:
             # 엔진별 고유 키만 반환 (공유 ai_api_key 폴백 제거 — 엔진 전환 시 타 엔진 키 노출 방지)
             return self.config.get(f'{eng}_api_key', '').strip()
 
+        tk.Label(ai_grid, text="AI 엔진 종류", font=FS, bg=BG, fg=SUBTEXT).grid(row=0, column=0, sticky='w', pady=6, padx=(0,8))
+        engine_var = tk.StringVar(value=AI_ENGINE_LABELS[_cur_id])
+        cmb_engine = ttk.Combobox(ai_grid, textvariable=engine_var, state="readonly", font=FS)
+        cmb_engine['values'] = tuple(AI_ENGINE_LABELS[i] for i in AI_ENGINE_ORDER)
+        cmb_engine.grid(row=0, column=1, sticky='ew', pady=6)
+
+        # 엔진 선택 시 무료/유료 배지 + 한 줄 설명 (row 1)
+        _ENG_INFO = {
+            'gemini': ('무료·추천', GREEN,  '일일 한도만 있고 월 제한 없음. 처음이라면 추천.'),
+            'claude': ('유료',      YELLOW, '문장력·감성 표현이 가장 자연스럽습니다.'),
+            'openai': ('유료',      YELLOW, '안정적인 범용 성능.'),
+            'groq':   ('무료',      GREEN,  '응답 속도가 가장 빠릅니다.'),
+        }
+        eng_info = tk.Frame(ai_grid, bg=BG)
+        eng_info.grid(row=1, column=1, sticky='w', pady=(0,2))
+        eng_badge = tk.Label(eng_info, font=FS, bg=BG)
+        eng_badge.pack(side='left')
+        eng_desc = tk.Label(eng_info, font=FS, bg=BG, fg=SUBTEXT)
+        eng_desc.pack(side='left', padx=(6,0))
+        def _render_eng_info():
+            b, c, d = _ENG_INFO.get(_selected_engine_id(), ('', SUBTEXT, ''))
+            eng_badge.config(text=f"● {b}", fg=c)
+            eng_desc.config(text=d)
+
+        # API Key 입력 폼 (row 2)
+        tk.Label(ai_grid, text="API Key", font=FS, bg=BG, fg=SUBTEXT).grid(row=2, column=0, sticky='w', pady=3, padx=(0,8))
         default_key = _key_for_engine(_cur_id)
         ai_key_var = tk.StringVar(value=default_key)
         ai_entry = tk.Entry(ai_grid, textvariable=ai_key_var, font=FS, show='*', relief='flat', bg="#F7F7F9", highlightbackground=BORDER, highlightthickness=1)
-        ai_entry.grid(row=1, column=1, sticky='ew', ipady=3)
+        ai_entry.grid(row=2, column=1, sticky='ew', ipady=3)
 
         def _on_engine_change(event=None):
             ai_key_var.set(_key_for_engine(_selected_engine_id()))
+            _render_eng_info()
         cmb_engine.bind('<<ComboboxSelected>>', _on_engine_change)
 
         def _toggle_ai_vis():
             ai_entry.config(show='' if ai_entry.cget('show') == '*' else '*')
-        tk.Button(ai_grid, text="👁", font=FS, bg=BG, fg=GRAY, relief='flat', command=_toggle_ai_vis, cursor='hand2').grid(row=1, column=2, padx=4)
+        tk.Button(ai_grid, text="👁", font=FS, bg=BG, fg=GRAY, relief='flat', command=_toggle_ai_vis, cursor='hand2').grid(row=2, column=2, padx=4)
+
+        # 메시지 문체 — '내 말투 자동' 또는 4개 프리셋 (row 3)
+        _style_label2id = {ai_style.STYLE_LABELS[i]: i for i in ai_style.STYLE_ORDER}
+        _cur_style = self.config.get('ai_style_mode', ai_style.STYLE_AUTO).strip()
+        if _cur_style not in ai_style.STYLE_LABELS:
+            _cur_style = ai_style.STYLE_AUTO
+        tk.Label(ai_grid, text="메시지 문체", font=FS, bg=BG, fg=SUBTEXT).grid(row=3, column=0, sticky='nw', pady=6, padx=(0,8))
+        style_var = tk.StringVar(value=ai_style.STYLE_LABELS[_cur_style])
+        cmb_style = ttk.Combobox(ai_grid, textvariable=style_var, state="readonly", font=FS)
+        cmb_style['values'] = tuple(ai_style.STYLE_LABELS[i] for i in ai_style.STYLE_ORDER)
+        cmb_style.grid(row=3, column=1, sticky='ew', pady=6)
+
+        def _selected_style_id():
+            return _style_label2id.get(style_var.get(), ai_style.STYLE_AUTO)
+
+        # 문체 미리보기 — 프리셋은 지침+예시, auto는 본인 노트 분석 요약+예시 (row 4)
+        style_prev = tk.Label(ai_grid, font=("맑은 고딕", 8), bg="#F7F7F9", fg=SUBTEXT,
+                              justify='left', anchor='w', wraplength=430, padx=8, pady=6)
+        style_prev.grid(row=4, column=1, sticky='ew', pady=(0,2))
+
+        def _set_prev(text):
+            try:
+                if style_prev.winfo_exists():
+                    style_prev.config(text=text)
+            except Exception:
+                pass
+
+        def _render_style_preview():
+            mode = _selected_style_id()
+            if mode != ai_style.STYLE_AUTO:
+                p = ai_style.STYLE_PRESETS.get(mode, {})
+                ex = (p.get('examples') or [''])[0]
+                _set_prev(f"{p.get('guidance','')}\n\n[생성 예시] {ex}")
+                return
+            # auto — 본인 노트 백그라운드 분석 (네트워크)
+            _set_prev("내 노트 분석 중…")
+            instructor = self.config.get('instructor_id', '').strip()
+            def _work():
+                notes = self.ai._fetch_instructor_notes(instructor)
+                prof  = ai_style.analyze_notes(notes)
+                summ  = ai_style.profile_summary(prof)
+                exs   = ai_style.pick_examples(notes, k=1)
+                ex    = exs[0] if exs else ''
+                txt   = summ + (f"\n\n[생성 예시] {ex}" if ex else "")
+                self.root.after(0, lambda: _set_prev(txt))
+            threading.Thread(target=_work, daemon=True).start()
+
+        cmb_style.bind('<<ComboboxSelected>>', lambda e: _render_style_preview())
+
+        # 강사 개별 지침 — 자유 입력 (row 5~6)
+        tk.Label(ai_grid, text="개별 지침", font=FS, bg=BG, fg=SUBTEXT).grid(row=5, column=0, sticky='nw', pady=(8,0), padx=(0,8))
+        custom_txt = tk.Text(ai_grid, height=3, font=FS, relief='flat', wrap='word',
+                             bg="#F7F7F9", highlightbackground=BORDER, highlightthickness=1)
+        custom_txt.grid(row=5, column=1, sticky='ew', pady=(8,0))
+        custom_txt.insert('1.0', (self.config.get('ai_custom_prompt') or '').strip())
+        tk.Label(ai_grid, text="이 강사에게만 적용할 추가 지침 (예: 끝에 응원 한마디 / 줄임말 금지 / 다음 시험 일정 강조)",
+                 font=("맑은 고딕", 8), bg=BG, fg=GRAY, justify='left', wraplength=430).grid(row=6, column=1, sticky='w', pady=(2,0))
+
+        _render_eng_info()
+        _render_style_preview()
 
         # ── ⑤ 하단 컨트롤 (저장) ───────────────────────────────────
         tk.Frame(inner, bg=BORDER, height=1).pack(fill='x', padx=16, pady=(10,0))
@@ -2298,6 +2378,13 @@ class App:
 
                 self.config['ai_engine_type'] = chosen_engine
                 self.config[f'{chosen_engine}_api_key'] = chosen_key
+
+                self.config['ai_style_mode'] = _selected_style_id()
+                self.config['ai_custom_prompt'] = custom_txt.get('1.0', 'end').strip()
+                try:
+                    self.ai.invalidate_style_cache()  # 문체/강사 변경 즉시 반영
+                except Exception:
+                    pass
 
                 save_config(self.config)
 

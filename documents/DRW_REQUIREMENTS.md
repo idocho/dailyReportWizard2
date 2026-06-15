@@ -1,7 +1,7 @@
 # DailyReportWizard — 요구사항 명세서
 
 **Crafted by IDO(idocho@kakao.com) · Powered by Claude AI**  
-**문서 버전**: 8.36 · **앱 버전**: v2.3.0(베타·최신)/v2.2.3(이전) · **최종 수정**: 2026-06-15
+**문서 버전**: 8.43 · **앱 버전**: v2.4.0(베타·최신)/v2.3.0(이전) · **최종 수정**: 2026-06-15
 
 > Firebase 스키마 전체 명세: [ClassManager/documents/DB_SCHEMA.md](../../ClassManager/documents/DB_SCHEMA.md)
 
@@ -11,6 +11,13 @@
 
 | 문서 버전 | 날짜 | 주요 변경 |
 |-----------|------|-----------|
+| 8.43 | 2026-06-15 | **[릴리즈] v2.4.0 베타 승격** — PC앱 AI 개선 일괄(문체 반영·개별 지침·설정 GUI·에러 사용자화·기본엔진 Gemini·이름 주어 제거·출결번호 픽스, v8.37~8.42) 테스트 완료 후 v2.4.0 릴리즈. lockstep: 웹 라인 `code/public/v2.3.0`→`v2.4.0` 동결 클론(웹 코드 미변경, 인라인 APP_VERSION만 갱신), `APP_VERSION` v2.4.0, versions.json v2.4.0 베타·최신/v2.3.0 이전 강등, 포털 index.html 재생성, firebase redirect 최신 타겟 v2.4.0. Mac 환경이라 포털 생성은 build-portal.ps1 동등 로직 수동 실행. **exe 빌드·firebase deploy는 Windows에서 별도 수행 필요** |
+| 8.42 | 2026-06-15 | **[v2.3.0] 생성 메시지 이름 주어 중복 제거** — 메시지 위 ‘오늘의 OOO는?’ 고정 헤더에 이름이 이미 있는데 본문이 ‘OOO는/OOO 학생은/OO이는’로 시작해 중복. 종전 규칙이 "기본 원칙/예외 외"로 약해 일부 엔진이 무시. **하드 금지로 강화**: `_base_conditions` 규칙1·일괄 `[문체 기준]` 모두 이름 주어 절대 금지+이름 없이 시작 명시, 단건 `[학생 이름]`은 "식별용 참고, 본문 주어 금지"로 라벨 변경. exe 재빌드 |
+| 8.41 | 2026-06-15 | **[v2.3.0] AI 엔진 기본값 groq→gemini 통일** — `DEFAULT_CONFIG.ai_engine_type`가 `groq`였고 런타임 fallback(`ai_engine.py` 쿨다운·엔진설정·일괄, `app.py` 버튼초기화)도 `'groq'`이라, 키 미설정/신규 config에서 무료·비추천 Groq가 기본으로 잡히던 불일치. UI·위저드는 이미 `gemini` 기본(`AI_ENGINE_ORDER` 선두) → 전 지점 `gemini`로 통일. exe 재빌드 |
+| 8.40 | 2026-06-15 | **[v2.3.0] 에러 메시지 사용자화 — `errors.py` 신설(§9)** — payload 크기 초과 등 기술 에러를 비개발자도 알아들을 한국어 안내로 변환(`humanize_error`). HTTP 코드 맵+timeout/네트워크/파싱/내용필터, **응답 본문 용량초과 키워드 우선 감지(400→413 승격)**. 끝에 `(참고: HTTP 413)` 식별코드만 잔존. `ai_engine`(단건·일괄 except 블록을 humanize로 일원화, 기존 `HTTP {code}: {reason}`·`str(e)` 노출 제거)·`app.py`(가져오기/연결/계정/명단 실패) 적용. exe 재빌드 |
+| 8.39 | 2026-06-15 | **[v2.3.0] AI 설정 GUI 개선 + 강사 개별 지침** — ① 엔진 콤보 아래 무료/유료 배지+한 줄 설명(`_ENG_INFO`/`_render_eng_info`). ② 문체 콤보 아래 미리보기(프리셋=지침+예시, auto=`ai_style.profile_summary` 분석 요약+예시, 백그라운드 fetch). ③ **개별 지침** 자유 텍스트박스 신설 — config `ai_custom_prompt`, 문체와 직교(무엇을 챙길지), 단건은 system(`_system_conditions`)·일괄은 `[학생데이터]` 앞에 `[강사 개별 지침]` 블록 주입(§3.5 우선순위: 안전·사실 규칙이 항상 우선, 가드레일 문구는 프롬프트 내부에만·UI 미노출). `ai_style.profile_summary` 추가. exe 재빌드 |
+| 8.38 | 2026-06-15 | **[v2.3.0] 단건 AI 생성 출결번호 노출 버그픽스** — `gen_single`의 `name` 인자가 nameKey(출결번호)인데 `build_single_prompt`가 이를 `[학생 이름]`에 그대로 넣어, 일부 엔진이 학생 이름 자리에 출결번호를 출력. **픽스**: `gen_single`에서 `all_students[nameKey].name`을 조회해 `display_name`으로 분리 전달(데이터·태그 조회는 nameKey 유지). `build_single_prompt(display_name=...)` 파라미터 신설(미지정 시 name 폴백). 일괄(`gen_all`)은 본래 display_name 사용이라 영향 없음 |
+| 8.37 | 2026-06-15 | **[v2.3.0] AI 메시지 문체(말투) 반영 — `ai_style.py` 신설(§3.6)** — 강사가 직접 수정·전송한 최종 특이사항(`history/`)의 말투·분량을 AI 생성에 반영. 실DB 289건(강사 5명) 문체 분석으로 4개 대표 유형 도출(따뜻·상세/정돈·균형/정보·코칭/간결·요점). 설정 `ai_style_mode`: **`auto`(기본)** = 로그인 강사 본인 history 노트를 통계 분석(길이·이모지·느낌표·해요체·개조식)해 문체 지침 자동 생성 + 본인 노트 2개 few-shot, 또는 4프리셋 수동 선택(override). 주입: 단건은 `_DEFAULT_STYLE_BLOCK` 자리, 일괄은 `[문체 기준]` 다음에 `AiEngine._style_block()` 삽입(지침+예시). 예시 블록에 '이름·점수 베끼지 말 것' 경고. 세션 캐시 `{mode}|{instructor}`(history fetch 1회·읽기 전용, 표본 40건), 설정 저장 시 `invalidate_style_cache()`. 설정창 AI 섹션에 "메시지 문체" 콤보박스 추가. 신규 `code/ai_style.py`, `ai_engine.py`/`app.py` 연동, exe 재빌드 |
 | 8.36 | 2026-06-15 | **[PC] 이미지 전송 후 잔류 톡방 일괄 정리** — 정책 8.8(이미지 방은 업로드 취소 위험에 건별 미닫음)로 누적되던 채팅방을 **전체 전송 완료 후 일괄 닫기**. `kakao_image.close_rooms(rooms)` 신설(CM `kakao_send.close_rooms` 미러): ① 카카오톡 프로세스 소속 창만(타 앱 동명 제목 오폐쇄 차단) ② 제목 전방일치(`room_opened` 포함비교보다 엄격 — 파괴 동작이라) → `WM_CLOSE` PostMessage(X클릭 경로: 업로드 진행 중이면 카톡이 확인 팝업으로 보류, 자동 조작 안 함=업로드 보호). `_do_send`·`_do_bulk_send`가 이미지 방·오류 중단 방을 `lingering`에 모아 종료 후 `_cleanup_rooms()`(2초 유예 후 호출, 상태바에 "🧹 N개 정리 · M개 유지" 표기). 비치명·비 Windows no-op |
 | 8.35 | 2026-06-14 | **[v2.3.0] 위저드 교재 입력 datalist + 교재명 통일 마이그레이션** — ① 최초 설정 위저드 교재 입력(`#wzTb`)이 평문이라 기존 교재 재선택 불가→중복·오타 파편화. 설정 경로와 동일하게 `config.textbooks ∪ 모든 반 courses` 소스 datalist 연결(자동완성). ② DB 파편화 교재명 통일(활성 course + obs): `Signature100+`·`시그니처 100+`→`SIGNATURE 100+`, `유형해결의 법칙`→`유형해결의법칙`, `쏀`→`쎈` 등. 18 course rename + 84 obs 이동(충돌 0), `config/textbooks` 레지스트리 정리. 백업 `migration_backup_textbooks_20260614.json`(gitignore). **앱 버전 라벨**: v2.3.0 베타 승격·v2.2.3 이전 강등(versions.json) |
 | 8.34 | 2026-06-14 | **[v2.3.0] obs 신규 태그 `writeup_weak`(✍️ 서술 미흡) 추가** — 노트 마이닝(`scripts/mine_note_tags.py`) 첫 검토에서 강사 교차 반복 발굴된 후보. caution 분류(학부모 완곡 전달). 기존 highlight:process_good(풀이과정 우수)의 부정 축으로, 서술형·논술형 풀이과정 작성 미흡을 기록. 3곳 동기화: 웹 `app-core.js` TAGS.caution(입력 UI)·PC `constants.py` TAGS(표시 LUT)·`ai_engine.py` _CAUTION_TEXT("서술형·논술형 풀이 과정 작성이 미흡하여 연습이 필요함"). 더미 생성기·캐시버스트(`app-core.js?v=202606141600`) 갱신, exe 재빌드 |
@@ -332,7 +339,7 @@ DRW 2.0이 저장하는 수업 관찰 데이터(`obs/`)와 성적 데이터(`sco
 | 기본 매크로 설정 | 카카오톡 전송 딜레이(초), 톡방 접두사 |
 | Firebase 연결 | DB URL, DB 경로, ⚡ 연결 테스트 (`config` 노드 조회 + null 여부 검증) |
 | 내 강사 계정 | 이름 입력 → 조회/신규등록, 🔄 학급명단 동기화 |
-| AI 엔진 설정 | 엔진 종류 선택(표시명 Gemini/Claude/GPT (OpenAI)/Groq, 내부 id gemini/claude/openai/groq) + API Key + 👁 토글 |
+| AI 엔진 설정 | 엔진 선택(+선택 시 무료/유료 배지·한 줄 설명) + API Key + 👁 + **메시지 문체**(선택 시 미리보기) + **개별 지침** 텍스트박스 (§3.6) |
 | 학급·학생·교재·프리셋 | 웹 PWA 전담 안내 |
 
 **AI 엔진 설정 저장 키**
@@ -345,6 +352,8 @@ DRW 2.0이 저장하는 수업 관찰 데이터(`obs/`)와 성적 데이터(`sco
 | `gemini_api_key` | Gemini 전용 Key |
 | `openai_api_key` | OpenAI 전용 Key |
 | `claude_api_key` | Claude 전용 Key |
+| `ai_style_mode` | 메시지 문체(§3.6). `"auto"`(기본·내 말투 자동) \| `"warm_detail"` \| `"balanced"` \| `"info_coach"` \| `"concise"` |
+| `ai_custom_prompt` | 강사 개별 지침(§3.6) 자유 텍스트. 빈 문자열이면 미적용 |
 
 **학급명단 동기화 (`_fetch_class_data`)**
 
@@ -503,9 +512,11 @@ def _my_classes(self, sheet) -> list:
 
 - 컨텍스트: 학생명, 교재별 수행도·진도·과제, 직접 작성 메모, 오늘 태그
 - AI 호출 직전 현재 특이사항 `Text` 위젯 값을 `note_data`에 저장한 뒤 프롬프트를 생성한다. 따라서 FocusOut 전 작성한 메모도 `[직접 작성 메모 — 반드시 반영]`에 반영된다.
+- **표시 이름 분리**: `gen_single`의 `name` 인자는 nameKey(출결번호)다. 데이터·태그 조회는 nameKey로 하되, 프롬프트 `[학생 이름]`에는 `all_students[nameKey].name`을 조회해 `display_name`으로 전달한다. (미전달 시 nameKey가 그대로 새어 일부 엔진이 출결번호를 이름으로 출력하던 버그 수정). 일괄(`gen_all`)은 처음부터 display_name 사용.
 - 직접 작성 메모는 참고 자료가 아니라 교사가 직접 입력한 핵심 전달 사항으로 취급하며, 최종 문장에 자연스럽게 포함해야 한다.
 - `max_tokens=400`, `temperature=0.75` (자연스러운 문체)
 - system prompt: `_base_conditions()` 전달 (Claude: system 필드, Groq/OpenAI: system role 메시지, Gemini: `system_instruction`)
+- **문체 블록 주입**: 프롬프트의 `[문체 참고 예시]` 위치에 `AiEngine._style_block()` 결과(§3.6)를 삽입. 비면 기본 예시 3종 fallback(`_DEFAULT_STYLE_BLOCK`)
 - 완료 후 쿨다운 틱 시작
 
 ### 3.3 일괄 생성 (`gen_all`)
@@ -515,6 +526,7 @@ def _my_classes(self, sheet) -> list:
 - 배치 프롬프트: 학생 데이터 JSON 배열 → JSON 배열 응답 (`max_tokens=8192`, `temperature=0.5`)
   - 학생당 출력 ~68토큰 실측 → 8192는 ~100명까지 여유. (4096→8192 상향: 메모/하이라이트 포함 시 마진 확보)
 - system prompt: `_base_conditions()` 전달 (JSON 안정성 위해 temperature 0.5 유지)
+- **문체 블록 주입**: `[문체 기준]` 다음에 `_style_block()` 결과(§3.6) 삽입. 비면 "기본 분량은 2~3문장 100자 내외." 사용
 - 응답 파싱: `json.loads()` 전 ` ```json ``` ` 펜스 제거
 
 ### 3.4 태그 → 프롬프트 변환 (`_build_tags_context`)
@@ -533,7 +545,7 @@ def _my_classes(self, sheet) -> list:
 
 ### 3.5 생성 지침 (`_base_conditions`)
 
-1. 문체: ~했습니다 체 통일. 학생 이름 **또는** 수업 내용으로 자연스럽게 시작 (이름 고정 패턴 금지)
+1. 문체: ~했습니다 체 통일. **학생 이름을 주어로 쓰지 않음**(‘OOO는/OOO 학생은/OO이는’ 금지) — 메시지 위 ‘오늘의 OOO는?’ 헤더에 이름이 이미 있어 중복. 이름 없이 수업 내용·행동으로 바로 시작. 단건 `[학생 이름]`은 식별용 참고로만 제공
 2. 금지: '어머님/학부모님' 호칭, 시스템 표현, 할루시네이션
 3. 태그 반영: 명시된 항목만. 미명시 이벤트 임의 추가 금지
 4. 주의 태그: '졸음·잡담·태도불량' 직접 단어 절대 금지. '오늘은 조금 피곤해 보이는 날이었습니다' 수준 완곡 표현
@@ -543,8 +555,49 @@ def _my_classes(self, sheet) -> list:
 8. 과제 반복 금지: 진도·과제(페이지·번호)는 메시지 별도 항목으로 전달되므로 특이사항에서 그대로 읽어주는 문장 금지
 9. 출력: 순수 텍스트 (JSON·마크다운 금지). 2~3문장, 100자 내외
 
+> **강사 개별 지침과 우선순위**: `ai_custom_prompt`(§3.6)가 있으면 단건은 system(`_system_conditions` = `_base_conditions()` + 개별 지침), 일괄은 `[학생데이터]` 앞에 `[강사 개별 지침]` 블록으로 주입. 블록 머리말에 "위의 작성 지침과 사실·안전 규칙을 위반하지 않는 선에서 반영"을 명시 → 자유 입력이 호칭 금지·할루시네이션 금지·과제 반복 금지 등 안전 규칙을 덮어쓰지 못한다. **이 가드레일 문구는 프롬프트 내부에만 존재하고 설정 UI에는 노출하지 않는다.**
+
 **few-shot 예시** (단건 프롬프트에 포함, 문체·어조 참고용)
 > "오늘 이차함수 단원에서 막혔던 개념을 반복 설명 후 이해했습니다. 틀린 문항을 스스로 재풀이하며 오답을 정리하는 모습이 인상적이었습니다."
+
+> 위 기본 예시는 `ai_style_mode`가 미설정이거나 auto 모드에서 분석할 본인 노트가 없을 때만 쓰인다. 그 외에는 §3.6 문체 블록이 이 자리를 대체한다.
+
+### 3.6 메시지 문체 (ai_style.py)
+
+강사가 직접 수정·전송한 최종 특이사항(`history/`)의 말투·분량을 AI 생성에 반영한다. 설정 `ai_style_mode`로 모드를 고른다.
+
+**모드**
+
+| 모드 id | 라벨 | 동작 |
+|---------|------|------|
+| `auto` (기본) | ✍️ 내 말투 자동 | 로그인 강사(`instructor_id`) 본인이 전송한 노트를 history에서 추출해 통계 분석 → 문체 지침 자동 생성 + 본인 노트 2개를 few-shot 예시로 사용 |
+| `warm_detail` | 📖 따뜻·상세형 | 4문장+, 공감·노력 서술, 😊 이모지 |
+| `balanced` | 📋 정돈·균형형 | 3~4문장, 담백·명료, 이모지 없음 |
+| `info_coach` | 🎯 정보·코칭형 | 일정·시험·코칭 구체 명시, 운영 안내 빠짐없이 |
+| `concise` | ⚡ 간결·요점형 | 2~3문장, 점수·사실 위주 개조식 |
+
+> 4개 프리셋은 실DB `history/` 289건(강사 5명, 2026-06) 문체 분석으로 도출. 프리셋 예시는 학생 실명 없는 실노트를 익명화해 하드코딩(`STYLE_PRESETS`).
+
+**auto 분석** (`analyze_notes`/`build_guidance`)
+- 통계: 평균 길이, 이모지율, 느낌표율, 해요체율, 개조식율
+- 길이→분량 지침(110자 미만 간결 / 200자 미만 정돈 / 이상 상세), 이모지율≥0.4→이모지 사용 지침, 해요율≥0.35→부드러운 어조, 느낌표율≥0.3→느낌표 허용, 개조식율≥0.4→줄바꿈 요약
+- 예시(`pick_examples`): 실명 흔적 적은 노트 중 중앙값 길이 근처 2개
+
+**주입/캐시** (`AiEngine._style_block`)
+- `resolve_style(mode, provider)` → (지침, 예시) → `style_prompt_block()`로 `[문체 지침]`+`[문체 참고 예시]` 텍스트화
+- 예시 블록에 "말투·길이만 참고, 예시의 이름·점수·사실은 가져오지 말 것" 경고 명시(실명·사실 베끼기 방지)
+- 세션 캐시 키 `{mode}|{instructor}` — auto 모드 history fetch는 1회만, 설정 저장 시 `invalidate_style_cache()`로 무효화
+- auto 모드는 history 읽기만 함(쓰기 없음). 표본 상한 40건(최신순)
+
+**강사 개별 지침** (`ai_custom_prompt`)
+- 문체와 직교(어떻게=문체 / 무엇을=개별 지침). 문체 모드와 무관하게 항상 적용
+- `AiEngine._custom_block()`이 `[강사 개별 지침 …]` 블록 생성, 빈 값이면 미주입. 우선순위는 §3.5 참조(안전 규칙 우선)
+- 저장은 config(강사 PC/계정별) → 자연히 강사별 개인화
+
+**설정 UI** (app.py `_open_settings` AI 섹션)
+- 엔진 콤보 아래 `_ENG_INFO`로 무료/유료 배지(● 색상)+한 줄 설명 갱신(`_render_eng_info`). `AI_ENGINE_LABELS`는 웹/가이드 공유라 라벨 자체는 변경하지 않음
+- 문체 콤보 아래 미리보기 Label(`_render_style_preview`): 프리셋=지침+예시, auto=`profile_summary`(평균 길이·어조·이모지 여부)+예시 1개. auto는 history fetch라 백그라운드 스레드로 "분석 중…"→결과 갱신
+- 개별 지침 `tk.Text`(3줄). 저장 시 `ai_custom_prompt`에 기록, 가드레일 문구는 UI 미노출
 
 ---
 
@@ -1029,7 +1082,7 @@ CM `settings.json dbSecret` / Analyzer `drw_fb_secret`(localStorage).
 | `room_prefix` | `"오직 "` | 톡방 접두사 |
 | `firebase_url` | `""` | |
 | `firebase_path` | `""` | |
-| `ai_engine_type` | `"groq"` | 멀티 엔진 선택 |
+| `ai_engine_type` | `"gemini"` | 멀티 엔진 선택 (무료·추천 기본값, `AI_ENGINE_ORDER` 선두) |
 | `ai_api_key` | `""` | 통합 API Key |
 | `instructor_id` | `""` | |
 
@@ -1057,6 +1110,7 @@ CM `settings.json dbSecret` / Analyzer `drw_fb_secret`(localStorage).
 - `_do_send`: 별도 스레드 실행. 루프 내 상태 업데이트는 `root.after(0, lambda ...)`, 완료 후 처리는 `root.after(0, _on_done)` 으로 메인 스레드에 위임 (tkinter 스레드 안전 원칙)
 - `_build_tags_context`: `caution`과 `extra`는 독립 블록. caution 없이 extra만 존재해도 정상 처리 (변수 스코프 분리). `highlight` 있으면 lines 최상단에 삽입
 - `nickname_suffix`: 한 글자 이름 방어 — `full_name[1:] or full_name`
+- **에러 메시지 사용자화 (`errors.py` `humanize_error(exc, context)`)**: 기술적 예외를 비개발자용 한국어 안내로 변환. HTTP 상태코드 맵(`_HTTP_MSG`: 400/401/403/404/413/429/5xx)+timeout/URLError(네트워크)/JSONDecodeError(파싱)/Gemini 빈응답(내용 필터). **용량 초과 우선 감지**: 응답 본문에 `payload size`·`too large`·`exceeds the limit` 등이 있으면 상태코드와 무관하게 413("한 번에 보낸 내용이 너무 많습니다. 학생 수를 줄여 나눠서 생성") 안내(일부 API는 400으로 반환). 끝에 `(참고: HTTP 413)` 식 식별 코드만 남겨 문의 시 추적 가능. 적용처: `ai_engine`(단건·일괄 생성), `app.py`(데이터 가져오기·Firebase 연결 테스트·강사 계정 처리·명단 가져오기)
 
 **웹 PWA**
 - 아코디언 상태는 `openSaIds: Set`로 DOM 재생성 후에도 복원

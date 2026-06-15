@@ -13,8 +13,10 @@ DEBUG_AI_PROMPT: bool = False
 
 from constants import (APP_VERSION, AI_COOLDOWNS, AI_COOLDOWN_PAID,
                        AI_ENGINE_LABELS, GEMINI_MODEL, TAGS, grade_label)
-from firebase import fetch_tags_today, today_key, active_courses
+from firebase import fetch_tags_today, today_key, active_courses, firebase_get
 from storage import save_daily_cache
+import ai_style
+from errors import humanize_error
 
 def dprint(*args, **kwargs):
     """DEBUG_AI_PROMPT 플래그가 True일 때만 출력되는 디버그 프린트."""
@@ -149,9 +151,9 @@ def _base_conditions() -> str:
     return (
         "[작성 지침]\n"
         "1. 문체: ~했습니다 체로 통일 (했어요 혼용 금지).\n"
-        "첫 문장은 학생 이름('OO 학생은')으로 시작하지 않는 것을 기본 원칙으로 함.\n"
-        "수업 내용·성취·이해도·관찰된 행동 중심으로 자연스럽게 시작.\n"
-        "학생 이름을 첫 주어로 사용하는 표현은 예외 상황 외 금지.\n"
+        "★ 학생 이름을 주어로 절대 쓰지 마세요. 메시지 바로 위에 '오늘의 OOO는?' 헤더가 "
+        "이미 이름을 표시하므로, 본문에서 'OOO는'·'OOO 학생은'·'OO이는' 같은 이름 주어는 "
+        "중복이라 금지합니다. 이름·호칭 없이 곧바로 수업 내용·성취·이해도·관찰된 행동으로 시작하세요.\n"
         "2. 직접 작성 메모: [직접 작성 메모 — 반드시 반영] 섹션이 있으면 핵심 사실을 빠뜨리지 말고 "
         "최종 문장에 자연스럽게 포함하세요. 특히 일정·보강·시험·상담·준비물 등 운영 메모는 반드시 보존.\n"
         "3. 금지: '어머님·학부모님' 호칭, 시스템 표현('미입력·데이터 없음' 등), "
@@ -171,9 +173,24 @@ def _base_conditions() -> str:
 
 
 # ── 단건 생성 프롬프트 ───────────────────────────────────────────────
+_DEFAULT_STYLE_BLOCK = (
+    "[문체 참고 예시 — 내용은 아래 학생 데이터로 새로 작성]\n"
+    "예1) \"오늘 이차함수 단원에서 막혔던 개념을 반복 설명 후 이해했습니다. 틀린 문항을 스스로 재풀이하며 오답을 정리하는 모습이 인상적이었습니다.\"\n"
+    "예2) \"주간 테스트를 실시했으며, 오늘은 다소 피곤해 보이는 날이었지만 끝까지 집중해서 임했습니다.\"\n"
+    "예3) \"예습 내용을 바탕으로 설명을 빠르게 이해하고 응용 문제까지 도전했습니다. 오늘 다룬 개념을 완전히 자기 것으로 만든 하루였습니다.\""
+)
+
+
 def build_single_prompt(sheet, cls, name, textbooks, student_data, progress_data,
-                        existing_note, tags, tb_grade=None):
-    """단건 AI 생성용 프롬프트 조립 (v2.0 키 구조)."""
+                        existing_note, tags, tb_grade=None, style_block="",
+                        display_name=None):
+    """단건 AI 생성용 프롬프트 조립 (v2.0 키 구조).
+
+    name: nameKey(출결번호) — 데이터/태그 조회 키.
+    display_name: 프롬프트 [학생 이름]에 노출할 표시 이름. 미지정 시 name 사용
+        (구버전 호환). 출결번호가 이름으로 새는 것을 방지하려면 반드시 표시명 전달.
+    style_block: ai_style.style_prompt_block() 결과(문체 지침+예시). 비면 기본 예시.
+    """
     _tg = tb_grade or {}
     lines = []
     for tb in textbooks:
@@ -195,11 +212,8 @@ def build_single_prompt(sheet, cls, name, textbooks, student_data, progress_data
     prompt = (
         "수학학원 교사가 학부모에게 보낼 데일리 리포트 특이사항을 작성합니다.\n"
         "아래 제공된 데이터만을 근거로 작성하고, 데이터에 없는 내용은 절대 추가하지 마세요.\n\n"
-        "[문체 참고 예시 — 내용은 아래 학생 데이터로 새로 작성]\n"
-        "예1) \"오늘 이차함수 단원에서 막혔던 개념을 반복 설명 후 이해했습니다. 틀린 문항을 스스로 재풀이하며 오답을 정리하는 모습이 인상적이었습니다.\"\n"
-        "예2) \"주간 테스트를 실시했으며, 오늘은 다소 피곤해 보이는 날이었지만 끝까지 집중해서 임했습니다.\"\n"
-        "예3) \"예습 내용을 바탕으로 설명을 빠르게 이해하고 응용 문제까지 도전했습니다. 오늘 다룬 개념을 완전히 자기 것으로 만든 하루였습니다.\"\n\n"
-        f"[학생 이름]\n{name}\n\n"
+        f"{style_block or _DEFAULT_STYLE_BLOCK}\n\n"
+        f"[학생 이름 — 식별용 참고, 본문에 주어로 쓰지 말 것]\n{display_name or name}\n\n"
         f"[수업 데이터]\n{context}\n\n"
     )
     if tags_block:
@@ -216,8 +230,12 @@ def build_single_prompt(sheet, cls, name, textbooks, student_data, progress_data
 
 
 # ── 일괄 생성 프롬프트 ───────────────────────────────────────────────
-def build_batch_prompt(targets):
-    """일괄 AI 생성용 프롬프트 조립 (군더더기 제거 및 JSON 안정화)."""
+def build_batch_prompt(targets, style_block="", custom_block=""):
+    """일괄 AI 생성용 프롬프트 조립 (군더더기 제거 및 JSON 안정화).
+
+    style_block: ai_style.style_prompt_block() 결과. 비면 기본 문체 기준만 사용.
+    custom_block: 강사 개별 지침 블록. [학생데이터] 앞에 삽입.
+    """
     students_payload = []
     for t in targets:
         valid_data = []
@@ -249,17 +267,21 @@ def build_batch_prompt(targets):
         "수학학원 교사가 학부모용 데일리 리포트 특이사항을 일괄 작성합니다.\n"
         "⚠️ 각 학생의 '수업관찰및이벤트' 필드에 명시된 항목만 반영하세요. "
         "필드에 없는 자율학습·재시험·주간테스트 등은 절대 언급하지 마세요.\n\n"
-        "[문체 기준] 2~3문장 100자 내외. 학부모가 읽기 편한 따뜻한 어조. "
-        "학생 이름 또는 수업 내용으로 자연스럽게 시작 (매번 이름으로만 시작하지 말 것). "
+        "[문체 기준] 학부모가 읽기 편한 어조. "
+        "★ 학생 이름을 주어로 쓰지 마세요 — 메시지 위에 '오늘의 OOO는?' 헤더로 이름이 이미 "
+        "표시되므로 'OOO는'·'OOO 학생은'·'OO이는' 식 이름 주어는 중복이라 금지. 이름 없이 "
+        "수업 내용·행동으로 바로 시작하세요. "
         "'졸음·잡담·태도불량' 직접 단어 사용 금지 — 완곡하게 표현.\n"
-        "자율학습·주간 테스트·재시험 등 별도 전달 이벤트는 다른 수업 묘사와 섞지 말고 "
+        + (f"{style_block}\n" if style_block else "기본 분량은 2~3문장 100자 내외.\n")
+        + "자율학습·주간 테스트·재시험 등 별도 전달 이벤트는 다른 수업 묘사와 섞지 말고 "
         "가능하면 독립 문장으로 명확히 작성하세요.\n"
         "각 학생의 '직접작성메모_반드시반영' 필드는 교사가 직접 입력한 핵심 전달 사항이므로 "
         "최종 note에 반드시 자연스럽게 포함하세요.\n"
         "⭐ 하이라이트 항목이 있으면 가장 인상적인 표현으로 강조.\n\n"
         "⚠️ 반드시 JSON 배열로만 응답 (다른 텍스트 금지):\n"
         '[{"cls":"반명","name":"이름","note":"특이사항"}, ...]\n\n'
-        f"[학생데이터]\n{students_json}"
+        + (f"{custom_block}\n\n" if custom_block else "")
+        + f"[학생데이터]\n{students_json}"
     )
     return prompt
 
@@ -377,9 +399,71 @@ class AiEngine:
     def __init__(self, app):
         self.app        = app
         self._last_call = 0.0
+        # auto 문체 프로파일 세션 캐시 — (mode|instructor) 키로 1회 fetch/분석
+        self._style_cache_key = None
+        self._style_cache     = ("", [])
+
+    # ── 문체(말투) 주입 블록 해석 ─────────────────────────────────────
+    def _fetch_instructor_notes(self, instructor):
+        """history/ 에서 해당 강사가 전송한 노트 본문 리스트(최신순 일부)."""
+        if not instructor:
+            return []
+        try:
+            data = firebase_get(self.app.config, "history") or {}
+        except Exception:
+            return []
+        rows = []
+        for nk, days in data.items():
+            if not isinstance(days, dict):
+                continue
+            for d, rec in days.items():
+                if not isinstance(rec, dict):
+                    continue
+                note = (rec.get('note') or '').strip()
+                if note and rec.get('instructor', '') == instructor:
+                    rows.append((d, note))
+        rows.sort(key=lambda x: x[0], reverse=True)  # 최신 우선
+        return [n for _, n in rows[:40]]             # 분석 표본 상한
+
+    def _style_block(self):
+        """현재 설정(ai_style_mode)에 맞는 문체 프롬프트 블록 문자열."""
+        mode = self.app.config.get('ai_style_mode', ai_style.STYLE_AUTO).strip()
+        instructor = self.app.config.get('instructor_id', '').strip()
+        cache_key = f"{mode}|{instructor}"
+        if self._style_cache_key != cache_key:
+            guidance, examples = ai_style.resolve_style(
+                mode, lambda: self._fetch_instructor_notes(instructor)
+            )
+            self._style_cache = (guidance, examples)
+            self._style_cache_key = cache_key
+        return ai_style.style_prompt_block(*self._style_cache)
+
+    def invalidate_style_cache(self):
+        """설정 변경(문체/강사) 후 호출 — 다음 생성 시 재분석."""
+        self._style_cache_key = None
+
+    def _custom_block(self):
+        """강사 개별 지침(ai_custom_prompt) → 프롬프트 블록. 비면 ''.
+
+        안전·사실충실 규칙(_base_conditions)을 위반하지 않는 선에서만 반영하도록
+        명시 — 자유 입력이 호칭 금지·할루시네이션 금지 등을 덮어쓰지 못하게 한다.
+        """
+        cust = (self.app.config.get('ai_custom_prompt') or '').strip()
+        if not cust:
+            return ""
+        return (
+            "[강사 개별 지침 — 위의 작성 지침과 사실·안전 규칙을 위반하지 않는 선에서 반영]\n"
+            f"{cust}"
+        )
+
+    def _system_conditions(self):
+        """단건 system 프롬프트 = 공통 지침(+ 강사 개별 지침)."""
+        base = _base_conditions()
+        cust = self._custom_block()
+        return f"{base}\n\n{cust}" if cust else base
 
     def _check_cooldown(self):
-        engine_type = self.app.config.get('ai_engine_type', 'groq').strip().lower()
+        engine_type = self.app.config.get('ai_engine_type', 'gemini').strip().lower()
         cooldown = AI_COOLDOWNS.get(engine_type, AI_COOLDOWN_PAID)
         remaining = max(0, cooldown - (time.time() - self._last_call))
         if remaining > 0:
@@ -395,7 +479,7 @@ class AiEngine:
         """App 설정 딕셔너리로부터 활성화된 엔진 타입과 해당 Key를 리턴합니다.
         (설정 키 명칭은 사용 중인 app.cfg 규격에 부합하게 맞추어 조율하세요)
         """
-        engine_type = self.app.config.get('ai_engine_type', 'groq').strip().lower()
+        engine_type = self.app.config.get('ai_engine_type', 'gemini').strip().lower()
 
         # 엔진별 고유 키만 사용 (공유 ai_api_key 폴백 제거 — 엔진 간 키 오염 방지)
         api_key = self.app.config.get(f'{engine_type}_api_key', '').strip()
@@ -438,11 +522,14 @@ class AiEngine:
             print(f"[SINGLE] tags_today={tags if tags else '(없음)'}")
             print(f"[SINGLE] existing_note={existing if existing else '(없음)'}")
 
-        # 프롬프트 생성
+        # 프롬프트 생성 (문체 블록 주입 — 강사 말투/프리셋)
+        # name 은 nameKey(출결번호). 프롬프트 노출용 표시 이름은 별도 조회.
+        display_name = app.all_students.get(name, {}).get('name', name)
         prompt = build_single_prompt(
             sheet, cls, name, textbooks,
             app.student_data, app.progress_data, existing, tags,
-            tb_grade=tb_grade
+            tb_grade=tb_grade, style_block=self._style_block(),
+            display_name=display_name
         )
 
         note_txt.config(state='normal')
@@ -455,7 +542,7 @@ class AiEngine:
             try:
                 text = _call_ai_hub(engine_type, api_key, prompt,
                                     max_tokens=400, temperature=0.75,
-                                    system=_base_conditions())
+                                    system=self._system_conditions())
                 app.note_data[note_key] = {'value': text}
                 save_daily_cache(app.progress_data, app.student_data, app.note_data, app.force_data)
 
@@ -469,11 +556,9 @@ class AiEngine:
                         self._start_cooldown_tick(ai_btn)
                 app.root.after(0, _ok)
 
-            except urllib.error.HTTPError as e:
-                msg = "API 한도를 초과했습니다(429). 잠시 후 다시 시도해 주세요." if e.code == 429 else f"HTTP {e.code}: {e.reason}"
-                app.root.after(0, lambda m=msg: self._show_err(note_txt, ai_btn, m))
             except Exception as e:
-                app.root.after(0, lambda m=str(e): self._show_err(note_txt, ai_btn, m))
+                msg = humanize_error(e, "AI 특이사항 생성 중 문제가 발생했습니다.")
+                app.root.after(0, lambda m=msg: self._show_err(note_txt, ai_btn, m))
 
         threading.Thread(target=_call, daemon=True).start()
 
@@ -545,7 +630,8 @@ class AiEngine:
         ):
             return
 
-        prompt = build_batch_prompt(targets)
+        prompt = build_batch_prompt(targets, style_block=self._style_block(),
+                                    custom_block=self._custom_block())
 
         # 진행 표시 — 자동 소멸 modeless Toplevel (OK 버튼 모달 대신).
         # 완료/에러 콜백에서 _close_prog() 으로 닫는다.
@@ -610,11 +696,9 @@ class AiEngine:
                     messagebox.showinfo("일괄 AI 생성 완료", f"{u}명의 특이사항 작성이 완료되었습니다.")
                 app.root.after(0, _ok)
 
-            except urllib.error.HTTPError as e:
-                msg = "API 한도를 초과했습니다(429). 잠시 후 다시 시도해 주세요." if e.code == 429 else f"HTTP {e.code}: {e.reason}"
-                app.root.after(0, lambda m=msg: (_close_prog(), self._show_batch_err(m)))
             except Exception as e:
-                app.root.after(0, lambda m=str(e): (_close_prog(), self._show_batch_err(m)))
+                msg = humanize_error(e, "일괄 AI 생성 중 문제가 발생했습니다.")
+                app.root.after(0, lambda m=msg: (_close_prog(), self._show_batch_err(m)))
 
         threading.Thread(target=_call, daemon=True).start()
 
@@ -623,7 +707,7 @@ class AiEngine:
             try:
                 if not btn.winfo_exists():
                     return
-                engine_type = self.app.config.get('ai_engine_type', 'groq').strip().lower()
+                engine_type = self.app.config.get('ai_engine_type', 'gemini').strip().lower()
                 cooldown = AI_COOLDOWNS.get(engine_type, AI_COOLDOWN_PAID)
                 remaining = max(0, cooldown - (time.time() - self._last_call))
                 if remaining > 0:

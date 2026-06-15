@@ -6,7 +6,7 @@ import platform as _platform
 
 # ── 앱 메타 ───────────────────────────────────────────────────────────
 APP_TITLE   = "Daily Report Wizard"
-APP_VERSION = "v2.3.0"
+APP_VERSION = "v2.4.0"
 APP_CREDIT  = "Crafted by IDO(idocho@kakao.com)  ·  Powered by Claude AI"
 
 AI_COOLDOWN_GROQ   = 30  # Groq 무료 플랜 RPM 제한 대응 (보수적)
@@ -161,7 +161,7 @@ DEFAULT_CONFIG = {
     "firebase_url":   "",
     "firebase_path":  "",
     "firebase_secret": "",  # DB Secret (?auth=) — Security Rules 전환 후 사용(#15)
-    "ai_engine_type":  "groq",
+    "ai_engine_type":  "gemini",  # 무료·추천 엔진을 기본값으로 (AI_ENGINE_ORDER 선두)
     "groq_api_key":    "",
     "openai_api_key":  "",
     "claude_api_key":  "",
