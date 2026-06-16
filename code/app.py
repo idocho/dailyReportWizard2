@@ -2067,7 +2067,7 @@ class App:
         win = tk.Toplevel(self.root)
         self._settings_win = win
         win.title("설정")
-        win.geometry("520x720")
+        win.geometry("560x680")
         win.configure(bg=BG)
         win.resizable(False, True)
 
@@ -2077,11 +2077,54 @@ class App:
         hdr.pack_propagate(False)
         tk.Label(hdr, text="⚙ 설정", font=FT, bg=DARK, fg='white').pack(side='left', padx=16, pady=8)
 
-        # 메인 영역 (스크롤 배치)
-        canvas, inner = make_scroll_frame(win, bg=BG)
-        canvas.pack(fill='both', expand=True)
+        # ── 하단 고정 푸터(저장/취소) — 본문보다 먼저 bottom 배치 ──────
+        footer = tk.Frame(win, bg=BG)
+        footer.pack(side='bottom', fill='x')
+        tk.Frame(win, bg=BORDER, height=1).pack(side='bottom', fill='x')
 
-        # ── ① 기본 환경 매크로 설정 ───────────────────────────
+        # ── 본문: 좌측 탭 레일 + 우측 탭별 스크롤 콘텐츠 ───────────────
+        body = tk.Frame(win, bg=BG)
+        body.pack(side='top', fill='both', expand=True)
+        rail = tk.Frame(body, bg="#F4F4F6", width=132)
+        rail.pack(side='left', fill='y')
+        rail.pack_propagate(False)
+        content = tk.Frame(body, bg=BG)
+        content.pack(side='left', fill='both', expand=True)
+
+        def _mk_tab():
+            holder = tk.Frame(content, bg=BG)
+            _cv, frm = make_scroll_frame(holder, bg=BG)
+            return holder, frm
+        ai_hold,   tab_ai      = _mk_tab()
+        conn_hold, tab_conn    = _mk_tab()
+        acct_hold, tab_account = _mk_tab()
+        gen_hold,  tab_general = _mk_tab()
+
+        _TABS = [
+            ('ai',      '🤖 AI 생성',  ai_hold),
+            ('conn',    '🔥 연결',     conn_hold),
+            ('account', '👤 강사 계정', acct_hold),
+            ('general', '⚙ 일반',      gen_hold),
+        ]
+        _tab_btns = {}
+        def _show_tab(key):
+            for _k, _l, h in _TABS:
+                h.pack_forget()
+            for _k, _l, h in _TABS:
+                if _k == key:
+                    h.pack(fill='both', expand=True)
+            for _k, b in _tab_btns.items():
+                b.config(bg=(INDIGO_L if _k == key else "#F4F4F6"),
+                         fg=(INDIGO if _k == key else TEXT))
+        for _k, _lbl, _h in _TABS:
+            b = tk.Button(rail, text="  " + _lbl, font=FB, bg="#F4F4F6", fg=TEXT,
+                          relief='flat', anchor='w', padx=8, pady=8, cursor='hand2',
+                          command=lambda kk=_k: _show_tab(kk))
+            b.pack(fill='x', padx=6, pady=1)
+            _tab_btns[_k] = b
+
+        # ── 일반(매크로) 탭 ───────────────────────────────────
+        inner = tab_general
         self._settings_section(inner, "기본 매크로 설정")
         
         delay_grid = tk.Frame(inner, bg=BG)
@@ -2104,8 +2147,8 @@ class App:
         prefix_var = tk.StringVar(value=self.config.get('room_prefix', '오직 '))
         tk.Entry(delay_grid, textvariable=prefix_var, font=FS, relief='solid', bd=1).grid(row=2, column=1, sticky='ew', ipady=3)
 
-        # ── ② Firebase Database 연결 설정 ───────────────────
-        tk.Frame(inner, bg=BORDER, height=1).pack(fill='x', padx=16, pady=(4,0))
+        # ── 연결 탭 (Firebase) ────────────────────────────────
+        inner = tab_conn
         self._settings_section(inner, "Firebase 연결 설정")
 
         fb_grid = tk.Frame(inner, bg=BG)
@@ -2141,8 +2184,8 @@ class App:
         test_row.pack(fill='x', padx=16, pady=(0,10))
         tk.Button(test_row, text="⚡ 연결 테스트", font=FS, bg="#EEF0FF", fg=INDIGO, relief='flat', padx=10, pady=4, cursor='hand2', command=_test_connection).pack(side='left')
 
-        # ── ③ 내 강사 계정 ────────────────────────────────────────
-        tk.Frame(inner, bg=BORDER, height=1).pack(fill='x', padx=16, pady=(4,0))
+        # ── 강사 계정 탭 ───────────────────────────────────────
+        inner = tab_account
         self._settings_section(inner, "내 강사 계정")
         tk.Label(inner, text="강사 이름을 입력하고 조회하세요. 등록된 계정이 없으면 신규 등록합니다.", font=FS, bg=BG, fg=SUBTEXT, wraplength=460).pack(anchor='w', padx=16, pady=(0,6))
 
@@ -2239,10 +2282,10 @@ class App:
         tk.Button(fetch_row, text="🔄 학급/명단 동기화", font=FS, bg="#F7F7F9", fg=TEXT, relief='solid', bd=1, padx=10, pady=4, cursor='hand2', command=_fetch_class_data).pack(side='left')
         tk.Label(fetch_row, text="계정 조회 후 클릭하세요", font=FS, bg=BG, fg=GRAY).pack(side='left', padx=8)
 
-        # ── 🤖 ④ AI 특이사항 생성 엔진 다중화 (요청 사항 반영) ───────────────────────────
-        tk.Frame(inner, bg=BORDER, height=1).pack(fill='x', padx=16, pady=(4,0))
-        self._settings_section(inner, "AI 특이사항 생성 엔진 설정")
-        tk.Label(inner, text="사용할 AI 엔진을 선택하고 API Key를 입력하세요. 중앙 패널에서 ✨ AI생성 버튼이 연동됩니다.", font=FS, bg=BG, fg=SUBTEXT, justify='left', wraplength=460).pack(anchor='w', padx=16, pady=(0,6))
+        # ── 🤖 AI 생성 탭 (전면·핵심 기능) ────────────────────
+        inner = tab_ai
+        self._settings_section(inner, "AI 특이사항 생성")
+        tk.Label(inner, text="사용할 AI 엔진·문체·개별 지침을 설정하세요. 중앙 패널 ✨ AI생성 버튼이 연동됩니다.", font=FS, bg=BG, fg=SUBTEXT, justify='left', wraplength=400).pack(anchor='w', padx=16, pady=(0,6))
 
         ai_grid = tk.Frame(inner, bg=BG)
         ai_grid.pack(fill='x', padx=16, pady=(0,10))
@@ -2314,10 +2357,16 @@ class App:
         def _selected_style_id():
             return _style_label2id.get(style_var.get(), ai_style.STYLE_AUTO)
 
+        # 라벨 폭에 맞춰 자동 줄바꿈 (창/컬럼 실폭 반영 — 고정 wraplength로 잘리던 문제 해결)
+        def _wrap_to_width(lbl, pad=16):
+            lbl.bind('<Configure>',
+                     lambda e, w=lbl: e.width > 1 and w.config(wraplength=e.width - pad))
+
         # 문체 미리보기 — 프리셋은 지침+예시, auto는 본인 노트 분석 요약+예시 (row 4)
         style_prev = tk.Label(ai_grid, font=("맑은 고딕", 8), bg="#F7F7F9", fg=SUBTEXT,
-                              justify='left', anchor='w', wraplength=430, padx=8, pady=6)
+                              justify='left', anchor='w', wraplength=340, padx=8, pady=6)
         style_prev.grid(row=4, column=1, sticky='ew', pady=(0,2))
+        _wrap_to_width(style_prev)
 
         def _set_prev(text):
             try:
@@ -2354,15 +2403,15 @@ class App:
                              bg="#F7F7F9", highlightbackground=BORDER, highlightthickness=1)
         custom_txt.grid(row=5, column=1, sticky='ew', pady=(8,0))
         custom_txt.insert('1.0', (self.config.get('ai_custom_prompt') or '').strip())
-        tk.Label(ai_grid, text="이 강사에게만 적용할 추가 지침 (예: 끝에 응원 한마디 / 줄임말 금지 / 다음 시험 일정 강조)",
-                 font=("맑은 고딕", 8), bg=BG, fg=GRAY, justify='left', wraplength=430).grid(row=6, column=1, sticky='w', pady=(2,0))
+        custom_hint = tk.Label(ai_grid, text="이 강사에게만 적용할 추가 지침 (예: 끝에 응원 한마디 / 줄임말 금지 / 다음 시험 일정 강조)",
+                 font=("맑은 고딕", 8), bg=BG, fg=GRAY, justify='left', anchor='w', wraplength=340)
+        custom_hint.grid(row=6, column=1, sticky='ew', pady=(2,0))
+        _wrap_to_width(custom_hint)
 
         _render_eng_info()
         _render_style_preview()
 
-        # ── ⑤ 하단 컨트롤 (저장) ───────────────────────────────────
-        tk.Frame(inner, bg=BORDER, height=1).pack(fill='x', padx=16, pady=(10,0))
-        
+        # ── 하단 고정 컨트롤 (저장) — footer 에 배치 (탭 무관 항상 노출) ──
         def _save_all():
             try:
                 self.config['send_speed'] = speed_var.get()  # 프리셋(고속/보통/안정) — wait_time 대체
@@ -2396,10 +2445,10 @@ class App:
             except Exception as err:
                 messagebox.showerror("오류", f"설정 저장 실패:\n{err}", parent=win)
 
-        btn_row = tk.Frame(inner, bg=BG)
-        btn_row.pack(fill='x', padx=16, pady=20)
-        tk.Button(btn_row, text="💾 설정 저장하기", font=FT, bg=INDIGO, fg='white', relief='flat', padx=20, pady=8, command=_save_all, cursor='hand2').pack(side='right')
-        tk.Button(btn_row, text="취소", font=FS, bg="#ECECEF", fg=TEXT, relief='flat', padx=16, pady=8, command=win.destroy, cursor='hand2').pack(side='right', padx=8)
+        tk.Button(footer, text="💾 설정 저장하기", font=FT, bg=INDIGO, fg='white', relief='flat', padx=20, pady=8, command=_save_all, cursor='hand2').pack(side='right', padx=(0,16), pady=12)
+        tk.Button(footer, text="취소", font=FS, bg="#ECECEF", fg=TEXT, relief='flat', padx=16, pady=8, command=win.destroy, cursor='hand2').pack(side='right', pady=12)
+
+        _show_tab('ai')   # 기본 탭: AI 생성(전면)
 
 
     def _gen_ai_note(self, group, classId, nameKey, subjects, note_txt, ai_btn=None, tb_grade=None):

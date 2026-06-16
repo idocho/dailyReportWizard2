@@ -527,6 +527,8 @@ function makeTb(title,sub=''){
 function render(){renderSb();renderMain();}
 function renderMain(){
   const mc=document.getElementById('mc');if(!mc)return;
+  // 온보딩 중엔 사이드바 숨김(풀스크린) — #wr.wz-mode 토글
+  const wr=document.getElementById('wr');if(wr)wr.classList.toggle('wz-mode',wizardActive);
   if(wizardActive){renderWizard(mc);return;}
   if(activeTab==='input')renderInput(mc);
   else if(activeTab==='scores')renderScores(mc);

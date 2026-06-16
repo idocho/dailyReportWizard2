@@ -4,7 +4,7 @@
   --indigo:#4F46E5; --indigo-ink:#4338CA; --indigo-l:#EEF0FF; --indigo-line:#DDE1FF;
   --green:#16A34A; --green-l:#ECFDF3; --yellow:#D97706; --yellow-l:#FFFAEB; --red:#DC2626; --red-l:#FEF2F2; --blue:#2563EB;
   --gray:#9CA3AF; --border:#ECECEF; --line-soft:#F3F3F5; --text:#18181B; --sub:#5C6370;
-  --sw:212px; --r:10px; --r-sm:7px; --r-lg:14px;
+  --sw:192px; --r:10px; --r-sm:7px; --r-lg:14px;
   --sh-1:0 1px 2px rgba(16,24,40,.04);
   --sh-2:0 1px 3px rgba(16,24,40,.07),0 1px 2px rgba(16,24,40,.04);
   --sh-pop:0 8px 24px rgba(16,24,40,.10);
@@ -16,6 +16,25 @@ body{font-family:'Pretendard','Malgun Gothic','맑은 고딕',-apple-system,sans
 #wr{display:flex;height:100%}
 .sidebar{width:var(--sw);background:var(--dark);color:rgba(255,255,255,.92);flex-shrink:0;display:flex;flex-direction:column;overflow-y:auto;position:fixed;top:0;bottom:0;left:0;z-index:50}
 .main{flex:1;margin-left:var(--sw);overflow-y:auto;min-height:100vh;padding-bottom:24px}
+/* 온보딩 풀스크린 — 위저드 중엔 사이드바 숨기고 본문 전체폭 사용 */
+#wr.wz-mode .sidebar{display:none}
+#wr.wz-mode .main{margin-left:0}
+/* 설정 좌측 탭 사이드바 (단일 롱 스크롤 → 4탭) */
+.stg{display:flex;align-items:flex-start;gap:0}
+.stg-rail{width:124px;flex-shrink:0;display:flex;flex-direction:column;gap:3px;padding:14px 8px;position:sticky;top:0}
+.stg-tab{display:flex;align-items:center;gap:7px;padding:9px 10px;border-radius:8px;font-size:12px;color:var(--sub);background:none;border:none;cursor:pointer;text-align:left;font-family:inherit;width:100%;transition:background .12s,color .12s}
+.stg-tab:hover{background:var(--line-soft)}
+.stg-tab.on{background:var(--indigo-l);color:var(--indigo-ink);font-weight:700}
+.stg-panes{flex:1;min-width:0;padding:14px 14px 16px 8px;display:flex;flex-direction:column;gap:10px}
+.stg-pane{display:none;flex-direction:column;gap:10px}
+.stg-pane.on{display:flex}
+.stg-foot{display:flex;flex-direction:column;gap:8px;margin-top:8px;padding-top:10px;border-top:1px solid var(--line-soft)}
+@media(max-width:600px){
+  .stg{flex-direction:column}
+  .stg-rail{flex-direction:row;width:auto;overflow-x:auto;position:static;padding:10px 12px 0;gap:6px}
+  .stg-tab{white-space:nowrap;width:auto}
+  .stg-panes{padding:12px}
+}
 .mhdr,.bnav{display:none}
 .d{display:block}.m{display:none}
 /* 태블릿 가로 전용 — 모바일 미지원 (소형 화면은 마스킹) */
@@ -239,6 +258,8 @@ body{font-family:'Pretendard','Malgun Gothic','맑은 고딕',-apple-system,sans
 .wz-head{padding:22px 26px 0;text-align:center}
 .wz-logo{font-size:13px;font-weight:800;color:var(--indigo)}
 .wz-hsub{font-size:11px;color:var(--gray);margin-top:2px}
+.wz-guide{display:inline-flex;align-items:center;gap:6px;margin-top:11px;font-size:11px;font-weight:700;color:var(--indigo-ink);background:var(--indigo-l);border:1px solid var(--indigo-line);border-radius:8px;padding:6px 12px;text-decoration:none}
+.wz-guide:hover{background:#E4E7FF}
 .wz-steps{display:flex;align-items:center;justify-content:center;padding:20px 26px 4px}
 .stp{display:flex;flex-direction:column;align-items:center;gap:5px;flex:0 0 auto}
 .stp-dot{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;background:#EEF1F6;color:var(--gray);border:2px solid transparent;transition:all .2s}

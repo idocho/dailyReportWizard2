@@ -2,6 +2,13 @@
 // ══════════════════════════════════════════════════════════
 //  설정
 // ══════════════════════════════════════════════════════════
+// 설정 좌측 탭 (account|conn|data|admin) — 재렌더 없이 CSS show/hide 전환
+let stgTab='account';
+function setStg(t){
+  stgTab=t;
+  document.querySelectorAll('.stg-tab').forEach(b=>b.classList.toggle('on',b.dataset.stg===t));
+  document.querySelectorAll('.stg-pane').forEach(p=>p.classList.toggle('on',p.dataset.stg===t));
+}
 function _saToggle(id){
   const hdr=document.querySelector(`#${id}>.sa-hdr`);
   const body=document.querySelector(`#${id}>.sa-body`);
@@ -68,6 +75,7 @@ function renderWizard(mc){
     <div class="wz-head">
       <div class="wz-logo">📝 DailyReportWizard</div>
       <div class="wz-hsub">처음 오셨네요 — 4단계로 빠르게 설정해요</div>
+      <a class="wz-guide" href="./guide.html" target="_blank">📖 설치 · 운용 가이드</a>
     </div>
     <div class="wz-steps">${_wzStepsBar()}</div>
     <div class="wz-body">${body}</div>
@@ -297,8 +305,7 @@ function renderSettings(mc){
       <div class="sa-body${openSaIds.has('sa-admin')?' open':''}" id="instrMgmtCard"><div style="padding:10px 12px;font-size:12px;color:var(--gray)">불러오는 중...</div></div>
     </div>`:'';
 
-  mc.innerHTML=makeTb('설정')+`<div style="padding:14px;display:flex;flex-direction:column;gap:10px">
-
+  const SA_FB=`
     <div class="sa" id="sa-fb">
       <div class="sa-hdr${openSaIds.has('sa-fb')?' open':''}" onclick="_saToggle('sa-fb')">
         <span class="sa-ico">🔥</span>
@@ -313,8 +320,9 @@ function renderSettings(mc){
         <div style="padding:10px 14px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn bp bsm" onclick="saveFb()">💾 저장</button><button class="btn bsm" onclick="loadCfg()">📥 학생 명단 불러오기</button></div>
         <div style="padding:0 14px 10px;font-size:10px;color:var(--sub)">💡 다른 기기에서 입력한 데이터는 위 버튼으로 수동 갱신하세요.</div>
       </div>
-    </div>
+    </div>`;
 
+  const SA_ACCT=`
     <div class="sa" id="sa-acct">
       <div class="sa-hdr${openSaIds.has('sa-acct')?' open':''}" onclick="_saToggle('sa-acct')">
         <span class="sa-ico">🔑</span>
@@ -338,8 +346,9 @@ function renderSettings(mc){
         </div>
         <div style="padding:4px 14px 10px;font-size:11px;color:var(--sub)">이름 그대로 Firebase 키로 사용됩니다 (예: <code>config/instructors/홍길동</code>)</div>
       </div>
-    </div>
+    </div>`;
 
+  const SA_PRESET=`
     <div class="sa" id="sa-preset">
       <div class="sa-hdr${openSaIds.has('sa-preset')?' open':''}" onclick="_saToggle('sa-preset')">
         <span class="sa-ico">🎯</span>
@@ -354,8 +363,9 @@ function renderSettings(mc){
           <button class="btn bsm" onclick="addPreset()">+ 추가</button>
         </div>
       </div>
-    </div>
+    </div>`;
 
+  const SA_ASGN=`
     <div class="sa" id="sa-asgn">
       <div class="sa-hdr${openSaIds.has('sa-asgn')?' open':''}" onclick="_saToggle('sa-asgn')">
         <span class="sa-ico">📚</span>
@@ -364,8 +374,9 @@ function renderSettings(mc){
         <span class="sa-chv">›</span>
       </div>
       <div class="sa-body${openSaIds.has('sa-asgn')?' open':''}">${asgRows}${addAsgn}</div>
-    </div>
+    </div>`;
 
+  const SA_CLS=`
     <div class="sa" id="sa-cls">
       <div class="sa-hdr${openSaIds.has('sa-cls')?' open':''}" onclick="_saToggle('sa-cls')">
         <span class="sa-ico">🏫</span>
@@ -374,8 +385,9 @@ function renderSettings(mc){
         <span class="sa-chv">›</span>
       </div>
       <div class="sa-body${openSaIds.has('sa-cls')?' open':''}">${renderClsMgmt()}</div>
-    </div>
+    </div>`;
 
+  const SA_RESET=`
     <div class="sa" id="sa-reset">
       <div class="sa-hdr${openSaIds.has('sa-reset')?' open':''}" onclick="_saToggle('sa-reset')">
         <span class="sa-ico">🗑</span>
@@ -384,23 +396,37 @@ function renderSettings(mc){
         <span class="sa-chv">›</span>
       </div>
       <div class="sa-body${openSaIds.has('sa-reset')?' open':''}">${resetHtml}</div>
+    </div>`;
+
+  const SA_FOOT=`
+    <div class="stg-foot">
+      <button class="btn" style="width:100%;border-style:dashed;color:var(--indigo-ink);border-color:var(--indigo-line);justify-content:center;display:flex;gap:6px" onclick="restartWizard()">🧭 초기 설정 위저드 다시 실행 <span style="font-size:10px;color:var(--gray);font-weight:600">(테스트용)</span></button>
+      <button class="adm-btn${adminOn?' on':''}" onclick="toggleAdmin()" id="admBtn">
+        <span>${adminOn?'🔓':'🔒'}</span>
+        <span id="admBtnLbl">${adminOn?'관리자 모드 해제':'관리자 모드'}</span>
+      </button>
+      ${adminOn?`<button class="btn bsm" style="width:100%;justify-content:center" onclick="changeAdminPw()">🔑 관리자 암호 변경</button>`:''}
+      <div style="font-size:10px;color:var(--gray);text-align:center">`+`DailyReportWizard ${APP_VERSION} · Crafted by IDO(idocho@kakao.com) · Powered by Claude AI`+`</div>
+    </div>`;
+
+  // 활성 탭 (관리자 탭은 adminOn일 때만) — 잡다한 단일 스크롤 → 4탭 좌측 레일
+  const T=(stgTab==='admin'&&!adminOn)?'account':stgTab;
+  const _tab=(k,ic,lb)=>`<button class="stg-tab${T===k?' on':''}" data-stg="${k}" onclick="setStg('${k}')">${ic} ${lb}</button>`;
+  const _pane=(k,html)=>`<div class="stg-pane${T===k?' on':''}" data-stg="${k}">${html}</div>`;
+  mc.innerHTML=makeTb('설정')+`<div class="stg">
+    <div class="stg-rail">
+      ${_tab('account','👤','계정·수업')}
+      ${_tab('conn','🔥','연결')}
+      ${_tab('data','💬','문구·데이터')}
+      ${adminOn?_tab('admin','👑','관리자'):''}
     </div>
-
-    ${tbMgmtHtml}
-
-    ${tbListHtml}
-
-    ${instrMgmt}
-
-    <button class="btn" style="width:100%;border-style:dashed;color:var(--indigo-ink);border-color:var(--indigo-line);justify-content:center;display:flex;gap:6px" onclick="restartWizard()">🧭 초기 설정 위저드 다시 실행 <span style="font-size:10px;color:var(--gray);font-weight:600">(테스트용)</span></button>
-
-    <button class="adm-btn${adminOn?' on':''}" onclick="toggleAdmin()" id="admBtn">
-      <span>${adminOn?'🔓':'🔒'}</span>
-      <span id="admBtnLbl">${adminOn?'관리자 모드 해제':'관리자 모드'}</span>
-    </button>
-    ${adminOn?`<button class="btn bsm" style="width:100%;justify-content:center" onclick="changeAdminPw()">🔑 관리자 암호 변경</button>`:''}
-
-    <div style="font-size:10px;color:var(--gray);text-align:center">`+`DailyReportWizard ${APP_VERSION} · Crafted by IDO(idocho@kakao.com) · Powered by Claude AI`+`</div>
+    <div class="stg-panes">
+      ${_pane('account',SA_ACCT+SA_ASGN+SA_CLS)}
+      ${_pane('conn',SA_FB)}
+      ${_pane('data',SA_PRESET+SA_RESET)}
+      ${adminOn?_pane('admin',tbMgmtHtml+tbListHtml+instrMgmt):''}
+      ${SA_FOOT}
+    </div>
   </div>`;
 
   setSync(!!dbUrl&&!!dbPath);
