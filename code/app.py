@@ -2067,9 +2067,10 @@ class App:
         win = tk.Toplevel(self.root)
         self._settings_win = win
         win.title("설정")
-        win.geometry("560x680")
+        win.geometry("660x700")
         win.configure(bg=BG)
-        win.resizable(False, True)
+        win.resizable(True, True)     # 가로·세로 모두 조절 가능 (긴 안내문 잘림 방지)
+        win.minsize(600, 560)
 
         # 헤더
         hdr = tk.Frame(win, bg=DARK, height=40)
@@ -2090,6 +2091,12 @@ class App:
         rail.pack_propagate(False)
         content = tk.Frame(body, bg=BG)
         content.pack(side='left', fill='both', expand=True)
+
+        # 라벨 실폭에 맞춰 자동 줄바꿈 — 창 가로 리사이즈/탭 폭 변화에 반응(고정 wraplength로
+        # 잘리던 문제 해결). 안내문·미리보기·힌트 등 긴 텍스트 라벨에 일괄 적용.
+        def _wrap_to_width(lbl, pad=16):
+            lbl.bind('<Configure>',
+                     lambda e, w=lbl: e.width > 1 and w.config(wraplength=e.width - pad))
 
         def _mk_tab():
             holder = tk.Frame(content, bg=BG)
@@ -2285,7 +2292,9 @@ class App:
         # ── 🤖 AI 생성 탭 (전면·핵심 기능) ────────────────────
         inner = tab_ai
         self._settings_section(inner, "AI 특이사항 생성")
-        tk.Label(inner, text="사용할 AI 엔진·문체·개별 지침을 설정하세요. 중앙 패널 ✨ AI생성 버튼이 연동됩니다.", font=FS, bg=BG, fg=SUBTEXT, justify='left', wraplength=400).pack(anchor='w', padx=16, pady=(0,6))
+        _ai_intro = tk.Label(inner, text="사용할 AI 엔진·문체·개별 지침을 설정하세요. 중앙 패널 ✨ AI생성 버튼이 연동됩니다.", font=FS, bg=BG, fg=SUBTEXT, justify='left', anchor='w')
+        _ai_intro.pack(anchor='w', fill='x', padx=16, pady=(0,6))
+        _wrap_to_width(_ai_intro, pad=36)
 
         ai_grid = tk.Frame(inner, bg=BG)
         ai_grid.pack(fill='x', padx=16, pady=(0,10))
@@ -2317,11 +2326,12 @@ class App:
             'groq':   ('무료',      GREEN,  '응답 속도가 가장 빠릅니다.'),
         }
         eng_info = tk.Frame(ai_grid, bg=BG)
-        eng_info.grid(row=1, column=1, sticky='w', pady=(0,2))
+        eng_info.grid(row=1, column=1, sticky='ew', pady=(0,2))
         eng_badge = tk.Label(eng_info, font=FS, bg=BG)
         eng_badge.pack(side='left')
-        eng_desc = tk.Label(eng_info, font=FS, bg=BG, fg=SUBTEXT)
-        eng_desc.pack(side='left', padx=(6,0))
+        eng_desc = tk.Label(eng_info, font=FS, bg=BG, fg=SUBTEXT, justify='left', anchor='w')
+        eng_desc.pack(side='left', fill='x', expand=True, padx=(6,0))
+        _wrap_to_width(eng_desc, pad=8)
         def _render_eng_info():
             b, c, d = _ENG_INFO.get(_selected_engine_id(), ('', SUBTEXT, ''))
             eng_badge.config(text=f"● {b}", fg=c)
@@ -2356,11 +2366,6 @@ class App:
 
         def _selected_style_id():
             return _style_label2id.get(style_var.get(), ai_style.STYLE_AUTO)
-
-        # 라벨 폭에 맞춰 자동 줄바꿈 (창/컬럼 실폭 반영 — 고정 wraplength로 잘리던 문제 해결)
-        def _wrap_to_width(lbl, pad=16):
-            lbl.bind('<Configure>',
-                     lambda e, w=lbl: e.width > 1 and w.config(wraplength=e.width - pad))
 
         # 문체 미리보기 — 프리셋은 지침+예시, auto는 본인 노트 분석 요약+예시 (row 4)
         style_prev = tk.Label(ai_grid, font=("맑은 고딕", 8), bg="#F7F7F9", fg=SUBTEXT,
@@ -2397,16 +2402,37 @@ class App:
 
         cmb_style.bind('<<ComboboxSelected>>', lambda e: _render_style_preview())
 
-        # 강사 개별 지침 — 자유 입력 (row 5~6)
-        tk.Label(ai_grid, text="개별 지침", font=FS, bg=BG, fg=SUBTEXT).grid(row=5, column=0, sticky='nw', pady=(8,0), padx=(0,8))
+        # 강사 개별 지침 — 나만의 맞춤 프롬프트 (row 5~6). '프롬프트로 동작'을 직관화:
+        # 라벨에 ✏️·"프롬프트" 노출 + 빈칸 placeholder 예시 + 동작 설명 힌트.
+        tk.Label(ai_grid, text="✏️ 나만의\n프롬프트", font=FS, bg=BG, fg=INDIGO, justify='left'
+                 ).grid(row=5, column=0, sticky='nw', pady=(8,0), padx=(0,8))
         custom_txt = tk.Text(ai_grid, height=3, font=FS, relief='flat', wrap='word',
                              bg="#F7F7F9", highlightbackground=BORDER, highlightthickness=1)
         custom_txt.grid(row=5, column=1, sticky='ew', pady=(8,0))
-        custom_txt.insert('1.0', (self.config.get('ai_custom_prompt') or '').strip())
-        custom_hint = tk.Label(ai_grid, text="이 강사에게만 적용할 추가 지침 (예: 끝에 응원 한마디 / 줄임말 금지 / 다음 시험 일정 강조)",
-                 font=("맑은 고딕", 8), bg=BG, fg=GRAY, justify='left', anchor='w', wraplength=340)
+
+        # placeholder — 빈 입력 시 회색 예시문(클릭하면 사라짐). 저장 시 placeholder는 빈값 처리.
+        _PH_CUSTOM = "예) 항상 존댓말로 써줘 · 끝에 응원 한마디 추가해줘 · 줄임말은 쓰지 마"
+        def _ph_show():
+            custom_txt.delete('1.0', 'end'); custom_txt.insert('1.0', _PH_CUSTOM)
+            custom_txt.config(fg=GRAY); custom_txt._ph_on = True
+        def _ph_in(_e=None):
+            if getattr(custom_txt, '_ph_on', False):
+                custom_txt.delete('1.0', 'end'); custom_txt.config(fg=TEXT); custom_txt._ph_on = False
+        def _ph_out(_e=None):
+            if not custom_txt.get('1.0', 'end-1c').strip():
+                _ph_show()
+        custom_txt.bind('<FocusIn>', _ph_in)
+        custom_txt.bind('<FocusOut>', _ph_out)
+        _saved_cp = (self.config.get('ai_custom_prompt') or '').strip()
+        if _saved_cp:
+            custom_txt.insert('1.0', _saved_cp); custom_txt.config(fg=TEXT); custom_txt._ph_on = False
+        else:
+            _ph_show()
+
+        custom_hint = tk.Label(ai_grid, text="💡 여기 적은 문장이 AI에게 그대로 전달돼 매 생성마다 반영됩니다. 이 강사 계정에만 적용돼요.",
+                 font=("맑은 고딕", 8), bg=BG, fg=GRAY, justify='left', anchor='w')
         custom_hint.grid(row=6, column=1, sticky='ew', pady=(2,0))
-        _wrap_to_width(custom_hint)
+        _wrap_to_width(custom_hint, pad=8)
 
         _render_eng_info()
         _render_style_preview()
@@ -2429,7 +2455,9 @@ class App:
                 self.config[f'{chosen_engine}_api_key'] = chosen_key
 
                 self.config['ai_style_mode'] = _selected_style_id()
-                self.config['ai_custom_prompt'] = custom_txt.get('1.0', 'end').strip()
+                # placeholder 표시 상태면 빈값으로 저장(예시문이 지침으로 새는 것 방지)
+                self.config['ai_custom_prompt'] = ('' if getattr(custom_txt, '_ph_on', False)
+                                                   else custom_txt.get('1.0', 'end').strip())
                 try:
                     self.ai.invalidate_style_cache()  # 문체/강사 변경 즉시 반영
                 except Exception:

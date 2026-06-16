@@ -419,13 +419,14 @@ function renderSettings(mc){
       ${_tab('conn','🔥','연결')}
       ${_tab('data','💬','문구·데이터')}
       ${adminOn?_tab('admin','👑','관리자'):''}
+      ${_tab('system','⚙️','시스템')}
     </div>
     <div class="stg-panes">
       ${_pane('account',SA_ACCT+SA_ASGN+SA_CLS)}
       ${_pane('conn',SA_FB)}
       ${_pane('data',SA_PRESET+SA_RESET)}
       ${adminOn?_pane('admin',tbMgmtHtml+tbListHtml+instrMgmt):''}
-      ${SA_FOOT}
+      ${_pane('system',SA_FOOT)}
     </div>
   </div>`;
 

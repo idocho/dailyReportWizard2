@@ -28,7 +28,7 @@ body{font-family:'Pretendard','Malgun Gothic','맑은 고딕',-apple-system,sans
 .stg-panes{flex:1;min-width:0;padding:14px 14px 16px 8px;display:flex;flex-direction:column;gap:10px}
 .stg-pane{display:none;flex-direction:column;gap:10px}
 .stg-pane.on{display:flex}
-.stg-foot{display:flex;flex-direction:column;gap:8px;margin-top:8px;padding-top:10px;border-top:1px solid var(--line-soft)}
+.stg-foot{display:flex;flex-direction:column;gap:8px}
 @media(max-width:600px){
   .stg{flex-direction:column}
   .stg-rail{flex-direction:row;width:auto;overflow-x:auto;position:static;padding:10px 12px 0;gap:6px}
