@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<!--
+  DailyReportWizard for Web — v2.5.0 (로그인 게이트 도입)
+  Crafted by IDO(idocho@kakao.com) · Powered by Claude AI
+  v2.5.0: Firebase Auth 로그인 게이트(캠퍼스+이름+비번) 추가. 로그인 성공 후에만 앱 로드.
+          데이터 경로/시크릿 제거·캠퍼스 경로 분리는 룰 배포(F)·마이그레이션 단계에서 완성.
+-->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="DRW">
+<meta name="theme-color" content="#1A1D2E">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<title>DailyReportWizard</title>
+<link rel="stylesheet" href="css/app.css?v=202606161700">
+<style>
+  #drw-gate{position:fixed;inset:0;z-index:9999;background:linear-gradient(160deg,#EEF0FF 0%,#FAFAFB 55%);
+    display:flex;align-items:center;justify-content:center;padding:24px;
+    font-family:"맑은 고딕","Malgun Gothic",system-ui,sans-serif}
+  #drw-gate .card{width:100%;max-width:360px;background:#fff;border:1px solid #ECECEF;border-radius:18px;
+    padding:28px 24px;box-shadow:0 12px 40px rgba(79,70,229,.10)}
+  #drw-gate h1{margin:0 0 2px;font-size:16px;font-weight:800;text-align:center;color:#18181B}
+  #drw-gate p{margin:0 0 14px;font-size:12px;color:#5C6370;text-align:center}
+  #drw-gate label{display:block;font-size:12px;font-weight:700;color:#5C6370;margin:12px 0 5px}
+  #drw-gate input,#drw-gate select{width:100%;padding:11px 12px;border:1px solid #ECECEF;border-radius:10px;font-size:14px;outline:none;box-sizing:border-box}
+  #drw-gate input:focus,#drw-gate select:focus{border-color:#4F46E5;box-shadow:0 0 0 3px #EEF0FF}
+  #drw-gate .btn{width:100%;margin-top:16px;padding:12px;border:none;border-radius:10px;background:#4F46E5;color:#fff;font-size:14px;font-weight:800;cursor:pointer}
+  #drw-gate .btn:disabled{opacity:.5}
+  #drw-gate .m{margin-top:11px;padding:9px 11px;border-radius:9px;font-size:12px;font-weight:600;display:none;background:#FEF2F2;color:#DC2626;border:1px solid #FECACA}
+  #drw-gate .m.show{display:block}
+  #drw-gate .foot{margin-top:14px;text-align:center;font-size:11px;color:#5C6370}
+</style>
+</head>
+<body>
+<!-- 로그인 게이트 (성공 시 제거, 그 후 앱 로드) -->
+<div id="drw-gate">
+  <div class="card">
+    <h1>DailyReportWizard</h1><p>강사 로그인</p>
+    <label>캠퍼스</label><select id="gt-campus"><option value="dongsuwon">동수원</option></select>
+    <label>이름</label><input id="gt-name" autocomplete="off">
+    <label>비밀번호</label><input id="gt-pw" type="password" autocomplete="current-password">
+    <button class="btn" id="gt-btn">로그인</button>
+    <div class="m" id="gt-msg"></div>
+    <div class="foot">비밀번호 분실 시 관리자에게 문의하세요.</div>
+  </div>
+</div>
+
+<div id="wr" style="display:none">
+  <aside class="sidebar" id="sb"></aside>
+  <main class="main" id="mc"></main>
+  <div class="toast" id="toast"></div>
+</div>
+
+<script src="js/auth/synth_email.js"></script>
+<script type="module">
+  const $=id=>document.getElementById(id);
+  const DBPATH='drw2_cbt'; // TODO(F): 캠퍼스 경로 분리(campus/{id}) 후 session.campus 사용
+  let A;
+  try{ A=await import('./js/auth/auth.js'); }
+  catch(e){ $('gt-msg').className='m show'; $('gt-msg').textContent='설정 오류: '+(e&&e.message||e); }
+
+  const cfg=(await import('./js/auth/firebase-config.js')).firebaseConfig;
+
+  function bootApp(){
+    // 설정 주입(로그인 세션 기반) — 사용자 수동 입력 제거
+    try{ localStorage.setItem('drw_db_url',cfg.databaseURL); localStorage.setItem('drw_db_path',DBPATH);
+         localStorage.removeItem('drw_db_secret'); }catch(_){}
+    $('drw-gate').remove(); $('wr').style.display='';
+    const order=['data/curriculum.js?v=202606112000','js/app-core.js?v=v250','js/app-input.js?v=v250','js/app-settings.js?v=v250','js/app-scores.js?v=v250'];
+    window.APP_VERSION='v2.5.0'; document.title='DailyReportWizard v2.5.0';
+    (function next(i){ if(i>=order.length)return; const s=document.createElement('script'); s.src=order[i]; s.onload=()=>next(i+1); document.body.appendChild(s); })(0);
+  }
+
+  if(A){
+    // 토큰 주기 갱신(1h 만료 대비)
+    async function refresh(){ const t=await A.getIdToken(); if(t) window.__AUTH_TOKEN__=t; }
+    let booted=false;
+    A.onAuth(async (user)=>{
+      if(user){ await refresh(); setInterval(refresh, 30*60*1000); if(!booted){ booted=true; bootApp(); } }
+    });
+    $('gt-btn').onclick=async()=>{
+      $('gt-msg').className='m'; const name=$('gt-name').value.trim(),pw=$('gt-pw').value,c=$('gt-campus').value;
+      if(!name){ $('gt-msg').className='m show'; $('gt-msg').textContent='이름을 입력하세요.'; return; }
+      $('gt-btn').disabled=true; $('gt-btn').textContent='로그인 중…';
+      try{ await A.loginByName(c,name,pw,['instructor','admin','super']); /* onAuth → bootApp */ }
+      catch(e){ $('gt-msg').className='m show'; $('gt-msg').textContent=e.message||String(e); $('gt-btn').disabled=false; $('gt-btn').textContent='로그인'; }
+    };
+  }
+</script>
+</body>
+</html>
