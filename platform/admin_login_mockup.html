@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<!--
+  admin_login_mockup.html — CampusManager 관리자 로그인 UI 목업 (AUTH_DESIGN §3, PLATFORM §1)
+  목업 전용. synth_email.js 실연결. DRW 로그인과 같은 계정 체계, role 로 권한·진입 결정.
+  시나리오: 관리자/super 가 CampusManager(관리자 웹)에 로그인. 강사가 들어오면 권한 거부.
+-->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>CampusManager 관리자 로그인 (목업)</title>
+<style>
+  :root{--bg:#FAFAFB;--panel:#FFFFFF;--indigo:#4F46E5;--indigo-ink:#4338CA;--indigo-l:#EEF0FF;
+    --line:#ECECEF;--text:#18181B;--sub:#5C6370;--green:#16A34A;--red:#DC2626;--ink:#15171F;}
+  *{box-sizing:border-box;font-family:"맑은 고딕","Malgun Gothic",system-ui,sans-serif}
+  body{margin:0;min-height:100vh;background:linear-gradient(160deg,#E7E9F5 0%,#FAFAFB 55%);
+       display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;color:var(--text)}
+  .card{width:100%;max-width:380px;background:var(--panel);border:1px solid var(--line);
+        border-radius:18px;box-shadow:0 12px 40px rgba(21,23,31,.12);padding:30px 26px}
+  .brand{text-align:center;margin-bottom:22px}
+  .brand .logo{width:52px;height:52px;border-radius:14px;background:var(--ink);
+        display:inline-flex;align-items:center;justify-content:center;font-size:24px;margin-bottom:10px;color:#fff}
+  .brand h1{margin:0;font-size:17px;font-weight:800}
+  .brand p{margin:4px 0 0;font-size:12px;color:var(--sub)}
+  .brand .tag{display:inline-block;margin-top:8px;font-size:11px;font-weight:800;background:var(--indigo);
+        color:#fff;padding:3px 10px;border-radius:20px}
+  label{display:block;font-size:12px;font-weight:700;color:var(--sub);margin:14px 0 6px}
+  select,input{width:100%;padding:12px 13px;border:1px solid var(--line);border-radius:11px;font-size:14px;background:#fff;outline:none}
+  select:focus,input:focus{border-color:var(--indigo);box-shadow:0 0 0 3px var(--indigo-l)}
+  .btn{width:100%;margin-top:20px;padding:13px;border:none;border-radius:11px;background:var(--ink);
+        color:#fff;font-size:15px;font-weight:800;cursor:pointer}
+  .btn:hover{background:#000}
+  .synth{margin-top:12px;font-size:10.5px;color:#94A3B8;text-align:center;font-family:ui-monospace,monospace;word-break:break-all;min-height:14px}
+  .synth b{color:var(--indigo)}
+  .msg{margin-top:14px;padding:10px 12px;border-radius:10px;font-size:12.5px;font-weight:600;display:none}
+  .msg.err{background:#FEF2F2;color:var(--red);border:1px solid #FECACA;display:block}
+  .msg.ok{background:#F0FDF4;color:var(--green);border:1px solid #BBF7D0;display:block}
+  .foot{margin-top:16px;text-align:center;font-size:11px;color:var(--sub);line-height:1.6}
+  .demo{margin-top:22px;width:100%;max-width:380px;background:#15171F;border-radius:14px;padding:14px 16px;color:#cbd5e1}
+  .demo h3{margin:0 0 4px;font-size:11px;font-weight:800;color:#fff}
+  .demo .hint{font-size:10px;color:#94A3B8;margin-bottom:10px}
+  .demo .row{display:flex;flex-wrap:wrap;gap:6px}
+  .demo button{flex:1;min-width:calc(50% - 3px);padding:8px 6px;border:1px solid #2d3142;border-radius:8px;background:#1f2330;color:#cbd5e1;font-size:11px;font-weight:700;cursor:pointer}
+  .demo button:hover{background:#2a2f40;color:#fff}
+</style>
+</head>
+<body>
+<div class="card" id="card-login">
+  <div class="brand">
+    <div class="logo">🏫</div>
+    <h1>CampusManager</h1>
+    <p>관리자 콘솔 로그인</p>
+    <span class="tag">관리자 전용</span>
+  </div>
+  <label for="campus">캠퍼스</label>
+  <select id="campus">
+    <option value="gangnam">강남 캠퍼스</option>
+    <option value="bundang">분당 캠퍼스</option>
+    <option value="pyeongchon">평촌 캠퍼스</option>
+  </select>
+  <label for="name">이름</label>
+  <input id="name" type="text" placeholder="이름" autocomplete="off">
+  <label for="pw">비밀번호</label>
+  <input id="pw" type="password" placeholder="비밀번호" autocomplete="off">
+  <button class="btn" id="loginBtn">로그인</button>
+  <div class="synth" id="synth"></div>
+  <div class="msg" id="msg"></div>
+  <div class="foot">강사 일일 리포트는 <b>강사용 앱(DRW)</b>에서 로그인하세요.<br>비번 분실 시 상위 관리자(super)에게 문의.</div>
+</div>
+
+<div class="card" id="card-home" style="display:none">
+  <div class="brand">
+    <div class="logo" style="background:var(--green)">✓</div>
+    <h1 id="welcome">환영합니다</h1>
+    <p id="home-sub"></p>
+  </div>
+  <div style="font-size:13px;color:var(--sub);line-height:1.9;background:var(--indigo-l);border-radius:11px;padding:14px" id="scope"></div>
+  <button class="btn" id="logoutBtn" style="margin-top:18px;background:#64748B">로그아웃</button>
+</div>
+
+<div class="demo">
+  <h3>🧪 목업 데모 컨트롤</h3>
+  <div class="hint">같은 계정 체계 — role 로 진입·권한 결정. Auth 미연동, 시뮬레이션.</div>
+  <div class="row">
+    <button onclick="demo('admin')">관리자 로그인</button>
+    <button onclick="demo('super')">super(전 캠퍼스)</button>
+    <button onclick="demo('instructor')">강사가 접근(거부)</button>
+    <button onclick="demo('inactive')">비활성 계정</button>
+    <button onclick="demo('wrong')">이름·비번 불일치</button>
+  </div>
+</div>
+
+<script src="synth_email.js"></script>
+<script>
+  const $=id=>document.getElementById(id);
+  const show=w=>{['card-login','card-home'].forEach(c=>$(c).style.display='none');$(w).style.display='block';};
+  function setMsg(t,x){$('msg').className='msg '+t;$('msg').textContent=x;}
+  function clr(){$('msg').className='msg';$('msg').textContent='';}
+  function updateSynth(){const n=$('name').value.trim();$('synth').innerHTML=n?'→ 로그인 ID(자동): <b>'+window.SynthEmail.synthEmail(n,$('campus').value)+'</b>':'';}
+  $('name').addEventListener('input',updateSynth);$('campus').addEventListener('change',updateSynth);
+
+  let mode='admin';
+  function demo(m){mode=m;clr();if(!$('name').value)$('name').value=(m==='super'?'박본사':'박관리');$('pw').value='••••';updateSynth();go(true);}
+  function go(fromDemo){
+    const n=$('name').value.trim();
+    if(!n&&!fromDemo){setMsg('err','이름을 입력하세요.');return;}
+    const camp=$('campus').selectedOptions[0].text;
+    if(mode==='inactive'){setMsg('err','비활성화된 계정입니다. 관리자에게 문의하세요.');return;}
+    if(mode==='wrong'){setMsg('err','이름 또는 비밀번호가 올바르지 않습니다.');return;}
+    if(mode==='instructor'){setMsg('err','관리자 권한이 없습니다. 강사는 강사용 앱(DRW)을 이용하세요.');return;}
+    clr();
+    if(mode==='super'){
+      $('welcome').textContent=n+' 운영자님';
+      $('home-sub').textContent='super · 전 캠퍼스';
+      $('scope').innerHTML='<b>운영자(super) 콘솔</b><br>전 캠퍼스 계정·명단·분석 + <b>관리자(admin) 임명/회수</b>.';
+    }else{
+      $('welcome').textContent=n+' 관리자님';
+      $('home-sub').textContent='admin · '+camp;
+      $('scope').innerHTML='<b>'+camp+' 관리자 콘솔</b><br>이 캠퍼스 강사 계정·명단·템플릿·일괄 전송 작성.';
+    }
+    show('card-home');
+  }
+  $('loginBtn').onclick=()=>{mode='admin';go(false);};
+  $('logoutBtn').onclick=()=>{show('card-login');$('pw').value='';clr();};
+</script>
+</body>
+</html>
