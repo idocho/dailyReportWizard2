@@ -9,39 +9,39 @@
   //   sendJobs/{campus}/...  = 관리자 일괄 전송 큐 (CampusManager 작성, 에이전트 소비)
   //   campus/{campusId}/...  = 캠퍼스별 데이터(students/classes/input/obs/scores/session/history)
   //
-  // role: instructor | admin | super | agent.  active:false = 즉시 차단.
+  // role: instructor(강사) | manager(캠퍼스 관리자) | admin(운영자) | agent.  active:false = 즉시 차단.
   // 표현식 주: RTDB 룰엔 함수가 없어 acl 조회를 인라인 반복한다.
   "rules": {
     ".read": false,
     ".write": false,
 
     "acl": {
-      // 전체 명단 읽기는 admin/super 만(프라이버시)
-      ".read": "auth != null && (root.child('acl').child(auth.uid).child('role').val() === 'admin' || root.child('acl').child(auth.uid).child('role').val() === 'super')",
+      // 전체 명단 읽기는 운영자(admin)/관리자(manager) 만(프라이버시)
+      ".read": "auth != null && (root.child('acl').child(auth.uid).child('role').val() === 'manager' || root.child('acl').child(auth.uid).child('role').val() === 'admin')",
       "$uid": {
         // 본인 엔트리는 본인도 읽기(로그인 직후 campus/role 파악)
         ".read": "auth != null && auth.uid === $uid",
-        // super: 전체 / admin: 자기 캠퍼스 instructor 만(권한상승 차단)
-        ".write": "auth != null && ( root.child('acl').child(auth.uid).child('role').val() === 'super' || ( root.child('acl').child(auth.uid).child('role').val() === 'admin' && newData.child('campus').val() === root.child('acl').child(auth.uid).child('campus').val() && newData.child('role').val() === 'instructor' && ( !data.exists() || data.child('role').val() === 'instructor' ) ) )",
-        ".validate": "newData.hasChildren(['campus','role','active']) && newData.child('role').val().matches(/^(instructor|admin|super|agent)$/)"
+        // admin(운영자): 전체 / manager(관리자): 자기 캠퍼스 instructor 만(권한상승 차단)
+        ".write": "auth != null && ( root.child('acl').child(auth.uid).child('role').val() === 'admin' || ( root.child('acl').child(auth.uid).child('role').val() === 'manager' && newData.child('campus').val() === root.child('acl').child(auth.uid).child('campus').val() && newData.child('role').val() === 'instructor' && ( !data.exists() || data.child('role').val() === 'instructor' ) ) )",
+        ".validate": "newData.hasChildren(['campus','role','active']) && newData.child('role').val().matches(/^(instructor|manager|admin|agent)$/)"
       }
     },
 
     "schema_version": {
       ".read": "auth != null",
-      ".write": "auth != null && root.child('acl').child(auth.uid).child('role').val() === 'super'"
+      ".write": "auth != null && root.child('acl').child(auth.uid).child('role').val() === 'admin'"
     },
 
     "sendJobs": {
       "$campus": {
-        // 읽기: 같은 캠퍼스 admin/super/agent (또는 super 전역)
-        ".read": "auth != null && root.child('acl').child(auth.uid).child('active').val() === true && ( root.child('acl').child(auth.uid).child('role').val() === 'super' || ( ( root.child('acl').child(auth.uid).child('campus').val() === $campus ) && ( root.child('acl').child(auth.uid).child('role').val() === 'admin' || root.child('acl').child(auth.uid).child('role').val() === 'agent' ) ) )",
+        // 읽기: 운영자(admin·전역) 또는 같은 캠퍼스 관리자(manager)/agent
+        ".read": "auth != null && root.child('acl').child(auth.uid).child('active').val() === true && ( root.child('acl').child(auth.uid).child('role').val() === 'admin' || ( ( root.child('acl').child(auth.uid).child('campus').val() === $campus ) && ( root.child('acl').child(auth.uid).child('role').val() === 'manager' || root.child('acl').child(auth.uid).child('role').val() === 'agent' ) ) )",
         "$jobId": {
-          // 작업 생성/수정: 같은 캠퍼스 admin/super
-          ".write": "auth != null && root.child('acl').child(auth.uid).child('active').val() === true && ( root.child('acl').child(auth.uid).child('role').val() === 'super' || ( root.child('acl').child(auth.uid).child('campus').val() === $campus && root.child('acl').child(auth.uid).child('role').val() === 'admin' ) )",
+          // 작업 생성/수정: 같은 캠퍼스 운영자(admin)/관리자(manager)
+          ".write": "auth != null && root.child('acl').child(auth.uid).child('active').val() === true && ( root.child('acl').child(auth.uid).child('role').val() === 'admin' || ( root.child('acl').child(auth.uid).child('campus').val() === $campus && root.child('acl').child(auth.uid).child('role').val() === 'manager' ) )",
           "status": {
             // 상태는 같은 캠퍼스 agent 도 기록(전송 진행/결과)
-            ".write": "auth != null && root.child('acl').child(auth.uid).child('active').val() === true && root.child('acl').child(auth.uid).child('campus').val() === $campus && ( root.child('acl').child(auth.uid).child('role').val() === 'agent' || root.child('acl').child(auth.uid).child('role').val() === 'admin' || root.child('acl').child(auth.uid).child('role').val() === 'super' )"
+            ".write": "auth != null && root.child('acl').child(auth.uid).child('active').val() === true && root.child('acl').child(auth.uid).child('campus').val() === $campus && ( root.child('acl').child(auth.uid).child('role').val() === 'agent' || root.child('acl').child(auth.uid).child('role').val() === 'manager' || root.child('acl').child(auth.uid).child('role').val() === 'admin' )"
           }
         }
       }
@@ -49,24 +49,24 @@
 
     "campus": {
       "$campus": {
-        // 캠퍼스 데이터 읽기: 같은 캠퍼스 활성 멤버(instructor/admin/agent) 또는 super
-        ".read": "auth != null && root.child('acl').child(auth.uid).child('active').val() === true && ( root.child('acl').child(auth.uid).child('role').val() === 'super' || root.child('acl').child(auth.uid).child('campus').val() === $campus )",
+        // 캠퍼스 데이터 읽기: 같은 캠퍼스 활성 멤버(instructor/manager/admin/agent)
+        ".read": "auth != null && root.child('acl').child(auth.uid).child('active').val() === true && ( root.child('acl').child(auth.uid).child('role').val() === 'admin' || root.child('acl').child(auth.uid).child('campus').val() === $campus )",
 
-        // 명단(students/classes): 같은 캠퍼스 admin 또는 super 만 쓰기
+        // 명단(students/classes): 같은 캠퍼스 admin 만 쓰기
         "students": {
-          ".write": "auth != null && root.child('acl').child(auth.uid).child('active').val() === true && ( root.child('acl').child(auth.uid).child('role').val() === 'super' || ( root.child('acl').child(auth.uid).child('campus').val() === $campus && root.child('acl').child(auth.uid).child('role').val() === 'admin' ) )"
+          ".write": "auth != null && root.child('acl').child(auth.uid).child('active').val() === true && ( root.child('acl').child(auth.uid).child('role').val() === 'admin' || ( root.child('acl').child(auth.uid).child('campus').val() === $campus && root.child('acl').child(auth.uid).child('role').val() === 'manager' ) )"
         },
         "classes": {
-          ".write": "auth != null && root.child('acl').child(auth.uid).child('active').val() === true && ( root.child('acl').child(auth.uid).child('role').val() === 'super' || ( root.child('acl').child(auth.uid).child('campus').val() === $campus && root.child('acl').child(auth.uid).child('role').val() === 'admin' ) )"
+          ".write": "auth != null && root.child('acl').child(auth.uid).child('active').val() === true && ( root.child('acl').child(auth.uid).child('role').val() === 'admin' || ( root.child('acl').child(auth.uid).child('campus').val() === $campus && root.child('acl').child(auth.uid).child('role').val() === 'manager' ) )"
         },
 
-        // 수업 운영(input/obs/scores/session/history): 같은 캠퍼스 instructor/admin/super (agent 제외)
-        "input":   { ".write": "auth != null && root.child('acl').child(auth.uid).child('active').val() === true && ( root.child('acl').child(auth.uid).child('role').val() === 'super' || ( root.child('acl').child(auth.uid).child('campus').val() === $campus && ( root.child('acl').child(auth.uid).child('role').val() === 'instructor' || root.child('acl').child(auth.uid).child('role').val() === 'admin' ) ) )" },
-        "obs":     { ".write": "auth != null && root.child('acl').child(auth.uid).child('active').val() === true && ( root.child('acl').child(auth.uid).child('role').val() === 'super' || ( root.child('acl').child(auth.uid).child('campus').val() === $campus && ( root.child('acl').child(auth.uid).child('role').val() === 'instructor' || root.child('acl').child(auth.uid).child('role').val() === 'admin' ) ) )" },
-        "scores":  { ".write": "auth != null && root.child('acl').child(auth.uid).child('active').val() === true && ( root.child('acl').child(auth.uid).child('role').val() === 'super' || ( root.child('acl').child(auth.uid).child('campus').val() === $campus && ( root.child('acl').child(auth.uid).child('role').val() === 'instructor' || root.child('acl').child(auth.uid).child('role').val() === 'admin' ) ) )" },
-        "session": { ".write": "auth != null && root.child('acl').child(auth.uid).child('active').val() === true && ( root.child('acl').child(auth.uid).child('role').val() === 'super' || ( root.child('acl').child(auth.uid).child('campus').val() === $campus && ( root.child('acl').child(auth.uid).child('role').val() === 'instructor' || root.child('acl').child(auth.uid).child('role').val() === 'admin' ) ) )" },
-        "history": { ".write": "auth != null && root.child('acl').child(auth.uid).child('active').val() === true && ( root.child('acl').child(auth.uid).child('role').val() === 'super' || ( root.child('acl').child(auth.uid).child('campus').val() === $campus && ( root.child('acl').child(auth.uid).child('role').val() === 'instructor' || root.child('acl').child(auth.uid).child('role').val() === 'admin' ) ) )" },
-        "config":  { ".write": "auth != null && root.child('acl').child(auth.uid).child('active').val() === true && ( root.child('acl').child(auth.uid).child('role').val() === 'super' || ( root.child('acl').child(auth.uid).child('campus').val() === $campus && root.child('acl').child(auth.uid).child('role').val() === 'admin' ) )" }
+        // 수업 운영(input/obs/scores/session/history): 같은 캠퍼스 instructor/운영자(admin)/관리자(manager) (agent 제외)
+        "input":   { ".write": "auth != null && root.child('acl').child(auth.uid).child('active').val() === true && ( root.child('acl').child(auth.uid).child('role').val() === 'admin' || ( root.child('acl').child(auth.uid).child('campus').val() === $campus && ( root.child('acl').child(auth.uid).child('role').val() === 'instructor' || root.child('acl').child(auth.uid).child('role').val() === 'manager' ) ) )" },
+        "obs":     { ".write": "auth != null && root.child('acl').child(auth.uid).child('active').val() === true && ( root.child('acl').child(auth.uid).child('role').val() === 'admin' || ( root.child('acl').child(auth.uid).child('campus').val() === $campus && ( root.child('acl').child(auth.uid).child('role').val() === 'instructor' || root.child('acl').child(auth.uid).child('role').val() === 'manager' ) ) )" },
+        "scores":  { ".write": "auth != null && root.child('acl').child(auth.uid).child('active').val() === true && ( root.child('acl').child(auth.uid).child('role').val() === 'admin' || ( root.child('acl').child(auth.uid).child('campus').val() === $campus && ( root.child('acl').child(auth.uid).child('role').val() === 'instructor' || root.child('acl').child(auth.uid).child('role').val() === 'manager' ) ) )" },
+        "session": { ".write": "auth != null && root.child('acl').child(auth.uid).child('active').val() === true && ( root.child('acl').child(auth.uid).child('role').val() === 'admin' || ( root.child('acl').child(auth.uid).child('campus').val() === $campus && ( root.child('acl').child(auth.uid).child('role').val() === 'instructor' || root.child('acl').child(auth.uid).child('role').val() === 'manager' ) ) )" },
+        "history": { ".write": "auth != null && root.child('acl').child(auth.uid).child('active').val() === true && ( root.child('acl').child(auth.uid).child('role').val() === 'admin' || ( root.child('acl').child(auth.uid).child('campus').val() === $campus && ( root.child('acl').child(auth.uid).child('role').val() === 'instructor' || root.child('acl').child(auth.uid).child('role').val() === 'manager' ) ) )" },
+        "config":  { ".write": "auth != null && root.child('acl').child(auth.uid).child('active').val() === true && ( root.child('acl').child(auth.uid).child('role').val() === 'admin' || ( root.child('acl').child(auth.uid).child('campus').val() === $campus && root.child('acl').child(auth.uid).child('role').val() === 'manager' ) )" }
       }
     }
   }

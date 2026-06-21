@@ -100,7 +100,7 @@
       $('gt-msg').className='m'; const name=$('gt-name').value.trim(),pw=$('gt-pw').value,c=$('gt-campus').value;
       if(!name){ $('gt-msg').className='m show'; $('gt-msg').textContent='이름을 입력하세요.'; return; }
       $('gt-btn').disabled=true; $('gt-btn').textContent='로그인 중…';
-      try{ await A.loginByName(c,name,pw,['instructor','admin','super']); /* onAuth → bootApp */ }
+      try{ await A.loginByName(c,name,pw,['instructor','manager','admin']); /* onAuth → bootApp */ }
       catch(e){ $('gt-msg').className='m show'; $('gt-msg').textContent=e.message||String(e); $('gt-btn').disabled=false; $('gt-btn').textContent='로그인'; }
     };
   }

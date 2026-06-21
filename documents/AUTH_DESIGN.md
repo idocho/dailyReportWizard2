@@ -19,9 +19,13 @@
 - 룰은 `auth`(로그인 신원) + `acl/`(명단)만 보고 허용/차단. **앱 클라이언트 체크는 보조일 뿐, 차단은 항상 룰(서버)에서.**
 - 커스텀 클레임(Admin SDK 서버 필요) 대신 **DB ACL을 룰이 직접 읽는** 방식 → 별도 백엔드 불필요, 관리자가 ACL만 관리.
 
+> **역할 명칭 확정(2026-06-21): `super` 폐기.** 3단 = `admin`(운영자·전 캠퍼스·관리자 임명) /
+> `manager`(캠퍼스 관리자) / `instructor`(강사) [+ `agent` 전송 에이전트]. 아래 문서에서
+> 이전 표기 'super'=현 **admin**, 이전 'admin'(캠퍼스)=현 **manager** 로 읽을 것.
+
 ```
 acl/
-  {uid}: { campus: "gangnam", role: "instructor"|"admin"|"super",
+  {uid}: { campus: "gangnam", role: "instructor"|"manager"|"admin",
            instructorId: "홍길동", active: true }
     · 키 = Firebase Auth uid (불변·고유). 이메일 키는 회피(이메일 변경·'.'치환 취약).
       관리자 도구가 계정 생성 시 uid를 즉시 받으므로 uid 매핑이 자연스러움.
@@ -29,7 +33,7 @@ acl/
       매 요청 acl.active 를 확인하므로 즉시 효력(개인 계정의 강점).
     · instructorId = 기존 config/instructors 키(한글 이름) — 로그인 신원↔기존 데이터 연결(§12).
       권한 판단엔 campus/role/active만 사용.
-    · role: instructor / admin(캠퍼스) / super(전 캠퍼스) / agent(전송 에이전트, 헤드리스)
+    · role: instructor(강사) / manager(캠퍼스 관리자) / admin(운영자·전 캠퍼스) / agent(전송 에이전트, 헤드리스)
       — agent 는 자기 캠퍼스 sendJobs 읽기·상태쓰기 + students 읽기만(PLATFORM_ARCHITECTURE §4)
 ```
 
