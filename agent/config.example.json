@@ -1,0 +1,9 @@
+{
+  "dbUrl": "https://dailyreportwizard-default-rtdb.firebaseio.com",
+  "campus": "dongsuwon",
+  "roomPrefix": "오직 ",
+  "_auth": "룰 배포(F) 후 agent 계정으로 인증 — 아래 채우면 idToken 사용. 그 전엔 비워둠(오픈 DB).",
+  "apiKey": "",
+  "agentEmail": "",
+  "agentPassword": ""
+}
