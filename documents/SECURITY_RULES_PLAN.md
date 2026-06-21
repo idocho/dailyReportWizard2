@@ -12,7 +12,7 @@
 | 단계 | 시점 | 내용 |
 |------|------|------|
 | 1차 | 전환 창(반나절) | DB Secret을 4클라에 설정 + deny-by-default 룰 배포 → 공개 노출 봉인. 시크릿은 레거시 admin 토큰이라 룰 우회 |
-| 2차 | CBT 종료 후 | Firebase Auth 승격(강사 신원 로그인, ADMIN_HASH 클라 게이트 대체) + 경로별 화이트리스트 룰 |
+| 2차 | CBT 종료 후 | Firebase Auth 승격(강사 신원 로그인, ADMIN_HASH 클라 게이트 대체) + 경로별 화이트리스트 룰 — **설계: [AUTH_DESIGN.md](AUTH_DESIGN.md)** |
 
 ## 클라이언트별 시크릿 설정 위치
 | 클라이언트 | 설정 키 | 입력 방법 |
