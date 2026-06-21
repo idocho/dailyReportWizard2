@@ -131,10 +131,7 @@ let archOpen={};     // 학급 관리 보관 과목 행 펼침 상태 {classId: 
 let clsAccOpen={};   // 학급 관리 학급 아코디언 펼침 상태 {classId: true} — renderMain마다 접히는 문제 방지(세션)
 let _resetSel=new Set(); // 초기화 다중 선택 상태
 let openSaIds=new Set(['sa-fb']); // 설정 아코디언 열림 상태 — renderMain() 재렌더 후 복원용
-// 초기 설정 위저드 (온보딩) — 강사 미설정 신규 사용자에게 4단계 가이드
-let wizardActive=false; // true면 renderMain()이 탭 대신 위저드 렌더
-let wzStep=0;           // 0:Firebase 1:계정 2:명단 3:수업 4:완료
-let wzCls=null;         // 위저드 수업 단계: 선택된 반(classId)
+// (v2.5.0) 온보딩 위저드 제거 — 로그인 게이트가 대체
 // 점수 입력 상태
 let scoreData={};        // {weekly: {classId: {subject: {testKey: testObj}}}, achievement: {curriculumKey: {testKey: testObj}}}
 let scoreEditing=null;   // {classId,subject,testKey,isAchievement} | null(=신규)
@@ -530,9 +527,6 @@ function makeTb(title,sub=''){
 function render(){renderSb();renderMain();}
 function renderMain(){
   const mc=document.getElementById('mc');if(!mc)return;
-  // 온보딩 중엔 사이드바 숨김(풀스크린) — #wr.wz-mode 토글
-  const wr=document.getElementById('wr');if(wr)wr.classList.toggle('wz-mode',wizardActive);
-  if(wizardActive){renderWizard(mc);return;}
   if(activeTab==='input')renderInput(mc);
   else if(activeTab==='scores')renderScores(mc);
   else renderSettings(mc);
