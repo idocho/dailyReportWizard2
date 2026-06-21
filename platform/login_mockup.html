@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<!--
+  login_mockup.html — 강사 로그인 UI 목업 (AUTH_DESIGN §3)
+  목업 전용 — 실제 앱 파일 미변경. Firebase Auth 미연동(콘솔 블로커), 동작은 시뮬레이션.
+  synth_email.js(실제 유틸)를 연결해 이름+캠퍼스→합성 ID 변환을 실제로 시연.
+-->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>DRW 강사 로그인 (목업)</title>
+<style>
+  :root{
+    --bg:#FAFAFB; --panel:#FFFFFF; --indigo:#4F46E5; --indigo-ink:#4338CA;
+    --indigo-l:#EEF0FF; --line:#ECECEF; --text:#18181B; --sub:#5C6370;
+    --green:#16A34A; --red:#DC2626; --accent:#FEE500;
+  }
+  *{box-sizing:border-box;font-family:"맑은 고딕","Malgun Gothic",system-ui,sans-serif}
+  body{margin:0;min-height:100vh;background:linear-gradient(160deg,#EEF0FF 0%,#FAFAFB 55%);
+       display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;color:var(--text)}
+  .card{width:100%;max-width:380px;background:var(--panel);border:1px solid var(--line);
+        border-radius:18px;box-shadow:0 12px 40px rgba(79,70,229,.10);padding:30px 26px}
+  .brand{text-align:center;margin-bottom:22px}
+  .brand .logo{width:52px;height:52px;border-radius:14px;background:var(--indigo);
+        display:inline-flex;align-items:center;justify-content:center;font-size:26px;margin-bottom:10px}
+  .brand h1{margin:0;font-size:17px;font-weight:800;letter-spacing:-.3px}
+  .brand p{margin:4px 0 0;font-size:12px;color:var(--sub)}
+  label{display:block;font-size:12px;font-weight:700;color:var(--sub);margin:14px 0 6px}
+  select,input{width:100%;padding:12px 13px;border:1px solid var(--line);border-radius:11px;
+        font-size:14px;background:#fff;outline:none;transition:border-color .15s,box-shadow .15s}
+  select:focus,input:focus{border-color:var(--indigo);box-shadow:0 0 0 3px var(--indigo-l)}
+  .btn{width:100%;margin-top:20px;padding:13px;border:none;border-radius:11px;background:var(--indigo);
+        color:#fff;font-size:15px;font-weight:800;cursor:pointer;transition:background .15s}
+  .btn:hover{background:var(--indigo-ink)}
+  .btn:disabled{opacity:.5;cursor:not-allowed}
+  .foot{margin-top:16px;text-align:center;font-size:11px;color:var(--sub);line-height:1.6}
+  .msg{margin-top:14px;padding:10px 12px;border-radius:10px;font-size:12.5px;font-weight:600;display:none}
+  .msg.err{background:#FEF2F2;color:var(--red);border:1px solid #FECACA;display:block}
+  .msg.ok{background:#F0FDF4;color:var(--green);border:1px solid #BBF7D0;display:block}
+  .synth{margin-top:12px;font-size:10.5px;color:#94A3B8;text-align:center;font-family:ui-monospace,monospace;
+        word-break:break-all;min-height:14px}
+  .synth b{color:var(--indigo)}
+  /* 데모 컨트롤(목업 전용) */
+  .demo{margin-top:22px;width:100%;max-width:380px;background:#15171F;border-radius:14px;padding:14px 16px;color:#cbd5e1}
+  .demo h3{margin:0 0 4px;font-size:11px;font-weight:800;color:#fff;letter-spacing:.3px}
+  .demo .hint{font-size:10px;color:#94A3B8;margin-bottom:10px}
+  .demo .row{display:flex;flex-wrap:wrap;gap:6px}
+  .demo button{flex:1;min-width:calc(50% - 3px);padding:8px 6px;border:1px solid #2d3142;border-radius:8px;
+        background:#1f2330;color:#cbd5e1;font-size:11px;font-weight:700;cursor:pointer}
+  .demo button:hover{background:#2a2f40;color:#fff}
+</style>
+</head>
+<body>
+
+<div class="card" id="card-login">
+  <div class="brand">
+    <div class="logo">📚</div>
+    <h1>DailyReportWizard</h1>
+    <p>강사 로그인</p>
+  </div>
+
+  <label for="campus">캠퍼스</label>
+  <select id="campus">
+    <option value="gangnam">강남 캠퍼스</option>
+    <option value="bundang">분당 캠퍼스</option>
+    <option value="pyeongchon">평촌 캠퍼스</option>
+  </select>
+
+  <label for="name">이름</label>
+  <input id="name" type="text" placeholder="이름을 입력하세요" autocomplete="off">
+
+  <label for="pw">비밀번호</label>
+  <input id="pw" type="password" placeholder="비밀번호" autocomplete="off">
+
+  <button class="btn" id="loginBtn">로그인</button>
+
+  <div class="synth" id="synth"></div>
+  <div class="msg" id="msg"></div>
+
+  <div class="foot">비밀번호를 잊으셨나요? <b>관리자에게 문의</b>하세요.<br>계정은 관리자가 발급합니다.</div>
+</div>
+
+<!-- 첫 로그인: 비번 변경 화면 -->
+<div class="card" id="card-changepw" style="display:none">
+  <div class="brand">
+    <div class="logo" style="background:var(--green)">🔑</div>
+    <h1>비밀번호 변경</h1>
+    <p>첫 로그인입니다. 새 비밀번호를 설정하세요.</p>
+  </div>
+  <label for="np1">새 비밀번호</label>
+  <input id="np1" type="password" placeholder="새 비밀번호(8자 이상)">
+  <label for="np2">새 비밀번호 확인</label>
+  <input id="np2" type="password" placeholder="다시 입력">
+  <button class="btn" id="changeBtn" style="background:var(--green)">변경하고 시작</button>
+  <div class="msg" id="msg2"></div>
+</div>
+
+<!-- 로그인 성공 화면 -->
+<div class="card" id="card-home" style="display:none">
+  <div class="brand">
+    <div class="logo" style="background:var(--green)">✓</div>
+    <h1 id="welcome">환영합니다</h1>
+    <p id="home-sub">로그인 성공 (목업)</p>
+  </div>
+  <div style="font-size:13px;color:var(--sub);line-height:1.9;background:var(--indigo-l);border-radius:11px;padding:14px">
+    여기서부터 <b>일일 리포트 입력 화면</b>으로 진입합니다.<br>
+    (실제 앱에서는 acl에서 campus·role·instructorId를 받아 본인 담당 수업이 표시됩니다.)
+  </div>
+  <button class="btn" id="logoutBtn" style="margin-top:18px;background:#64748B">로그아웃</button>
+</div>
+
+<!-- 목업 데모 컨트롤 -->
+<div class="demo">
+  <h3>🧪 목업 데모 컨트롤 (실제 앱엔 없음)</h3>
+  <div class="hint">Firebase Auth 미연동 — 아래로 상태를 시뮬레이션. 합성 ID 변환은 실제 synth_email.js로 동작.</div>
+  <div class="row">
+    <button onclick="demo('ok')">정상 로그인</button>
+    <button onclick="demo('first')">첫 로그인(비번 변경)</button>
+    <button onclick="demo('inactive')">비활성 계정(퇴사)</button>
+    <button onclick="demo('wrong')">이름·비번 불일치</button>
+  </div>
+</div>
+
+<script src="synth_email.js"></script>
+<script>
+  const $ = id => document.getElementById(id);
+  const show = which => {
+    for (const c of ['card-login','card-changepw','card-home']) $(c).style.display = 'none';
+    $(which).style.display = 'block';
+  };
+  function setMsg(el, type, text){ el.className = 'msg ' + type; el.textContent = text; }
+  function clearMsg(el){ el.className = 'msg'; el.textContent = ''; }
+
+  // 합성 ID 실시간 미리보기 (실제 변환 유틸 사용)
+  function updateSynth(){
+    const name = $('name').value.trim(), campus = $('campus').value;
+    if (!name) { $('synth').innerHTML = ''; return; }
+    try {
+      const email = window.SynthEmail.synthEmail(name, campus);
+      $('synth').innerHTML = '→ 로그인 ID(자동): <b>' + email + '</b>';
+    } catch(e){ $('synth').innerHTML = ''; }
+  }
+  $('name').addEventListener('input', updateSynth);
+  $('campus').addEventListener('change', updateSynth);
+
+  // 시뮬레이션 결과 모드(데모 버튼이 설정)
+  let mode = 'ok';
+  function demo(m){ mode = m; clearMsg($('msg')); $('pw').value = m==='wrong' ? '' : '••••'; if(m==='ok'||m==='first'){ if(!$('name').value) $('name').value='홍길동'; updateSynth(); } simulateLogin(true); }
+
+  function simulateLogin(fromDemo){
+    const name = $('name').value.trim();
+    if (!name && !fromDemo) { setMsg($('msg'),'err','이름을 입력하세요.'); return; }
+    const email = name ? window.SynthEmail.synthEmail(name, $('campus').value) : '(이름 미입력)';
+    // 목업 분기
+    if (mode === 'inactive') { setMsg($('msg'),'err','비활성화된 계정입니다. 관리자에게 문의하세요.'); return; }
+    if (mode === 'wrong')    { setMsg($('msg'),'err','이름 또는 비밀번호가 올바르지 않습니다.'); return; }
+    if (mode === 'first')    { clearMsg($('msg')); show('card-changepw'); return; }
+    // ok
+    clearMsg($('msg'));
+    $('welcome').textContent = name + ' 강사님, 환영합니다';
+    $('home-sub').textContent = $('campus').selectedOptions[0].text + ' · ' + email;
+    show('card-home');
+  }
+
+  $('loginBtn').onclick = () => { mode = 'ok'; simulateLogin(false); };
+  $('changeBtn').onclick = () => {
+    const a = $('np1').value, b = $('np2').value;
+    if (a.length < 8) return setMsg($('msg2'),'err','비밀번호는 8자 이상이어야 합니다.');
+    if (a !== b)      return setMsg($('msg2'),'err','두 비밀번호가 일치하지 않습니다.');
+    setMsg($('msg2'),'ok','변경 완료! 잠시 후 시작합니다…');
+    setTimeout(()=>{ clearMsg($('msg2')); $('np1').value=$('np2').value=''; mode='ok'; simulateLogin(true); }, 800);
+  };
+  $('logoutBtn').onclick = () => { show('card-login'); $('pw').value=''; clearMsg($('msg')); };
+</script>
+</body>
+</html>
