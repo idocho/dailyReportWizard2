@@ -70,6 +70,12 @@ def load_config():
             # 디스크에 평문 시크릿이 남아 있으면(레거시 config.json) 복호 후 재저장으로
             # 암호화 마이그레이션 — DPAPI 가능 환경에서만 실제 암호화됨.
             needs_migration = secret_codec.has_plaintext_secret(cfg)
+            # 폐기 키 제거(보안·정리): ai_api_key 는 엔진별 키로 대체된 deprecated 필드인데
+            # 레거시 config 에 평문 API 키가 남아 있을 수 있어 적재 시 제거.
+            for _dk in ('ai_api_key',):
+                if _dk in cfg:
+                    cfg.pop(_dk, None)
+                    needs_migration = True
             # 민감 필드 복호 → 이후 메모리상 cfg 는 항상 평문(앱 코드 무수정).
             secret_codec.decrypt_fields(cfg)
             # 구버전 room_prefix 마이그레이션
