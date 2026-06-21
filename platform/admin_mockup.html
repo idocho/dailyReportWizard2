@@ -77,7 +77,7 @@
 <div class="topbar">
   <span class="t">CampusManager</span>
   <span class="tag">관리자</span>
-  <span class="who"><b>박관리</b> · 강남 캠퍼스</span>
+  <span class="who"><b>박관리</b> · 동수원</span>
 </div>
 
 <div class="wrap">
@@ -110,7 +110,7 @@
     <input id="m-name" type="text" placeholder="강사 이름" autocomplete="off">
     <div class="synth" id="m-synth"></div>
     <label>캠퍼스 (관리자 소속 고정)</label>
-    <input id="m-campus" type="text" value="강남 캠퍼스" disabled>
+    <input id="m-campus" type="text" value="동수원" disabled>
     <label>역할</label>
     <input type="text" value="강사 (instructor)" disabled title="관리자는 강사만 발급 — 권한상승 차단">
     <label>임시 비밀번호</label>
@@ -146,7 +146,7 @@
 
 <script src="synth_email.js"></script>
 <script>
-  const CAMPUS = 'gangnam';            // 관리자 소속(고정)
+  const CAMPUS = 'dongsuwon';          // 관리자 소속(고정)
   const $ = id => document.getElementById(id);
   let people = [
     {name:'홍길동', role:'instructor', active:true},
