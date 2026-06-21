@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<!--
+  send_mockup.html — CampusManager 일괄 전송 작성 + 전송 에이전트 흐름 목업 (PLATFORM §3·§4)
+  목업 전용. 아키텍처: 웹 작성 → sendJobs 큐 → 로컬 전송 에이전트 → KakaoTalk → 상태 회신.
+  관리자 도메인(일괄). 강사 일일 전송과 분리.
+-->
+<html lang="ko">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CampusManager · 일괄 전송 (목업)</title>
+<style>
+  :root{--bg:#FAFAFB;--panel:#FFFFFF;--indigo:#4F46E5;--indigo-ink:#4338CA;--indigo-l:#EEF0FF;
+    --line:#ECECEF;--soft:#F3F3F5;--text:#18181B;--sub:#5C6370;--green:#16A34A;--red:#DC2626;--amber:#D97706;--ink:#15171F;}
+  *{box-sizing:border-box;font-family:"맑은 고딕","Malgun Gothic",system-ui,sans-serif}
+  body{margin:0;min-height:100vh;background:var(--bg);color:var(--text)}
+  .topbar{background:var(--ink);color:#fff;padding:13px 22px;display:flex;align-items:center;gap:12px}
+  .topbar .t{font-size:15px;font-weight:800}.topbar .tag{font-size:11px;font-weight:700;background:var(--indigo);padding:3px 9px;border-radius:20px}
+  .topbar .who{margin-left:auto;font-size:12px;color:#cbd5e1}.topbar .who b{color:#fff}
+  .nav{display:flex;gap:4px;padding:10px 22px 0;background:var(--ink)}
+  .nav a{font-size:12.5px;font-weight:700;color:#94A3B8;padding:8px 13px;border-radius:9px 9px 0 0;text-decoration:none}
+  .nav a.on{background:var(--bg);color:var(--indigo-ink)}
+  .arch{max-width:880px;margin:16px auto 0;padding:0 18px;display:flex;align-items:center;gap:8px;font-size:11px;color:var(--sub);flex-wrap:wrap}
+  .arch span{background:#fff;border:1px solid var(--line);border-radius:20px;padding:5px 11px;font-weight:700}
+  .arch b{color:var(--indigo-ink)} .arch .ar{color:#cbd5e1}
+  .wrap{max-width:880px;margin:14px auto;padding:0 18px;display:grid;grid-template-columns:1fr 320px;gap:18px}
+  @media(max-width:680px){.wrap{grid-template-columns:1fr}}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px}
+  .panel h3{margin:0 0 12px;font-size:14px;font-weight:800}
+  label{display:block;font-size:12px;font-weight:700;color:var(--sub);margin:12px 0 6px}
+  select,textarea,input{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:10px;font-size:13px;outline:none;font-family:inherit}
+  textarea{min-height:90px;resize:vertical}
+  select:focus,textarea:focus{border-color:var(--indigo);box-shadow:0 0 0 3px var(--indigo-l)}
+  .stulist{border:1px solid var(--line);border-radius:10px;max-height:150px;overflow:auto;padding:4px}
+  .stu{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:7px;font-size:13px;cursor:pointer}
+  .stu:hover{background:var(--soft)}
+  .selrow{display:flex;align-items:center;gap:10px;margin:8px 0}
+  .selrow .cnt{font-size:12px;color:var(--sub)}.selrow a{font-size:12px;color:var(--indigo);cursor:pointer;font-weight:700}
+  .pv{background:var(--soft);border-radius:10px;padding:10px 12px;font-size:12.5px;color:var(--text);white-space:pre-wrap;line-height:1.6;min-height:40px}
+  .imgrow{display:flex;align-items:center;gap:8px;margin-top:10px;font-size:12px;color:var(--sub)}
+  .send{margin-top:16px;width:100%;padding:13px;border:none;border-radius:11px;background:var(--indigo);color:#fff;font-size:15px;font-weight:800;cursor:pointer}
+  .send:hover{background:var(--indigo-ink)}
+  .agent{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700;margin-bottom:12px}
+  .dot{width:9px;height:9px;border-radius:50%}.dot.on{background:var(--green)}.dot.off{background:var(--red)}
+  .agent .sw{margin-left:auto;font-size:11px;color:var(--indigo);cursor:pointer}
+  .job{border:1px solid var(--line);border-radius:11px;padding:11px;margin-bottom:10px}
+  .job .jh{display:flex;align-items:center;font-size:12px;font-weight:800;margin-bottom:7px}
+  .job .jh .st{margin-left:auto;font-size:11px;font-weight:800;padding:2px 8px;border-radius:20px}
+  .st.q{background:#FEF3C7;color:var(--amber)}.st.run{background:var(--indigo-l);color:var(--indigo-ink)}.st.done{background:#F0FDF4;color:var(--green)}.st.warn{background:#FEF2F2;color:var(--red)}
+  .bar{height:6px;background:var(--soft);border-radius:6px;overflow:hidden;margin:6px 0}
+  .bar i{display:block;height:100%;background:var(--green);width:0;transition:width .25s}
+  .rcpts{font-size:11px;color:var(--sub);display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
+  .rcpts .r{padding:2px 7px;border-radius:20px;background:var(--soft)}
+  .rcpts .r.ok{background:#F0FDF4;color:var(--green)}.rcpts .r.run{background:var(--indigo-l);color:var(--indigo-ink)}
+  .empty{font-size:12px;color:var(--sub);text-align:center;padding:24px 0}
+  .toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:11px 18px;border-radius:10px;font-size:13px;font-weight:600;opacity:0;transition:opacity .2s;pointer-events:none}
+  .toast.show{opacity:1}
+</style>
+</head>
+<body>
+<div class="topbar"><span class="t">CampusManager</span><span class="tag">관리자</span><span class="who"><b>박관리</b> · 강남 캠퍼스</span></div>
+<div class="nav"><a href="admin_mockup.html">강사 계정</a><a href="roster_mockup.html">명단</a><a class="on" href="#">템플릿·전송</a></div>
+<div class="arch"><span>📝 <b>웹 작성</b></span><span class="ar">→</span><span>📥 <b>sendJobs</b> 큐</span><span class="ar">→</span><span>🖥 <b>전송 에이전트</b>(로컬)</span><span class="ar">→</span><span>💬 KakaoTalk</span></div>
+
+<div class="wrap">
+  <!-- 작성 -->
+  <div class="panel">
+    <h3>일괄 메시지 작성</h3>
+    <label>템플릿</label>
+    <select id="tpl" onchange="loadTpl()">
+      <option value="0">일반 공지</option><option value="1">시험 안내</option><option value="2">성적 안내(성적참조)</option>
+    </select>
+    <label>대상 반</label>
+    <select id="cls" onchange="renderStus()"><option>중1A</option><option>중2B</option><option>중3개별화</option></select>
+    <div class="selrow"><span class="cnt" id="selcnt"></span><a onclick="selAll(true)">전체선택</a><a onclick="selAll(false)">해제</a></div>
+    <div class="stulist" id="stulist"></div>
+    <label>메시지 ({이름} {반} {날짜} 치환)</label>
+    <textarea id="body" oninput="preview()"></textarea>
+    <div class="imgrow"><input type="checkbox" id="img" style="width:auto" onchange="preview()"><label for="img" style="margin:0">📎 이미지 첨부</label></div>
+    <label>미리보기 (첫 수신자 기준)</label>
+    <div class="pv" id="pv"></div>
+    <button class="send" onclick="createJob()">전송 작업 생성 → 에이전트</button>
+  </div>
+
+  <!-- 에이전트/큐 상태 -->
+  <div class="panel">
+    <div class="agent"><span class="dot on" id="adot"></span><span id="atext">전송 에이전트 연결됨 (강남-PC)</span><span class="sw" onclick="toggleAgent()">상태 전환</span></div>
+    <h3 style="font-size:13px">전송 작업 (sendJobs)</h3>
+    <div id="jobs"><div class="empty">아직 작업이 없습니다.<br>왼쪽에서 작성 후 전송하세요.</div></div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+  const $=id=>document.getElementById(id);
+  const TPL=[
+    {body:'안녕하세요, {이름} 학부모님.\n{반} 반 안내드립니다.\n(내용을 입력하세요)\n감사합니다.'},
+    {body:'안녕하세요, {이름} 학부모님.\n{반} 반 시험 일정 안내드립니다.\n• 일시: ○월 ○일\n감사합니다.'},
+    {body:'안녕하세요, {이름} 학부모님.\n{반} 반 {날짜} 성적 안내드립니다.\n(성적 데이터 자동 첨부)\n감사합니다.'},
+  ];
+  const ROSTER={'중1A':['김민준','이서연','정하윤'],'중2B':['박도윤','한지호'],'중3개별화':['최지우']};
+  let sel=new Set(), agentOn=true, jobs=[], jid=0;
+  const toast=t=>{const e=$('toast');e.textContent=t;e.classList.add('show');setTimeout(()=>e.classList.remove('show'),1700);};
+  const today=()=>'(오늘)';
+
+  function loadTpl(){$('body').value=TPL[+$('tpl').value].body;preview();}
+  function renderStus(){const arr=ROSTER[$('cls').value];sel=new Set(arr);
+    $('stulist').innerHTML=arr.map(n=>`<label class="stu"><input type="checkbox" checked onchange="toggleStu('${n}',this.checked)" style="width:auto">${n}</label>`).join('');
+    updcnt();preview();}
+  function toggleStu(n,c){c?sel.add(n):sel.delete(n);updcnt();preview();}
+  function selAll(v){const arr=ROSTER[$('cls').value];sel=v?new Set(arr):new Set();
+    [...$('stulist').querySelectorAll('input')].forEach(i=>i.checked=v);updcnt();preview();}
+  function updcnt(){$('selcnt').textContent=`선택 ${sel.size}명`;}
+  function render(tmpl,name){return tmpl.replace(/{이름}/g,name).replace(/{반}/g,$('cls').value).replace(/{날짜}/g,today());}
+  function preview(){const first=[...sel][0]||'(수신자 없음)';let t=render($('body').value,first);if($('img').checked)t+='\n📎 [이미지 첨부됨]';$('pv').textContent=t;}
+
+  function toggleAgent(){agentOn=!agentOn;$('adot').className='dot '+(agentOn?'on':'off');
+    $('atext').textContent=agentOn?'전송 에이전트 연결됨 (강남-PC)':'⚠ 에이전트 오프라인 — 작업이 대기열에 쌓임';
+    if(agentOn) jobs.filter(j=>j.status==='queued').forEach(runJob); renderJobs();}
+
+  function createJob(){
+    const r=[...sel]; if(!r.length){toast('수신자를 선택하세요');return;} if(!$('body').value.trim()){toast('메시지를 입력하세요');return;}
+    const job={id:++jid,cls:$('cls').value,recipients:r.map(n=>({name:n,status:'대기'})),done:0,status:'queued',img:$('img').checked};
+    jobs.unshift(job);renderJobs();
+    if(agentOn) runJob(job); else toast('에이전트 오프라인 — 작업 대기열에 보관');
+  }
+  function runJob(job){
+    job.status='수신';renderJobs();
+    setTimeout(()=>{ job.status='running';
+      let i=0;const tick=()=>{ if(!agentOn){job.status='queued';renderJobs();return;}
+        if(i>0)job.recipients[i-1].status='완료',job.done=i;
+        if(i<job.recipients.length){job.recipients[i].status='전송';renderJobs();i++;setTimeout(tick,260);}
+        else{job.status='done';renderJobs();}
+      };tick();
+    },300);
+  }
+  function renderJobs(){
+    if(!jobs.length){$('jobs').innerHTML='<div class="empty">아직 작업이 없습니다.</div>';return;}
+    $('jobs').innerHTML=jobs.map(j=>{
+      const pct=Math.round(j.done/j.recipients.length*100);
+      const st=j.status==='queued'?['q','대기중']:j.status==='수신'?['run','에이전트 수신']:j.status==='running'?['run',`전송 중 ${j.done}/${j.recipients.length}`]:['done','완료'];
+      return `<div class="job"><div class="jh">#${j.id} ${j.cls} (${j.recipients.length}명${j.img?' +📎':''})<span class="st ${st[0]}">${st[1]}</span></div>
+        <div class="bar"><i style="width:${pct}%"></i></div>
+        <div class="rcpts">${j.recipients.map(x=>`<span class="r ${x.status==='완료'?'ok':x.status==='전송'?'run':''}">${x.name}${x.status==='완료'?' ✓':x.status==='전송'?' …':''}</span>`).join('')}</div></div>`;
+    }).join('');
+  }
+  loadTpl();renderStus();
+</script>
+</body>
+</html>
