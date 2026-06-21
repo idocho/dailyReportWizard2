@@ -80,6 +80,18 @@ acl/
 
 - **강사 계정 발급/삭제(=acl 관리)는 관리자 도구(CM 또는 웹 관리자)에서.** 이메일로 등록 → 강사 첫 로그인 시 매칭.
 
+## 6.1 교차-클라 동일 계정 (웹 ↔ PC)
+**같은 이메일+비번 계정 하나로 웹·PC 모두 로그인.** acl/룰은 클라 종류를 구분하지 않음 —
+한 사람=한 신원. 시나리오는 동일하되 구현만 다르다:
+- **웹앱**: Firebase JS SDK가 토큰 발급·1시간 갱신·세션 유지를 자동 처리.
+- **PC앱(Python)**: REST로 직접 처리 — 공식 클라이언트 Auth SDK 없음. 필요 배관:
+  1. 로그인 `POST identitytoolkit…/accounts:signInWithPassword?key={웹APIKey}` → `idToken`(1h)+`refreshToken`.
+  2. RTDB REST 호출의 `?auth=` 를 **시크릿 → idToken** 으로 교체(`firebase.py _fb_url` 소폭 수정).
+  3. idToken 만료 전 `POST securetoken…/token` (refresh_token)로 자동 재발급.
+  4. **refreshToken 은 DPAPI 암호화 저장** — 기존 `secret_codec` 재활용(매번 재로그인 방지).
+  - 필요한 키 = **Firebase 웹 API Key**(공개값, 비밀 아님).
+- **퇴사 자동 반영**: 계정 비활성/비번 변경 → refreshToken 무효화 → 웹·PC 모두 다음 갱신 시 차단·재로그인 강제.
+
 ## 7. 만능키 → 로그인 무중단 전환 절차
 1. Firebase Authentication 활성화(이메일/비번), 관리계정·강사계정 사전 발급, `acl/` 시드.
 2. 룰을 **"시크릿 OR (auth+acl)"** 병행 허용으로 1차 배포 → 기존 시크릿 클라 안 끊김.
