@@ -121,24 +121,144 @@ class App:
         self._bulk_send_cancel = None
 
         self._main_built = False
-        # Firebase 미설정(최초 실행) 시: 정상 UI 대신 메인 창에 설치 위저드를 띄운다.
-        # 위저드 완료/이탈 시 정상 레이아웃을 빌드 → 팝업 없이 한 창에서 단계 전환.
-        if not self.config.get('firebase_url') or not self.config.get('firebase_path'):
-            self._run_setup_wizard()
+        self._token_job  = None
+        # 로그인 전환(AUTH_DESIGN): 저장된 refresh_token으로 세션 복원 시도 → 실패 시 로그인 화면.
+        if self._try_resume_session():
+            self._post_login()
         else:
-            # 스키마 버전 게이트(#15): DB가 이 앱보다 새 스키마면 쓰기 오염 방지 위해 차단
-            ok, db_ver = check_schema(self.config)
-            if not ok:
-                from firebase import SCHEMA_MAX
-                messagebox.showerror(
-                    "앱 버전 낮음",
-                    f"DB 스키마 v{db_ver} > 지원 v{SCHEMA_MAX}\n"
-                    "데이터 보호를 위해 실행을 중단합니다.\n최신 버전 앱으로 교체해 주세요.")
-                self.root.destroy()
-                return
-            self._build_main_ui()
-            # 공용 교재/학급 목록은 Firebase students/+classes를 단일 원본으로 사용
-            self.root.after(300, self._sync_shared_sheets_from_firebase)
+            self._run_login()
+
+    # ── 로그인(인증) ─────────────────────────────────────────────────
+    def _try_resume_session(self):
+        """저장된 refresh_token으로 idToken 갱신 + acl 재검증. 성공 시 True(메모리 _id_token 세팅)."""
+        rt  = (self.config.get('refresh_token') or '').strip()
+        uid = (self.config.get('acl_uid') or '').strip()
+        if not rt or not uid:
+            return False
+        try:
+            import pc_auth
+            tks = pc_auth.refresh(rt)
+            acl = pc_auth.get_acl(uid, tks['idToken'])
+            if not acl or acl.get('active') is not True:
+                return False
+            self.config['_id_token']     = tks['idToken']
+            self.config['refresh_token'] = tks['refreshToken']
+            self.config['firebase_url']  = pc_auth.FIREBASE_DB_URL
+            self.config['firebase_path'] = 'campus/' + acl['campus']
+            self.config['instructor_id'] = acl.get('instructorId', self.config.get('instructor_id', ''))
+            save_config(self.config)
+            return True
+        except Exception:
+            return False
+
+    def _post_login(self):
+        """로그인/복원 후: 스키마 게이트 → 메인 UI → 토큰 갱신 예약."""
+        ok, db_ver = check_schema(self.config)
+        if not ok:
+            from firebase import SCHEMA_MAX
+            messagebox.showerror("앱 버전 낮음",
+                f"DB 스키마 v{db_ver} > 지원 v{SCHEMA_MAX}\n"
+                "데이터 보호를 위해 실행을 중단합니다.\n최신 버전 앱으로 교체해 주세요.")
+            self.root.destroy()
+            return
+        self._build_main_ui()
+        self.root.after(300, self._sync_shared_sheets_from_firebase)
+        self._schedule_token_refresh()
+
+    def _run_login(self):
+        """로그인 화면(캠퍼스+이름+비번)을 메인 창에 빌드."""
+        for w in self.root.winfo_children():
+            w.destroy()
+        wrap = tk.Frame(self.root, bg=BG)
+        wrap.place(relx=0.5, rely=0.5, anchor='center')
+        tk.Label(wrap, text="DailyReportWizard", font=(FT[0], 18, 'bold'), bg=BG, fg=TEXT).pack(pady=(0, 2))
+        tk.Label(wrap, text="강사 로그인", font=FB, bg=BG, fg=SUBTEXT).pack(pady=(0, 18))
+        CAMPUS = {'동수원': 'dongsuwon'}
+        tk.Label(wrap, text="캠퍼스", font=FS, bg=BG, fg=SUBTEXT, anchor='w').pack(fill='x')
+        cv = tk.StringVar(value=list(CAMPUS.keys())[0])
+        ttk.Combobox(wrap, textvariable=cv, values=list(CAMPUS.keys()),
+                     state='readonly', width=30).pack(pady=(2, 10))
+        tk.Label(wrap, text="이름", font=FS, bg=BG, fg=SUBTEXT, anchor='w').pack(fill='x')
+        nv = tk.Entry(wrap, width=32); nv.pack(pady=(2, 10)); nv.focus()
+        tk.Label(wrap, text="비밀번호", font=FS, bg=BG, fg=SUBTEXT, anchor='w').pack(fill='x')
+        pv = tk.Entry(wrap, width=32, show='*'); pv.pack(pady=(2, 10))
+        err = tk.Label(wrap, text="", font=FS, bg=BG, fg='#DC2626'); err.pack()
+        btn = tk.Button(wrap, text="로그인", bg=INDIGO, fg='white', font=FT,
+                        relief='flat', width=26, cursor='hand2')
+        btn.pack(pady=(8, 0))
+        def submit(*_a):
+            err.config(text=""); btn.config(state='disabled', text="로그인 중...")
+            self.root.update_idletasks()
+            try:
+                self._do_login(CAMPUS.get(cv.get(), 'dongsuwon'), nv.get().strip(), pv.get())
+            except Exception as e:
+                err.config(text=str(e)); btn.config(state='normal', text="로그인")
+        btn.config(command=submit)
+        nv.bind('<Return>', lambda e: pv.focus())
+        pv.bind('<Return>', submit)
+        tk.Label(wrap, text="비밀번호 분실 시 관리자에게 문의하세요.",
+                 font=FS, bg=BG, fg=SUBTEXT).pack(pady=(16, 0))
+
+    def _do_login(self, campus, name, pw):
+        if not name:
+            raise RuntimeError("이름을 입력하세요.")
+        import pc_auth
+        s   = pc_auth.sign_in(campus, name, pw)        # 실패 시 RuntimeError(한국어)
+        acl = pc_auth.get_acl(s['uid'], s['idToken'])
+        if not acl or acl.get('active') is not True:
+            raise RuntimeError("비활성화된 계정입니다. 관리자에게 문의하세요.")
+        if acl.get('mustChangePw'):
+            if not self._change_password(s):
+                raise RuntimeError("비밀번호 변경이 필요합니다.")
+        self.config['_id_token']     = s['idToken']
+        self.config['refresh_token'] = s['refreshToken']
+        self.config['acl_uid']       = s['uid']
+        self.config['firebase_url']  = pc_auth.FIREBASE_DB_URL
+        self.config['firebase_path'] = 'campus/' + acl['campus']
+        self.config['instructor_id'] = acl.get('instructorId', name)
+        save_config(self.config)
+        for w in self.root.winfo_children():
+            w.destroy()
+        self._post_login()
+
+    def _change_password(self, s):
+        """첫 로그인 비번 변경. 성공 시 acl.mustChangePw 해제. 반환 성공여부."""
+        from tkinter import simpledialog
+        import pc_auth, urllib.request
+        np1 = simpledialog.askstring("비밀번호 변경", "첫 로그인입니다. 새 비밀번호(6자 이상):",
+                                     show='*', parent=self.root)
+        if not np1:
+            return False
+        np2 = simpledialog.askstring("비밀번호 변경", "새 비밀번호 확인:", show='*', parent=self.root)
+        if np1 != np2:
+            messagebox.showwarning("불일치", "두 비밀번호가 일치하지 않습니다."); return False
+        if len(np1) < 6:
+            messagebox.showwarning("짧음", "비밀번호는 6자 이상이어야 합니다."); return False
+        try:
+            tks = pc_auth.update_password(s['idToken'], np1)
+            if tks.get('idToken'):     s['idToken']     = tks['idToken']
+            if tks.get('refreshToken'): s['refreshToken'] = tks['refreshToken']
+            url = f"{pc_auth.FIREBASE_DB_URL}/acl/{s['uid']}/mustChangePw.json?auth={s['idToken']}"
+            urllib.request.urlopen(urllib.request.Request(url, data=b'false', method='PUT'), timeout=15)
+            return True
+        except Exception as e:
+            messagebox.showerror("변경 실패", str(e)); return False
+
+    def _schedule_token_refresh(self):
+        """idToken 1h 만료 대비 — 50분마다 refreshToken으로 갱신."""
+        def _do():
+            try:
+                import pc_auth
+                rt = self.config.get('refresh_token')
+                if rt:
+                    tks = pc_auth.refresh(rt)
+                    self.config['_id_token']     = tks['idToken']
+                    self.config['refresh_token'] = tks['refreshToken']
+                    save_config(self.config)
+            except Exception:
+                pass
+            self._token_job = self.root.after(50 * 60 * 1000, _do)
+        self._token_job = self.root.after(50 * 60 * 1000, _do)
 
     def _build_main_ui(self):
         """헤더 고정 + 노트북(데일리 리포트 / 메시지 발송) 레이아웃 빌드."""

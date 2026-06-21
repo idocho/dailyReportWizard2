@@ -37,11 +37,11 @@ def _fb_url(cfg, node):
     enc_path = urllib.parse.quote(path, safe='/')
     encoded  = urllib.parse.quote(node, safe='/')
     url = f"{base}/{enc_path}/{encoded}.json"
-    # Security Rules 전환 대비(#15): firebase_secret 설정 시 ?auth= 전달.
-    # 미설정이면 종전과 동일(no-op) — 룰 배포 전 운영에 영향 없음.
-    secret = (cfg.get('firebase_secret') or '').strip()
-    if secret:
-        url += '?auth=' + urllib.parse.quote(secret, safe='')
+    # 인증 토큰: 로그인 idToken(_id_token, 메모리) 우선 → 레거시 firebase_secret 폴백.
+    # 미설정이면 종전과 동일(no-op).
+    tok = (cfg.get('_id_token') or cfg.get('firebase_secret') or '').strip()
+    if tok:
+        url += '?auth=' + urllib.parse.quote(tok, safe='')
     return url
 
 

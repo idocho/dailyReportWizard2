@@ -21,7 +21,7 @@ import sys
 # 암호화 대상 필드 — storage.py 와 스크립트가 공유 참조
 SENSITIVE_KEYS = (
     "groq_api_key", "openai_api_key", "claude_api_key", "gemini_api_key",
-    "firebase_secret",
+    "firebase_secret", "refresh_token",
 )
 
 _PREFIX = "dpapi:"  # 암호문 식별 마커. 없으면 평문으로 간주(하위호환)

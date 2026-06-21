@@ -88,7 +88,9 @@ def save_config(cfg):
 
     전달받은 cfg dict 는 변경하지 않는다(메모리 평문 유지) — 암호화한 복사본만 기록."""
     _ensure_parent(CONFIG_PATH)
-    to_write = secret_codec.encrypt_fields(cfg)
+    # 임시 런타임 키(_접두, 예: _id_token)는 디스크에 영속하지 않음.
+    clean = {k: v for k, v in cfg.items() if not str(k).startswith('_')}
+    to_write = secret_codec.encrypt_fields(clean)
     with open(CONFIG_PATH, 'w', encoding='utf-8') as f:
         json.dump(to_write, f, ensure_ascii=False, indent=2)
 
