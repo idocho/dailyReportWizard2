@@ -103,6 +103,8 @@
       try{ await A.loginByName(c,name,pw,['instructor','manager','admin']); /* onAuth → bootApp */ }
       catch(e){ $('gt-msg').className='m show'; $('gt-msg').textContent=e.message||String(e); $('gt-btn').disabled=false; $('gt-btn').textContent='로그인'; }
     };
+    $('gt-name').addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); $('gt-pw').focus(); } });
+    $('gt-pw').addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); $('gt-btn').click(); } });
   }
 </script>
 </body>
