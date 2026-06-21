@@ -60,7 +60,7 @@
 <script src="js/auth/synth_email.js"></script>
 <script type="module">
   const $=id=>document.getElementById(id);
-  const DBPATH='drw2_cbt'; // TODO(F): 캠퍼스 경로 분리(campus/{id}) 후 session.campus 사용
+  let CAMPUS_PATH='drw2_cbt'; // 로그인 후 acl.campus 기반 campus/{campus}로 설정
   let A;
   try{ A=await import('./js/auth/auth.js'); }
   catch(e){ $('gt-msg').className='m show'; $('gt-msg').textContent='설정 오류: '+(e&&e.message||e); }
@@ -69,7 +69,7 @@
 
   function bootApp(){
     // 설정 주입(로그인 세션 기반) — 사용자 수동 입력 제거
-    try{ localStorage.setItem('drw_db_url',cfg.databaseURL); localStorage.setItem('drw_db_path',DBPATH);
+    try{ localStorage.setItem('drw_db_url',cfg.databaseURL); localStorage.setItem('drw_db_path',CAMPUS_PATH);
          localStorage.removeItem('drw_db_secret'); }catch(_){}
     $('drw-gate').remove(); $('wr').style.display='';
     const order=['data/curriculum.js?v=202606112000','js/app-core.js?v=v250','js/app-input.js?v=v250','js/app-settings.js?v=v250','js/app-scores.js?v=v250'];
@@ -91,6 +91,7 @@
       try{
         const acl=await (await fetch(cfg.databaseURL.replace(/\/$/,'')+'/acl/'+user.uid+'.json?auth='+window.__AUTH_TOKEN__)).json();
         if(!acl || acl.active!==true){ await A.logout(); $('gt-msg').className='m show'; $('gt-msg').textContent='비활성화된 계정입니다. 관리자에게 문의하세요.'; return; }
+        if(acl.campus) CAMPUS_PATH='campus/'+acl.campus;   // 캠퍼스 경로 분리
         localStorage.setItem('drw_instr', JSON.stringify({ id: acl.instructorId, name: acl.instructorId, assignments: [] }));
       }catch(_){ /* 조회 실패 시에도 부팅은 진행(가용성) */ }
       booted=true; bootApp();

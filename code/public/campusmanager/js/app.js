@@ -8,7 +8,7 @@ import * as P from './provision.js';
 import { firebaseConfig } from './firebase-config.js';
 
 const DB = firebaseConfig.databaseURL.replace(/\/$/, '');
-const DBPATH = 'drw2_cbt';                 // TODO(F): 캠퍼스 경로 분리(campus/{id})
+let DBPATH = 'drw2_cbt';                    // 로그인 후 campus/{campus}로 설정(renderShell)
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 const toast = t => { const e = $('toast'); e.textContent = t; e.classList.add('show'); setTimeout(() => e.classList.remove('show'), 1900); };
@@ -55,6 +55,7 @@ window.doLogout = async () => { try { await A.logout(); } catch(_){} location.re
 
 // ── 셸 ────────────────────────────────────────────────────────────────
 function renderShell(){
+  DBPATH = 'campus/' + session.campus;   // 캠퍼스 경로 분리
   $('gate').classList.add('hidden');
   $('app').classList.remove('hidden');
   $('whoName').textContent = session.instructorId || session.uid;
