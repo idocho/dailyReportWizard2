@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<!--
+  admin_mockup.html — CampusManager 강사 계정 관리 UI 목업 (AUTH_DESIGN §3.1·§5, PLATFORM §1)
+  목업 전용 — 실제 앱 파일 미변경. Firebase 미연동, 동작 시뮬레이션.
+  synth_email.js(실제 유틸) 연결: 발급 시 이름+캠퍼스→합성 로그인 ID 실제 변환.
+  시나리오: 관리자(admin)가 자기 캠퍼스 강사 계정을 발급/비활성/비번리셋.
+-->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CampusManager · 계정 관리 (목업)</title>
+<style>
+  :root{
+    --bg:#FAFAFB; --panel:#FFFFFF; --indigo:#4F46E5; --indigo-ink:#4338CA;
+    --indigo-l:#EEF0FF; --line:#ECECEF; --soft:#F3F3F5; --text:#18181B; --sub:#5C6370;
+    --green:#16A34A; --green-l:#F0FDF4; --red:#DC2626; --red-l:#FEF2F2; --amber:#D97706;
+  }
+  *{box-sizing:border-box;font-family:"맑은 고딕","Malgun Gothic",system-ui,sans-serif}
+  body{margin:0;min-height:100vh;background:var(--bg);color:var(--text);padding:0 0 40px}
+  .topbar{background:#15171F;color:#fff;padding:13px 22px;display:flex;align-items:center;gap:12px}
+  .topbar .t{font-size:15px;font-weight:800}
+  .topbar .tag{font-size:11px;font-weight:700;background:var(--indigo);padding:3px 9px;border-radius:20px}
+  .topbar .who{margin-left:auto;font-size:12px;color:#cbd5e1}
+  .topbar .who b{color:#fff}
+  .wrap{max-width:760px;margin:24px auto;padding:0 18px}
+  .head{display:flex;align-items:center;margin-bottom:14px}
+  .head h2{margin:0;font-size:17px;font-weight:800}
+  .head .cnt{font-size:12px;color:var(--sub);margin-left:8px}
+  .head .add{margin-left:auto;padding:10px 16px;border:none;border-radius:10px;background:var(--indigo);
+        color:#fff;font-size:13px;font-weight:800;cursor:pointer}
+  .head .add:hover{background:var(--indigo-ink)}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th{text-align:left;padding:11px 14px;background:var(--soft);color:var(--sub);font-size:11px;font-weight:800}
+  td{padding:12px 14px;border-top:1px solid var(--line);vertical-align:middle}
+  .nm{font-weight:700}
+  .id{font-family:ui-monospace,monospace;font-size:10px;color:#94A3B8;word-break:break-all}
+  .pill{display:inline-block;font-size:11px;font-weight:800;padding:3px 9px;border-radius:20px}
+  .pill.on{background:var(--green-l);color:var(--green)}
+  .pill.off{background:var(--red-l);color:var(--red)}
+  .pill.role{background:var(--indigo-l);color:var(--indigo-ink)}
+  .act{display:flex;gap:6px;flex-wrap:wrap}
+  .act button{padding:6px 10px;border:1px solid var(--line);border-radius:8px;background:#fff;
+        font-size:11px;font-weight:700;cursor:pointer;color:var(--sub)}
+  .act button:hover{border-color:var(--indigo);color:var(--indigo)}
+  .act button.danger:hover{border-color:var(--red);color:var(--red)}
+  .note{margin-top:16px;background:var(--indigo-l);border-radius:12px;padding:14px 16px;font-size:12px;
+        color:var(--indigo-ink);line-height:1.8}
+  .note b{font-weight:800}
+  /* 발급 모달 */
+  .ov{position:fixed;inset:0;background:rgba(15,17,31,.45);display:none;align-items:center;justify-content:center;padding:20px}
+  .ov.on{display:flex}
+  .modal{background:#fff;border-radius:16px;width:100%;max-width:380px;padding:24px}
+  .modal h3{margin:0 0 16px;font-size:16px;font-weight:800}
+  label{display:block;font-size:12px;font-weight:700;color:var(--sub);margin:12px 0 6px}
+  input,select{width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:10px;font-size:14px;outline:none}
+  input:focus{border-color:var(--indigo);box-shadow:0 0 0 3px var(--indigo-l)}
+  input:disabled{background:var(--soft);color:var(--sub)}
+  .synth{margin-top:8px;font-size:10px;color:#94A3B8;font-family:ui-monospace,monospace;word-break:break-all;min-height:13px}
+  .synth b{color:var(--indigo)}
+  .tmp{display:flex;gap:8px;align-items:center}
+  .tmp input{font-family:ui-monospace,monospace;font-weight:700}
+  .tmp button{white-space:nowrap;padding:11px 12px;border:1px solid var(--line);border-radius:10px;background:#fff;cursor:pointer;font-size:12px;font-weight:700}
+  .mrow{display:flex;gap:8px;margin-top:20px}
+  .mrow button{flex:1;padding:12px;border:none;border-radius:10px;font-size:14px;font-weight:800;cursor:pointer}
+  .mrow .cancel{background:var(--soft);color:var(--sub)}
+  .mrow .ok{background:var(--indigo);color:#fff}
+  .toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%);background:#15171F;color:#fff;
+        padding:11px 18px;border-radius:10px;font-size:13px;font-weight:600;opacity:0;transition:opacity .2s;pointer-events:none}
+  .toast.show{opacity:1}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <span class="t">CampusManager</span>
+  <span class="tag">관리자</span>
+  <span class="who"><b>박관리</b> · 강남 캠퍼스</span>
+</div>
+
+<div class="wrap">
+  <div class="head">
+    <h2>강사 계정</h2><span class="cnt" id="cnt"></span>
+    <button class="add" onclick="openModal()">+ 강사 계정 발급</button>
+  </div>
+
+  <div class="card">
+    <table>
+      <thead><tr><th>이름</th><th>역할</th><th>상태</th><th>로그인 ID(자동)</th><th>작업</th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </div>
+
+  <div class="note">
+    • 강사는 발급받은 <b>이름 + 임시비번</b>으로 로그인 → <b>첫 로그인 시 비번 변경</b>.<br>
+    • 비번을 잊으면 <b>[비번 리셋]</b> → 새 임시비번 전달(합성 ID라 셀프 메일 불가).<br>
+    • <b>퇴사</b>는 <b>[비활성]</b> — 토큰이 살아 있어도 즉시 차단됩니다.<br>
+    • 관리자는 <b>자기 캠퍼스 강사만</b> 관리합니다. 다른 관리자·운영자(super)는 super가 콘솔에서 관리.
+  </div>
+</div>
+
+<!-- 발급 모달 -->
+<div class="ov" id="ov">
+  <div class="modal">
+    <h3>강사 계정 발급</h3>
+    <label>이름</label>
+    <input id="m-name" type="text" placeholder="강사 이름" autocomplete="off">
+    <div class="synth" id="m-synth"></div>
+    <label>캠퍼스 (관리자 소속 고정)</label>
+    <input id="m-campus" type="text" value="강남 캠퍼스" disabled>
+    <label>역할</label>
+    <input type="text" value="강사 (instructor)" disabled title="관리자는 강사만 발급 — 권한상승 차단">
+    <label>임시 비밀번호</label>
+    <div class="tmp">
+      <input id="m-pw" type="text" readonly>
+      <button onclick="genPw()">↻ 재생성</button>
+    </div>
+    <div class="mrow">
+      <button class="cancel" onclick="closeModal()">취소</button>
+      <button class="ok" onclick="issue()">발급</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="synth_email.js"></script>
+<script>
+  const CAMPUS = 'gangnam';            // 관리자 소속(고정)
+  const $ = id => document.getElementById(id);
+  let people = [
+    {name:'홍길동', role:'instructor', active:true},
+    {name:'김철수', role:'instructor', active:true},
+    {name:'이영희', role:'instructor', active:false},
+  ];
+
+  function synth(name){ try{ return window.SynthEmail.synthEmail(name, CAMPUS); }catch(e){ return ''; } }
+  function toast(t){ const el=$('toast'); el.textContent=t; el.classList.add('show'); setTimeout(()=>el.classList.remove('show'),1800); }
+
+  function render(){
+    $('cnt').textContent = `· ${people.length}명 (활성 ${people.filter(p=>p.active).length})`;
+    $('rows').innerHTML = people.map((p,i)=>`
+      <tr>
+        <td class="nm">${p.name}</td>
+        <td><span class="pill role">강사</span></td>
+        <td><span class="pill ${p.active?'on':'off'}">${p.active?'활성':'비활성(퇴사)'}</span></td>
+        <td class="id">${synth(p.name)}</td>
+        <td><div class="act">
+          <button onclick="resetPw(${i})">비번 리셋</button>
+          <button class="danger" onclick="toggle(${i})">${p.active?'비활성':'활성화'}</button>
+        </div></td>
+      </tr>`).join('');
+  }
+
+  function genPw(){ const c='ABCDEFGHJKMNPQRSTUVWXYZ23456789'; let s=''; for(let i=0;i<8;i++) s+=c[Math.floor(Math.random()*c.length)]; $('m-pw').value=s; }
+  function openModal(){ $('m-name').value=''; $('m-synth').innerHTML=''; genPw(); $('ov').classList.add('on'); $('m-name').focus(); }
+  function closeModal(){ $('ov').classList.remove('on'); }
+  $('m-name').addEventListener('input', ()=>{ const n=$('m-name').value.trim(); $('m-synth').innerHTML = n ? '→ 로그인 ID: <b>'+synth(n)+'</b>' : ''; });
+
+  function issue(){
+    const n=$('m-name').value.trim();
+    if(!n){ $('m-name').focus(); return; }
+    if(people.some(p=>p.name===n)){ toast('같은 캠퍼스에 동명 강사 존재 — 접미(예: '+n+'2) 필요'); return; }
+    people.push({name:n, role:'instructor', active:true});
+    render(); closeModal();
+    toast(`${n} 계정 발급 — 임시비번 ${$('m-pw').value} 전달`);
+  }
+  function resetPw(i){ genPw(); toast(`${people[i].name} 비번 리셋 — 새 임시비번 ${$('m-pw').value} 전달`); }
+  function toggle(i){ people[i].active=!people[i].active; render(); toast(`${people[i].name} ${people[i].active?'활성화':'비활성(퇴사 차단)'}`); }
+
+  render();
+</script>
+</body>
+</html>

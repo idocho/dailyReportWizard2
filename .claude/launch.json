@@ -6,6 +6,12 @@
       "runtimeExecutable": "python3",
       "runtimeArgs": ["-m", "http.server", "7788", "--directory", "code/public"],
       "port": 7788
+    },
+    {
+      "name": "platform-mockup",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "http.server", "8765", "--directory", "platform"],
+      "port": 8765
     }
   ]
 }
