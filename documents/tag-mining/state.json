@@ -1,6 +1,6 @@
 {
-  "last_run_date": "2026-06-14",
-  "runs": 1,
+  "last_run_date": "2026-06-16",
+  "runs": 2,
   "candidates": {
     "errnote_missing": {
       "theme": "오답노트 미작성/미제출",
@@ -15,7 +15,7 @@
           "rec": "new_tag"
         }
       ],
-      "streak": 1,
+      "streak": 0,
       "last_seen": "2026-06-14"
     },
     "mock_exam": {
@@ -31,7 +31,7 @@
           "rec": "new_tag"
         }
       ],
-      "streak": 1,
+      "streak": 0,
       "last_seen": "2026-06-14"
     },
     "writeup_weak": {
@@ -47,7 +47,7 @@
           "rec": "new_tag"
         }
       ],
-      "streak": 1,
+      "streak": 0,
       "last_seen": "2026-06-14",
       "promoted": "2026-06-14",
       "promoted_key": "writeup_weak"
@@ -65,7 +65,7 @@
           "rec": "new_tag"
         }
       ],
-      "streak": 1,
+      "streak": 0,
       "last_seen": "2026-06-14"
     },
     "condition_miss": {
@@ -81,7 +81,7 @@
           "rec": "refine_wording"
         }
       ],
-      "streak": 1,
+      "streak": 0,
       "last_seen": "2026-06-14"
     },
     "early_supplement": {
@@ -97,8 +97,104 @@
           "rec": "refine_wording"
         }
       ],
-      "streak": 1,
+      "streak": 0,
       "last_seen": "2026-06-14"
+    },
+    "hw_incomplete": {
+      "theme": "과제 미완수·별표만 표시하고 넘어감",
+      "category": "caution",
+      "suggested_label": "📋 과제 미완",
+      "suggested_phrase": "과제를 끝까지 해결하지 못하고 일부를 별표·미풀이로 남겨, 끝까지 마무리하는 습관 형성이 필요함",
+      "first_seen": "2026-06-16",
+      "history": [
+        {
+          "date": "2026-06-16",
+          "freq": 9,
+          "rec": "new_tag"
+        }
+      ],
+      "streak": 1,
+      "last_seen": "2026-06-16"
+    },
+    "rushing": {
+      "theme": "성급한 풀이·검토(검산) 습관 부족",
+      "category": "caution",
+      "suggested_label": "🏃 성급한 풀이",
+      "suggested_phrase": "문제를 충분히 고민·검토하지 않고 서둘러 풀어 조건을 놓치는 경향이 있어, 끝까지 꼼꼼히 읽고 검산하는 습관이 필요함",
+      "first_seen": "2026-06-16",
+      "history": [
+        {
+          "date": "2026-06-16",
+          "freq": 8,
+          "rec": "new_tag"
+        }
+      ],
+      "streak": 1,
+      "last_seen": "2026-06-16"
+    },
+    "absent": {
+      "theme": "결석",
+      "category": "caution",
+      "suggested_label": "🚫 결석",
+      "suggested_phrase": "오늘 수업에 결석하여, 진도·과제를 다음 수업 전 보완하도록 안내함",
+      "first_seen": "2026-06-16",
+      "history": [
+        {
+          "date": "2026-06-16",
+          "freq": 3,
+          "rec": "new_tag"
+        }
+      ],
+      "streak": 1,
+      "last_seen": "2026-06-16"
+    },
+    "material_missing": {
+      "theme": "교재·준비물 미지참",
+      "category": "caution",
+      "suggested_label": "📕 교재 미지참",
+      "suggested_phrase": "교재나 프린트를 가져오지 않아 임시 자료로 수업을 진행함, 준비물 지참을 안내함",
+      "first_seen": "2026-06-16",
+      "history": [
+        {
+          "date": "2026-06-16",
+          "freq": 6,
+          "rec": "new_tag"
+        }
+      ],
+      "streak": 1,
+      "last_seen": "2026-06-16"
+    },
+    "equation_setup": {
+      "theme": "활용문제에서 식 세우기·미지수 정의 어려움",
+      "category": "understand_sub",
+      "suggested_label": "🧩 식세우기 약함",
+      "suggested_phrase": "개념은 알지만 활용 유형에서 미지수를 정의하고 식을 세우는 과정을 어려워해, 문제 해석·식 유도 연습이 필요함",
+      "first_seen": "2026-06-16",
+      "history": [
+        {
+          "date": "2026-06-16",
+          "freq": 5,
+          "rec": "new_tag"
+        }
+      ],
+      "streak": 1,
+      "last_seen": "2026-06-16"
+    },
+    "self_directed": {
+      "theme": "자발적 일찍 등원·자율 보충(자기주도)",
+      "category": "highlight",
+      "suggested_label": "🌱 자기주도 보충",
+      "suggested_phrase": "스스로 일찍 등원하거나 자발적으로 부족한 부분을 보완하려는 자기주도적 학습 의지를 보임",
+      "first_seen": "2026-06-16",
+      "history": [
+        {
+          "date": "2026-06-16",
+          "freq": 5,
+          "rec": "new_tag"
+        }
+      ],
+      "streak": 1,
+      "last_seen": "2026-06-16"
     }
   }
 }

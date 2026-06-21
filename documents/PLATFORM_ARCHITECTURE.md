@@ -126,7 +126,8 @@
 - **보안과 분리**: 이 재구성은 UX·유지보수 개선이지 보안 필수 아님(보안은 로그인이 해결). 우선순위는 로그인 다음.
 
 ## 8. 미결
-- [ ] CampusManager: 신규 repo vs DRW 프로젝트 내 별도 호스팅 타깃 (동일 Firebase 프로젝트 전제)
+- [x] CampusManager: **독립 repo 확정** → `D:\WorkSpace\Development\CampusManager`(public/ 웹 + agent/).
+      동일 Firebase 프로젝트(dailyreportwizard) 공유, 별도 Hosting site로 배포. (전송 에이전트도 동반 이관)
 - [x] 전송 통합 여부: **통합 안 함** — 강사(일일)·관리자(일괄) 도메인 분리 확정(§3)
 - [ ] DRW 일일 전송의 로컬 형태: 기존 PC앱 유지 vs 강사측 얇은 전송기로 정리(§5-3에서 판단)
 - [ ] 에이전트 이미지 전달 방식(base64 큐 vs 스토리지)
