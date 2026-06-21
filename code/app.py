@@ -52,7 +52,7 @@ from constants import (
     FT, FB, FS, FE, _MOD,
     ASSIGN_GRADE_LABELS, grade_label, TAGS,
 )
-from storage  import (load_config, save_config, has_students,
+from storage  import (load_config, save_config,
                       save_daily_cache, load_daily_cache, set_runtime_cwd, RUNTIME_DIR,
                       load_templates, save_templates)
 from firebase import (firebase_get, firebase_put, firebase_patch, fetch_tags,

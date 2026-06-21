@@ -171,10 +171,6 @@ DEFAULT_CONFIG = {
     "claude_api_key":  "",
     "gemini_api_key":  "",
     "instructor_id":   "",
-    "sheets": {
-        "M": {"classes": {}},
-        "T": {"classes": {}}
-    },
     "presets": {
         "과제수행도": [
             "과제 완벽 수행 ✅",
