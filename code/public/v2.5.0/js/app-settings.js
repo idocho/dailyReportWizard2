@@ -305,48 +305,9 @@ function renderSettings(mc){
       <div class="sa-body${openSaIds.has('sa-admin')?' open':''}" id="instrMgmtCard"><div style="padding:10px 12px;font-size:12px;color:var(--gray)">불러오는 중...</div></div>
     </div>`:'';
 
-  const SA_FB=`
-    <div class="sa" id="sa-fb">
-      <div class="sa-hdr${openSaIds.has('sa-fb')?' open':''}" onclick="_saToggle('sa-fb')">
-        <span class="sa-ico">🔥</span>
-        <span class="sa-lbl">Firebase 연결</span>
-        <span class="sa-sub">${dbUrl?'연결됨 ✓':'미설정'}</span>
-        <span class="sa-chv">›</span>
-      </div>
-      <div class="sa-body${openSaIds.has('sa-fb')?' open':''}">
-        <div class="sr"><div class="sl">DB URL</div><input class="inp" id="sUrl" value="${esc(dbUrl)}" placeholder="https://your-project.firebaseio.com" type="url" onkeydown="if(event.key==='Enter')saveFb()"></div>
-        <div class="sr"><div class="sl">경로 (Secret Path)</div><input class="inp" id="sPth" value="${esc(dbPath)}" placeholder="drw_a7f3k9x2" onkeydown="if(event.key==='Enter')saveFb()"></div>
-        <div class="sr"><div class="sl">DB 시크릿 (선택)</div><input class="inp" id="sSec" value="${esc(dbSecret)}" placeholder="보안 전환 후 입력" type="password" onkeydown="if(event.key==='Enter')saveFb()"></div>
-        <div style="padding:10px 14px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn bp bsm" onclick="saveFb()">💾 저장</button><button class="btn bsm" onclick="loadCfg()">📥 학생 명단 불러오기</button></div>
-        <div style="padding:0 14px 10px;font-size:10px;color:var(--sub)">💡 다른 기기에서 입력한 데이터는 위 버튼으로 수동 갱신하세요.</div>
-      </div>
-    </div>`;
-
-  const SA_ACCT=`
-    <div class="sa" id="sa-acct">
-      <div class="sa-hdr${openSaIds.has('sa-acct')?' open':''}" onclick="_saToggle('sa-acct')">
-        <span class="sa-ico">🔑</span>
-        <span class="sa-lbl">내 계정</span>
-        ${acctSub}
-        <span class="sa-chv">›</span>
-      </div>
-      <div class="sa-body${openSaIds.has('sa-acct')?' open':''}">
-        ${instr.name
-          ? `<div style="display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--border)">
-               <div class="avatar" style="width:32px;height:32px;font-size:11px">${esc(instr.name.slice(0,3))}</div>
-               <div style="flex:1"><div style="font-size:13px;font-weight:700">${esc(instr.name)}</div><div style="font-size:11px;color:var(--sub)">${(instr.assignments||[]).length}개 수업</div></div>
-               <span style="font-size:11px;color:var(--green);font-weight:700">✓ 로그인됨</span>
-             </div>`
-          : ''}
-        <div class="sr"><div class="sl">${instr.name ? '다른 계정으로 전환' : '강사 이름으로 조회'}</div>
-          <div style="display:flex;gap:8px">
-            <input class="inp" id="acctName" value="" placeholder="이름을 입력하세요" style="flex:1" onkeydown="if(event.key==='Enter')lookupInstr()">
-            <button class="btn bp bsm" onclick="lookupInstr()" style="flex-shrink:0">조회</button>
-          </div>
-        </div>
-        <div style="padding:4px 14px 10px;font-size:11px;color:var(--sub)">이름 그대로 Firebase 키로 사용됩니다 (예: <code>config/instructors/홍길동</code>)</div>
-      </div>
-    </div>`;
+  // v2.5.0 슬림화: Firebase 연결(SA_FB)·자가등록 계정(SA_ACCT) 제거 — 로그인이 대체.
+  //   연결정보는 로그인 게이트가 자동 주입(index.html), 신원은 acl(instructorId)에서 옴.
+  //   내 이름은 사이드바 아바타에 표시됨(app-core).
 
   const SA_PRESET=`
     <div class="sa" id="sa-preset">
@@ -400,7 +361,7 @@ function renderSettings(mc){
 
   const SA_FOOT=`
     <div class="stg-foot">
-      <button class="btn" style="width:100%;border-style:dashed;color:var(--indigo-ink);border-color:var(--indigo-line);justify-content:center;display:flex;gap:6px" onclick="restartWizard()">🧭 초기 설정 위저드 다시 실행 <span style="font-size:10px;color:var(--gray);font-weight:600">(테스트용)</span></button>
+      <button class="btn bsm" style="width:100%;justify-content:center;display:flex;gap:6px" onclick="doLogout()">🚪 로그아웃</button>
       <button class="adm-btn${adminOn?' on':''}" onclick="toggleAdmin()" id="admBtn">
         <span>${adminOn?'🔓':'🔒'}</span>
         <span id="admBtnLbl">${adminOn?'관리자 모드 해제':'관리자 모드'}</span>
@@ -415,15 +376,13 @@ function renderSettings(mc){
   const _pane=(k,html)=>`<div class="stg-pane${T===k?' on':''}" data-stg="${k}">${html}</div>`;
   mc.innerHTML=makeTb('설정')+`<div class="stg">
     <div class="stg-rail">
-      ${_tab('account','👤','계정·수업')}
-      ${_tab('conn','🔥','연결')}
+      ${_tab('account','👤','수업')}
       ${_tab('data','💬','문구·데이터')}
       ${adminOn?_tab('admin','👑','관리자'):''}
       ${_tab('system','⚙️','시스템')}
     </div>
     <div class="stg-panes">
-      ${_pane('account',SA_ACCT+SA_ASGN+SA_CLS)}
-      ${_pane('conn',SA_FB)}
+      ${_pane('account',SA_ASGN+SA_CLS)}
       ${_pane('data',SA_PRESET+SA_RESET)}
       ${adminOn?_pane('admin',tbMgmtHtml+tbListHtml+instrMgmt):''}
       ${_pane('system',SA_FOOT)}
@@ -432,7 +391,6 @@ function renderSettings(mc){
 
   setSync(!!dbUrl&&!!dbPath);
   if(adminOn)loadInstrsSection();
-  if(!instr.name)_saOpen('sa-acct');
 }
 
 // ══════════════════════════════════════════════════════════

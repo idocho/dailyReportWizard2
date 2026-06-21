@@ -517,9 +517,9 @@ function init(){
   loadCurriculum();
   renderSb();
   if(!instructor){
-    // 신규 사용자 — 초기 설정 위저드 시작 (4단계 순차 가이드)
-    wizardActive=true;wzStep=0;
-    renderMain();
+    // v2.5.0: 온보딩 위저드 폐지 — 신원은 로그인 게이트(index.html)가 acl에서 주입.
+    // 여기 도달 = 게이트 우회/세션 이상 → 게이트로 복귀.
+    location.reload();
     return;
   }
   if(dbUrl&&dbPath){

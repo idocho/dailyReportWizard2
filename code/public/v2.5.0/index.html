@@ -78,6 +78,8 @@
   }
 
   if(A){
+    // 로그아웃(앱 설정의 로그아웃 버튼에서 호출)
+    window.doLogout=async()=>{ try{ await A.logout(); }catch(_){} ['drw_instr','drw_db_secret'].forEach(k=>{try{localStorage.removeItem(k);}catch(_){}}); location.reload(); };
     // 토큰 주기 갱신(1h 만료 대비)
     async function refresh(){ const t=await A.getIdToken(); if(t) window.__AUTH_TOKEN__=t; }
     let booted=false;
