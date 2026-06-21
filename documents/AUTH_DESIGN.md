@@ -29,7 +29,8 @@ acl/
       매 요청 acl.active 를 확인하므로 즉시 효력(개인 계정의 강점).
     · instructorId = 기존 config/instructors 키(한글 이름) — 로그인 신원↔기존 데이터 연결(§12).
       권한 판단엔 campus/role/active만 사용.
-    · role: instructor / admin(캠퍼스) / super(전 캠퍼스 — §11 결정)
+    · role: instructor / admin(캠퍼스) / super(전 캠퍼스) / agent(전송 에이전트, 헤드리스)
+      — agent 는 자기 캠퍼스 sendJobs 읽기·상태쓰기 + students 읽기만(PLATFORM_ARCHITECTURE §4)
 ```
 
 ### 2.1 개인 DB 설정 제거 (로그인의 부수 이득)
@@ -63,7 +64,7 @@ acl/
 
 ### 3.1 계정·비밀번호 관리 (관리자 생성형)
 - **비밀번호는 Firebase Auth가 해시(scrypt)로 보관 — 관리자·앱 누구도 실제 비번을 보지 못한다.**
-- **발급**: 관리자가 ClassManager(또는 웹 관리자)에서 계정 생성(이름 입력 → 합성 이메일 자동) +
+- **발급**: 관리자가 **CampusManager**(관리자 웹, PLATFORM_ARCHITECTURE)에서 계정 생성(이름 → 합성 이메일 자동) +
   **임시 비밀번호** 지정 → 강사에게 **이름+임시비번** 개별 전달(비공개 채널).
 - **첫 로그인 시 비번 변경 강제** → 이후 본인만 앎.
 - **강사 자가등록 전면 제거(확정)**: 현재 웹은 "이름 입력 → 없으면 새로 등록"(app-settings.js
@@ -137,6 +138,9 @@ drw2_{campus}/                                          // 예: drw2_gangnam
   - 가능하면 운영 전용 구글계정 분리(개인 메일과 분리).
 - super 가 굳이 in-app 데이터계정으로 상주할 필요는 적음 — **평소엔 콘솔 owner로만, 분석 등 필요 시
   super 로그인**. 상주 최소화가 노출면을 줄인다.
+
+> **플랫폼 재구성 연계**: 관리자 기능은 신규 **CampusManager(웹)** 로, 카톡 전송은 **전송 에이전트(로컬)**
+> 로 분리 예정 — [PLATFORM_ARCHITECTURE.md](PLATFORM_ARCHITECTURE.md). 아래 표는 그 전·과도기 기준.
 
 ## 6. 클라이언트별 적용 (작업 규모순)
 | 클라 | 사용자 | 적용 |
