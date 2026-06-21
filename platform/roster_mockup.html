@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<!--
+  roster_mockup.html — CampusManager 명단(students/classes) 관리 UI 목업 (PLATFORM §1·§2)
+  목업 전용. ClassManager 의 명단 CRUD·CSV 임포트를 관리자 웹으로 이관한 화면.
+  데이터 모델: students/{nameKey}={name,class} · classes/{classId}={group:M|T}. 무소속=class null.
+-->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CampusManager · 명단 관리 (목업)</title>
+<style>
+  :root{--bg:#FAFAFB;--panel:#FFFFFF;--indigo:#4F46E5;--indigo-ink:#4338CA;--indigo-l:#EEF0FF;
+    --line:#ECECEF;--soft:#F3F3F5;--text:#18181B;--sub:#5C6370;--green:#16A34A;--red:#DC2626;--ink:#15171F;}
+  *{box-sizing:border-box;font-family:"맑은 고딕","Malgun Gothic",system-ui,sans-serif}
+  body{margin:0;min-height:100vh;background:var(--bg);color:var(--text)}
+  .topbar{background:var(--ink);color:#fff;padding:13px 22px;display:flex;align-items:center;gap:12px}
+  .topbar .t{font-size:15px;font-weight:800}
+  .topbar .tag{font-size:11px;font-weight:700;background:var(--indigo);padding:3px 9px;border-radius:20px}
+  .topbar .who{margin-left:auto;font-size:12px;color:#cbd5e1}.topbar .who b{color:#fff}
+  .nav{display:flex;gap:4px;padding:10px 22px 0;background:var(--ink)}
+  .nav a{font-size:12.5px;font-weight:700;color:#94A3B8;padding:8px 13px;border-radius:9px 9px 0 0;text-decoration:none}
+  .nav a.on{background:var(--bg);color:var(--indigo-ink)}
+  .wrap{max-width:880px;margin:20px auto;padding:0 18px;display:grid;grid-template-columns:230px 1fr;gap:18px}
+  @media(max-width:640px){.wrap{grid-template-columns:1fr}}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+  .ph{display:flex;align-items:center;padding:12px 14px;border-bottom:1px solid var(--line)}
+  .ph h3{margin:0;font-size:13px;font-weight:800}.ph .sp{margin-left:auto}
+  .gtoggle{display:flex;gap:4px;padding:10px 12px}
+  .gtoggle button{flex:1;padding:7px;border:1px solid var(--line);border-radius:8px;background:#fff;font-size:12px;font-weight:700;color:var(--sub);cursor:pointer}
+  .gtoggle button.on{background:var(--indigo);color:#fff;border-color:var(--indigo)}
+  .clist{padding:4px 8px 10px}
+  .citem{display:flex;align-items:center;gap:8px;padding:9px 10px;border-radius:9px;cursor:pointer;font-size:13px}
+  .citem:hover{background:var(--soft)}
+  .citem.on{background:var(--indigo-l);color:var(--indigo-ink);font-weight:800}
+  .citem .n{margin-left:auto;font-size:11px;color:var(--sub)}
+  .citem.unassigned{color:var(--amber,#D97706)}
+  .addrow{padding:6px 10px 12px}
+  .addrow button{width:100%;padding:9px;border:1px dashed var(--line);border-radius:9px;background:#fff;color:var(--sub);font-size:12px;font-weight:700;cursor:pointer}
+  .addrow button:hover{border-color:var(--indigo);color:var(--indigo)}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th{text-align:left;padding:10px 14px;background:var(--soft);color:var(--sub);font-size:11px;font-weight:800}
+  td{padding:11px 14px;border-top:1px solid var(--line)}
+  .num{font-family:ui-monospace,monospace;color:var(--sub)}
+  .act{display:flex;gap:6px}
+  .act button{padding:5px 9px;border:1px solid var(--line);border-radius:7px;background:#fff;font-size:11px;font-weight:700;color:var(--sub);cursor:pointer}
+  .act button:hover{border-color:var(--indigo);color:var(--indigo)}
+  .act button.del:hover{border-color:var(--red);color:var(--red)}
+  .btn{padding:8px 14px;border:none;border-radius:9px;background:var(--indigo);color:#fff;font-size:12.5px;font-weight:800;cursor:pointer}
+  .btn:hover{background:var(--indigo-ink)}
+  .btn.ghost{background:#fff;color:var(--indigo);border:1px solid var(--indigo-l)}
+  .empty{padding:40px 20px;text-align:center;color:var(--sub);font-size:13px}
+  .toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:11px 18px;border-radius:10px;font-size:13px;font-weight:600;opacity:0;transition:opacity .2s;pointer-events:none}
+  .toast.show{opacity:1}
+  .ov{position:fixed;inset:0;background:rgba(15,17,31,.45);display:none;align-items:center;justify-content:center;padding:20px}
+  .ov.on{display:flex}.modal{background:#fff;border-radius:16px;width:100%;max-width:360px;padding:22px}
+  .modal h3{margin:0 0 14px;font-size:15px;font-weight:800}
+  label{display:block;font-size:12px;font-weight:700;color:var(--sub);margin:10px 0 5px}
+  input,select{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:10px;font-size:14px;outline:none}
+  input:focus{border-color:var(--indigo);box-shadow:0 0 0 3px var(--indigo-l)}
+  .mrow{display:flex;gap:8px;margin-top:18px}.mrow button{flex:1;padding:11px;border:none;border-radius:10px;font-size:14px;font-weight:800;cursor:pointer}
+  .mrow .cancel{background:var(--soft);color:var(--sub)}.mrow .ok{background:var(--indigo);color:#fff}
+</style>
+</head>
+<body>
+<div class="topbar"><span class="t">CampusManager</span><span class="tag">관리자</span><span class="who"><b>박관리</b> · 강남 캠퍼스</span></div>
+<div class="nav"><a href="admin_mockup.html">강사 계정</a><a class="on" href="#">명단</a><a href="send_mockup.html">템플릿·전송</a></div>
+
+<div class="wrap">
+  <!-- 좌: 반 목록 -->
+  <div class="panel">
+    <div class="gtoggle">
+      <button id="gM" class="on" onclick="setGroup('M')">M반</button>
+      <button id="gT" onclick="setGroup('T')">T반</button>
+    </div>
+    <div class="clist" id="clist"></div>
+    <div class="addrow"><button onclick="addClass()">+ 반 추가</button></div>
+  </div>
+
+  <!-- 우: 선택 반 학생 -->
+  <div class="panel">
+    <div class="ph">
+      <h3 id="stitle">학생</h3>
+      <span class="sp"></span>
+      <button class="btn ghost" style="margin-right:8px" onclick="importCsv()">⬆ CSV 가져오기</button>
+      <button class="btn" onclick="addStudent()">+ 학생 추가</button>
+    </div>
+    <div id="stbody"></div>
+  </div>
+</div>
+
+<!-- 학생 추가/이동 모달 -->
+<div class="ov" id="ov"><div class="modal">
+  <h3 id="m-title">학생 추가</h3>
+  <label>출결번호 (nameKey)</label><input id="m-key" placeholder="예: 101" autocomplete="off">
+  <label>이름</label><input id="m-name" placeholder="이름" autocomplete="off">
+  <label>반</label><select id="m-class"></select>
+  <div class="mrow"><button class="cancel" onclick="closeOv()">취소</button><button class="ok" onclick="saveStudent()">저장</button></div>
+</div></div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  const $=id=>document.getElementById(id);
+  let classes=[{id:'중1A',group:'M'},{id:'중2B',group:'M'},{id:'중3개별화',group:'T'}];
+  let students=[
+    {key:'101',name:'김민준',cls:'중1A'},{key:'102',name:'이서연',cls:'중1A'},
+    {key:'103',name:'정하윤',cls:'중1A'},{key:'201',name:'박도윤',cls:'중2B'},
+    {key:'202',name:'한지호',cls:'중2B'},{key:'301',name:'최지우',cls:'중3개별화'},
+    {key:'999',name:'신규생',cls:null},
+  ];
+  let group='M', sel='중1A', editKey=null;
+  const toast=t=>{const e=$('toast');e.textContent=t;e.classList.add('show');setTimeout(()=>e.classList.remove('show'),1700);};
+  const inClass=c=>students.filter(s=>s.cls===c).length;
+  const unassigned=()=>students.filter(s=>!s.cls||!classes.some(c=>c.id===s.cls));
+
+  function setGroup(g){group=g;$('gM').className=g==='M'?'on':'';$('gT').className=g==='T'?'on':'';
+    const first=classes.find(c=>c.group===g);sel=first?first.id:'__un__';renderC();renderS();}
+  function renderC(){
+    const items=classes.filter(c=>c.group===group).map(c=>
+      `<div class="citem ${sel===c.id?'on':''}" onclick="pick('${c.id}')">${c.id}<span class="n">${inClass(c.id)}명</span></div>`).join('');
+    const un=`<div class="citem unassigned ${sel==='__un__'?'on':''}" onclick="pick('__un__')">⚠ 무소속<span class="n">${unassigned().length}명</span></div>`;
+    $('clist').innerHTML=items+un;
+  }
+  function pick(c){sel=c;renderC();renderS();}
+  function renderS(){
+    const list = sel==='__un__' ? unassigned() : students.filter(s=>s.cls===sel);
+    $('stitle').textContent = (sel==='__un__'?'무소속':sel)+` · ${list.length}명`;
+    if(!list.length){$('stbody').innerHTML='<div class="empty">학생이 없습니다. <b>+ 학생 추가</b> 또는 CSV 가져오기.</div>';return;}
+    $('stbody').innerHTML=`<table><thead><tr><th>출결번호</th><th>이름</th><th>반</th><th>작업</th></tr></thead><tbody>`+
+      list.map(s=>`<tr><td class="num">${s.key}</td><td><b>${s.name}</b></td><td>${s.cls||'<span style="color:#D97706">무소속</span>'}</td>
+        <td><div class="act"><button onclick="editStudent('${s.key}')">편집</button><button class="del" onclick="delStudent('${s.key}')">삭제</button></div></td></tr>`).join('')
+      +`</tbody></table>`;
+  }
+  function fillClassOpts(cur){$('m-class').innerHTML=classes.map(c=>`<option value="${c.id}" ${c===cur||c.id===cur?'selected':''}>${c.id} (${c.group})</option>`).join('')+`<option value="">무소속</option>`;}
+  function addStudent(){editKey=null;$('m-title').textContent='학생 추가';$('m-key').value='';$('m-name').value='';$('m-key').disabled=false;fillClassOpts(sel==='__un__'?'':sel);$('ov').classList.add('on');$('m-key').focus();}
+  function editStudent(k){const s=students.find(x=>x.key===k);editKey=k;$('m-title').textContent='학생 편집';$('m-key').value=s.key;$('m-key').disabled=true;$('m-name').value=s.name;fillClassOpts(s.cls||'');$('ov').classList.add('on');}
+  function closeOv(){$('ov').classList.remove('on');}
+  function saveStudent(){
+    const key=$('m-key').value.trim(),name=$('m-name').value.trim(),cls=$('m-class').value||null;
+    if(!key||!name){toast('출결번호·이름을 입력하세요');return;}
+    if(editKey){const s=students.find(x=>x.key===editKey);s.name=name;s.cls=cls;}
+    else{ if(students.some(s=>s.key===key)){toast('이미 있는 출결번호입니다');return;} students.push({key,name,cls}); }
+    closeOv();renderC();renderS();toast('저장됨');
+  }
+  function delStudent(k){const s=students.find(x=>x.key===k);if(!confirm){};students=students.filter(x=>x.key!==k);renderC();renderS();toast(`${s.name} 삭제`);}
+  function addClass(){const id=prompt&&null;const name='신규반'+(classes.filter(c=>c.group===group).length+1);classes.push({id:name,group});sel=name;renderC();renderS();toast(`${name} 추가 (${group})`);}
+  function importCsv(){toast('CSV 가져오기 — 출결번호,이름,반 (시뮬레이션)');}
+
+  setGroup('M');
+</script>
+</body>
+</html>
