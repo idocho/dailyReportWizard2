@@ -82,7 +82,16 @@
     async function refresh(){ const t=await A.getIdToken(); if(t) window.__AUTH_TOKEN__=t; }
     let booted=false;
     A.onAuth(async (user)=>{
-      if(user){ await refresh(); setInterval(refresh, 30*60*1000); if(!booted){ booted=true; bootApp(); } }
+      if(!user) return;
+      await refresh(); setInterval(refresh, 30*60*1000);
+      if(booted) return;
+      // acl 조회 → 로그인 신원을 앱에 주입(온보딩·자가등록 제거) + 비활성 재검증
+      try{
+        const acl=await (await fetch(cfg.databaseURL.replace(/\/$/,'')+'/acl/'+user.uid+'.json?auth='+window.__AUTH_TOKEN__)).json();
+        if(!acl || acl.active!==true){ await A.logout(); $('gt-msg').className='m show'; $('gt-msg').textContent='비활성화된 계정입니다. 관리자에게 문의하세요.'; return; }
+        localStorage.setItem('drw_instr', JSON.stringify({ id: acl.instructorId, name: acl.instructorId, assignments: [] }));
+      }catch(_){ /* 조회 실패 시에도 부팅은 진행(가용성) */ }
+      booted=true; bootApp();
     });
     $('gt-btn').onclick=async()=>{
       $('gt-msg').className='m'; const name=$('gt-name').value.trim(),pw=$('gt-pw').value,c=$('gt-campus').value;
