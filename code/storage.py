@@ -4,6 +4,7 @@ Crafted by IDO(idocho@kakao.com) · Powered by Claude AI
 """
 import json, os, sys
 from constants import DEFAULT_CONFIG, DEFAULT_CACHE
+import secret_codec
 
 
 # ── 경로 ─────────────────────────────────────────────────────────────
@@ -66,9 +67,16 @@ def load_config():
         except Exception:
             cfg = None
         if isinstance(cfg, dict):
+            # 디스크에 평문 시크릿이 남아 있으면(레거시 config.json) 복호 후 재저장으로
+            # 암호화 마이그레이션 — DPAPI 가능 환경에서만 실제 암호화됨.
+            needs_migration = secret_codec.has_plaintext_secret(cfg)
+            # 민감 필드 복호 → 이후 메모리상 cfg 는 항상 평문(앱 코드 무수정).
+            secret_codec.decrypt_fields(cfg)
             # 구버전 room_prefix 마이그레이션
             if cfg.get('room_prefix', '').endswith('_'):
                 cfg['room_prefix'] = cfg['room_prefix'].rstrip('_') + ' '
+                needs_migration = True
+            if needs_migration:
                 save_config(cfg)
             return cfg
     save_config(DEFAULT_CONFIG)
@@ -76,9 +84,13 @@ def load_config():
 
 
 def save_config(cfg):
+    """cfg 를 디스크에 저장. 민감 필드(API 키·DB 시크릿)는 DPAPI 로 암호화해 기록.
+
+    전달받은 cfg dict 는 변경하지 않는다(메모리 평문 유지) — 암호화한 복사본만 기록."""
     _ensure_parent(CONFIG_PATH)
+    to_write = secret_codec.encrypt_fields(cfg)
     with open(CONFIG_PATH, 'w', encoding='utf-8') as f:
-        json.dump(cfg, f, ensure_ascii=False, indent=2)
+        json.dump(to_write, f, ensure_ascii=False, indent=2)
 
 
 # 기본 빌트인 템플릿 — templates.json 이 없거나 비어 있을 때 시드.

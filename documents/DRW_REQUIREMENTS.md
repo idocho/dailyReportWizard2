@@ -1,7 +1,7 @@
 # DailyReportWizard — 요구사항 명세서
 
 **Crafted by IDO(idocho@kakao.com) · Powered by Claude AI**  
-**문서 버전**: 8.46 · **앱 버전**: v2.4.0(베타·최신)/v2.3.0(이전) · **최종 수정**: 2026-06-16
+**문서 버전**: 8.47 · **앱 버전**: v2.4.0(베타·최신)/v2.3.0(이전) · **최종 수정**: 2026-06-21
 
 > Firebase 스키마 전체 명세: [ClassManager/documents/DB_SCHEMA.md](../../ClassManager/documents/DB_SCHEMA.md)
 
@@ -11,6 +11,7 @@
 
 | 문서 버전 | 날짜 | 주요 변경 |
 |-----------|------|-----------|
+| 8.47 | 2026-06-21 | **공식배포 前 보안 강화 (CBT 막바지·브랜치 endgame)** — ① **[PC] API 키·DB 시크릿 로컬 암호화** — `code/secret_codec.py` 신설(순수 `ctypes` DPAPI, pywin32 의존 0). `config.json`의 `groq/openai/claude/gemini_api_key`·`firebase_secret`을 `CryptProtectData`로 암호화(`dpapi:` 프리픽스+base64). **현재 Windows 사용자+머신 바인딩** — 파일만 복사해선 복호 불가(평문키 디스크 노출·과금탈취 차단). `storage.py` `save_config`은 암호화 복사본만 기록(메모리 cfg는 평문 유지 → 앱 코드 무수정), `load_config`은 복호 후 평문 반환 + 레거시 평문 config 자동 재저장 마이그레이션. **하위호환**: `unprotect`는 `dpapi:` 없으면 그대로 반환(평문·비-Windows 개발환경 100% 동작). `backup_db.py`·`restore_db.py`도 `secret_codec.unprotect`로 시크릿 복호(룰 전환 후 백업 유지). ② **[웹] 보안 응답 헤더** — `firebase.json`에 CSP(`default-src 'self'`; script/style `'unsafe-inline'`(인라인 핸들러 호환); connect-src firebaseio·firebasedatabase) + `X-Content-Type-Options:nosniff`·`X-Frame-Options:DENY`·`Referrer-Policy`·`Permissions-Policy`. ③ **[운영] 룰 전환 원샷 스크립트** `scripts/deploy-rules.ps1` — 백업→[무장확인 게이트]→schema_version=14→firebase.json database 배선(멱등)→`firebase deploy --only database`→무인증차단/유인증통과 검증을 순서·`-DryRun` 지원으로 자동화(`SECURITY_RULES_PLAN.md` 런북 실행체). **라이브 룰 배포 자체는 클라 무장 후 수동 트리거**(미무장 시 전 클라 차단) |
 | 8.46 | 2026-06-16 | **설정 UI 정리 (PC·웹)** — ① **[PC] 설정창 폭 확대·잘림 수정**: 고정 560→660 + `resizable(True,True)`·`minsize(600,560)`(가로 조절 가능). `_wrap_to_width`를 본문 공용으로 끌어올려 안내문·엔진 설명·미리보기·힌트가 창 폭에 맞춰 자동 줄바꿈(고정 wraplength 잘림 해소). ② **[PC] 개별 지침 직관화**: 라벨 `개별 지침`→`✏️ 나만의 프롬프트`(인디고), 빈칸 placeholder 예시("항상 존댓말 / 끝에 응원 한마디 / 줄임말 금지", 저장 시 예시문은 빈값 처리), 동작 설명 힌트("AI에게 그대로 전달돼 매 생성마다 반영"). ③ **[웹] 시스템 탭 분리**: 모든 설정 탭 하단에 항상 노출되던 「초기 설정 위저드 다시 실행 / 관리자 모드 / 크레딧」(`stg-foot`)을 독립 「⚙️ 시스템」 탭으로 이동 — `_pane('system',SA_FOOT)`, `.stg-foot` 구분선 제거, 캐시버스트 `?v=202606161700`. 실캡처·프리뷰 검증(탭 전환·footer 단일 노출·관리자 ON 시 5탭) |
 | 8.45 | 2026-06-16 | **[웹] GUI 정리 — 온보딩 풀스크린·설정 좌측 탭·사이드바 튜닝(§4.2·4.8·4.8-C)** — ① **온보딩 풀스크린**: 위저드 중 `#wr.wz-mode`로 사이드바 숨김(`renderMain` 토글)+본문 전체폭. 위저드 헤더에 설치·운용 **가이드 링크**(`.wz-guide`) 추가. ② **설정 좌측 탭**: 단일 롱 스크롤 아코디언 → 4탭(`.stg-rail`: 👤계정·수업/🔥연결/💬문구·데이터/👑관리자) + `setStg` CSS show/hide(아코디언·async 보존), `@600px` 가로 탭 반응형. 기존 `sa` 섹션 재사용. ③ **사이드바 튜닝**: `--sw` 212→192px. 캐시버스트 `?v=202606161200`(app.css·app-core·app-settings). 프리뷰 검증(온보딩 사이드바 none·가이드 노출·탭 전환·모바일 가로전환·콘솔 무에러) |
 | 8.44 | 2026-06-16 | **[PC] 설정창 좌측 탭 사이드바 재구성(§2.9)** — AI 기능 추가로 설정창이 단일 롱 스크롤로 비대해져 정리. 좌측 탭 레일(132px) + 탭별 스크롤 콘텐츠 + 하단 고정 푸터(저장/취소)로 분리. 탭: **🤖 AI 생성(기본·전면)** / 🔥 연결 / 👤 강사 계정 / ⚙ 일반(전송속도·접두사). 기존 위젯 빌드 코드는 유지하고 섹션별 부모를 `inner = tab_*`로 재지정, 섹션 구분선 제거. 창 520×720→560×680. exe 재빌드 |
@@ -999,9 +1000,12 @@ cfg.sheets.M.classes.중1A.tb_grade  = { "최상위수학": "중1-1", "우공비
 
 **접근 인증 (v8.16, Security Rules 전환 대비)**: 모든 클라이언트 REST 요청은 시크릿 설정 시
 `?auth={DB Secret}`을 부가(레거시 admin 토큰 — 룰 우회). 미설정 시 무인증(전환 전 동작).
-저장 위치 — 웹 `drw_db_secret`(localStorage) / PC `config.json firebase_secret` /
+저장 위치 — 웹 `drw_db_secret`(localStorage) / PC `config.json firebase_secret`(v8.47부터 DPAPI 암호화) /
 CM `settings.json dbSecret` / Analyzer `drw_fb_secret`(localStorage).
-룰·전환 절차는 `documents/SECURITY_RULES_PLAN.md`, 룰 본문은 `database.rules.json`(미배포 초안).
+룰·전환 절차는 `documents/SECURITY_RULES_PLAN.md`, 룰 본문은 `database.rules.json`(미배포 초안),
+전환 실행은 `scripts/deploy-rules.ps1`(클라 무장 후 수동).
+⚠️ 웹·CM·Analyzer 시크릿은 여전히 평문 저장 — DB Secret은 룰 우회 admin 토큰이라
+단말 1대만 새도 전체 DB 노출. 근본 차단은 2차 Firebase Auth(경로별 룰)로만 가능(CBT 종료 후).
 
 **누적 vs 휘발**: 누적 = `obs/`·`scores/`·`history/` (Analyzer 소스, 날짜키 YYYY-MM-DD). 휘발(당일 덮어쓰기) = `input/`·`session/`.
 **날짜 포맷**: 누적 노드·testKey = `YYYY-MM-DD`(todayKey). session.date = `M/D(요일)`(표시용).
@@ -1131,8 +1135,10 @@ CM `settings.json dbSecret` / Analyzer `drw_fb_secret`(localStorage).
 |------|------|
 | 최종 메시지 직접 수정 | 미리보기 패널 편집 가능화. AI생성 후 편집 시 재생성 경고 필요 |
 | PC 강사 배정 UI | 현재 웹에서만 가능 |
-| Firebase Security Rules | 현재 기본 설정. 최종 단계에서 강화 예정 |
-| API Key 보안 저장 | config.json 평문 저장 중. macOS Keychain / 암호화 미적용 |
+| Firebase Security Rules | **현재 무인증 공개 — 공식배포 前 룰 배포 필수**(`scripts/deploy-rules.ps1`). 2차 Firebase Auth(경로별 권한·클라 admin 게이트 대체)는 CBT 종료 후 |
+| API Key 보안 저장 | **[PC] v8.47 DPAPI 암호화 완료**(`secret_codec.py`). 웹/CM/Analyzer DB 시크릿은 평문(localStorage·json) — 2차 Auth로 해소 |
+| 웹/PC IP 보호 | 웹 JS 평문 노출(난독화 미적용)·PC exe 디컴파일 가능. 핵심 프롬프트(`ai_engine.py`) 서버화는 미적용 |
+| PII 파기 정책 | obs/scores/history 소프트삭제만(무한 누적). 보존기간·파기 절차 미정 |
 
 ## 11. 스코프 제외
 

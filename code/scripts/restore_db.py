@@ -13,6 +13,7 @@ restore_db.py — 백업 스냅샷에서 Firebase RTDB 복원 (파괴적 — 신
 """
 import argparse
 import json
+import sys
 import datetime
 import urllib.parse
 import urllib.request
@@ -22,13 +23,17 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 CONFIG_PATH = SCRIPT_DIR.parent / "config.json"
 BACKUP_DIR = SCRIPT_DIR / "backup"
 
+# config.json 의 firebase_secret 은 DPAPI 암호문일 수 있음 → 같은 코덱으로 복호.
+sys.path.insert(0, str(SCRIPT_DIR.parent))
+from secret_codec import unprotect
+
 
 def fb_url(cfg, node=""):
     base = cfg["firebase_url"].rstrip("/")
     path = cfg["firebase_path"].strip("/")
     suffix = f"/{node}" if node else ""
     url = f"{base}/{path}{suffix}.json"
-    secret = (cfg.get("firebase_secret") or "").strip()
+    secret = unprotect(cfg.get("firebase_secret") or "").strip()
     if secret:  # Security Rules 전환 후에도 복원 동작 유지(#15)
         url += "?auth=" + urllib.parse.quote(secret, safe="")
     return url

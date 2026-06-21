@@ -24,6 +24,10 @@ RETENTION_DAYS = 30
 SCRIPT_DIR = Path(__file__).resolve().parent
 BACKUP_DIR = SCRIPT_DIR / "backup"
 CONFIG_PATH = SCRIPT_DIR.parent / "config.json"
+
+# config.json 의 firebase_secret 은 DPAPI 암호문일 수 있음 → 같은 코덱으로 복호.
+sys.path.insert(0, str(SCRIPT_DIR.parent))
+from secret_codec import unprotect
 LOG_PATH = BACKUP_DIR / "backup.log"
 
 
@@ -48,7 +52,7 @@ def main():
         sys.exit(1)
 
     url = f"{base}/{path}.json"
-    secret = (cfg.get("firebase_secret") or "").strip()
+    secret = unprotect(cfg.get("firebase_secret") or "").strip()
     if secret:  # Security Rules 전환 후에도 백업 동작 유지(#15)
         url += "?auth=" + urllib.parse.quote(secret, safe="")
     log(f"GET {path} 시작")
