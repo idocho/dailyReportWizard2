@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<!--
+  admin.html — CampusManager 계정 콘솔 실구현 (auth.js 로그인 게이트 + provision.js 실동작).
+  관리자(admin/super)만 진입. 강사 계정 발급(실제 Auth+acl)·비활성. 비번리셋/삭제는 백엔드 필요(비활성 처리).
+  선행: 콘솔 Auth 활성화 + firebase-config.js.
+-->
+<html lang="ko">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CampusManager · 계정 콘솔</title>
+<style>
+  :root{--bg:#FAFAFB;--panel:#FFFFFF;--indigo:#4F46E5;--indigo-ink:#4338CA;--indigo-l:#EEF0FF;
+    --line:#ECECEF;--soft:#F3F3F5;--text:#18181B;--sub:#5C6370;--green:#16A34A;--red:#DC2626;--ink:#15171F;}
+  *{box-sizing:border-box;font-family:"맑은 고딕","Malgun Gothic",system-ui,sans-serif}
+  body{margin:0;min-height:100vh;background:var(--bg);color:var(--text)}
+  /* 로그인 게이트 */
+  #gate{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;
+        background:linear-gradient(160deg,#E7E9F5 0%,#FAFAFB 55%)}
+  .card{width:100%;max-width:360px;background:#fff;border:1px solid var(--line);border-radius:18px;padding:28px 24px;box-shadow:0 12px 40px rgba(21,23,31,.10)}
+  .card h1{margin:0 0 2px;font-size:16px;font-weight:800;text-align:center}
+  .card p{margin:0 0 16px;font-size:12px;color:var(--sub);text-align:center}
+  label{display:block;font-size:12px;font-weight:700;color:var(--sub);margin:12px 0 5px}
+  input,select{width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:10px;font-size:14px;outline:none}
+  input:focus,select:focus{border-color:var(--indigo);box-shadow:0 0 0 3px var(--indigo-l)}
+  .btn{width:100%;margin-top:16px;padding:12px;border:none;border-radius:10px;background:var(--ink);color:#fff;font-size:14px;font-weight:800;cursor:pointer}
+  .btn:hover{background:#000}.btn:disabled{opacity:.5}
+  .msg{margin-top:12px;padding:9px 11px;border-radius:9px;font-size:12px;font-weight:600;display:none}
+  .msg.err{background:#FEF2F2;color:var(--red);border:1px solid #FECACA;display:block}
+  .msg.ok{background:#F0FDF4;color:var(--green);border:1px solid #BBF7D0;display:block}
+  /* 콘솔 */
+  #app{display:none}
+  .topbar{background:var(--ink);color:#fff;padding:13px 22px;display:flex;align-items:center;gap:12px}
+  .topbar .t{font-size:15px;font-weight:800}.topbar .tag{font-size:11px;font-weight:700;background:var(--indigo);padding:3px 9px;border-radius:20px}
+  .topbar .who{margin-left:auto;font-size:12px;color:#cbd5e1}.topbar .who b{color:#fff}
+  .topbar .out{margin-left:14px;font-size:11px;color:#94A3B8;cursor:pointer}
+  .wrap{max-width:760px;margin:22px auto;padding:0 18px}
+  .head{display:flex;align-items:center;margin-bottom:14px}.head h2{margin:0;font-size:17px;font-weight:800}
+  .head .cnt{font-size:12px;color:var(--sub);margin-left:8px}.head .add{margin-left:auto;padding:9px 15px;border:none;border-radius:10px;background:var(--indigo);color:#fff;font-size:13px;font-weight:800;cursor:pointer}
+  .panel{background:#fff;border:1px solid var(--line);border-radius:14px;overflow:hidden}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th{text-align:left;padding:11px 14px;background:var(--soft);color:var(--sub);font-size:11px;font-weight:800}
+  td{padding:12px 14px;border-top:1px solid var(--line)}
+  .pill{display:inline-block;font-size:11px;font-weight:800;padding:3px 9px;border-radius:20px}
+  .pill.on{background:#F0FDF4;color:var(--green)}.pill.off{background:#FEF2F2;color:var(--red)}
+  .id{font-family:ui-monospace,monospace;font-size:10px;color:#94A3B8;word-break:break-all}
+  .act button{padding:6px 10px;border:1px solid var(--line);border-radius:8px;background:#fff;font-size:11px;font-weight:700;color:var(--sub);cursor:pointer;margin-right:5px}
+  .act button:hover{border-color:var(--indigo);color:var(--indigo)}
+  .act button:disabled{opacity:.4;cursor:not-allowed}
+  .note{margin-top:14px;background:var(--indigo-l);border-radius:11px;padding:12px 14px;font-size:11.5px;color:var(--indigo-ink);line-height:1.7}
+  .ov{position:fixed;inset:0;background:rgba(15,17,31,.45);display:none;align-items:center;justify-content:center;padding:20px}.ov.on{display:flex}
+  .modal{background:#fff;border-radius:16px;width:100%;max-width:340px;padding:22px}.modal h3{margin:0 0 12px;font-size:15px;font-weight:800}
+  .mrow{display:flex;gap:8px;margin-top:16px}.mrow button{flex:1;padding:11px;border:none;border-radius:10px;font-size:14px;font-weight:800;cursor:pointer}.mrow .cancel{background:var(--soft);color:var(--sub)}.mrow .ok{background:var(--indigo);color:#fff}
+  .toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:11px 18px;border-radius:10px;font-size:13px;font-weight:600;opacity:0;transition:opacity .2s;pointer-events:none}.toast.show{opacity:1}
+  .setup{max-width:380px;margin:60px auto;background:#FFFBEB;border:1px solid #FDE68A;color:#92400E;border-radius:12px;padding:16px;font-size:12.5px;line-height:1.7;display:none}
+</style>
+</head>
+<body>
+<div id="setup" class="setup"></div>
+
+<!-- 로그인 게이트 -->
+<div id="gate">
+  <div class="card">
+    <h1>CampusManager</h1><p>관리자 콘솔 로그인</p>
+    <label>캠퍼스</label><select id="g-campus"><option value="dongsuwon">동수원</option></select>
+    <label>이름</label><input id="g-name" autocomplete="off">
+    <label>비밀번호</label><input id="g-pw" type="password" autocomplete="current-password">
+    <button class="btn" id="g-btn">로그인</button>
+    <div class="msg" id="g-msg"></div>
+  </div>
+</div>
+
+<!-- 콘솔 -->
+<div id="app">
+  <div class="topbar"><span class="t">CampusManager</span><span class="tag" id="roleTag">관리자</span>
+    <span class="who"><b id="whoName"></b> · <span id="whoCampus"></span></span><span class="out" id="logout">로그아웃</span></div>
+  <div class="wrap">
+    <div class="head"><h2>강사 계정</h2><span class="cnt" id="cnt"></span><button class="add" id="addBtn">+ 강사 계정 발급</button></div>
+    <div class="panel"><table><thead><tr><th>이름</th><th>상태</th><th>로그인 ID(자동)</th><th>작업</th></tr></thead><tbody id="rows"></tbody></table></div>
+    <div class="note">• 발급 = 실제 Auth 계정+권한(acl) 생성, 임시비번 전달, 첫 로그인 시 비번 변경.<br>
+      • 비활성 = 즉시 차단(되돌림 가능). • <b>비번 리셋·삭제</b>는 Admin 백엔드 필요 → 현재 비활성 처리(추후 Cloud Function).</div>
+  </div>
+</div>
+
+<!-- 발급 모달 -->
+<div class="ov" id="ov"><div class="modal"><h3>강사 계정 발급</h3>
+  <label>이름</label><input id="m-name" autocomplete="off">
+  <label>임시 비밀번호</label><div style="display:flex;gap:8px"><input id="m-pw" readonly><button class="btn" style="width:auto;margin:0;padding:11px 12px;background:#fff;color:var(--indigo);border:1px solid var(--indigo-l)" id="m-gen">↻</button></div>
+  <div id="m-synth" style="margin-top:8px;font-size:10px;color:#94A3B8;font-family:ui-monospace,monospace;word-break:break-all;min-height:13px"></div>
+  <div class="mrow"><button class="cancel" id="m-cancel">취소</button><button class="ok" id="m-ok">발급</button></div>
+</div></div>
+
+<div class="toast" id="toast"></div>
+
+<script src="../synth_email.js"></script>
+<script type="module">
+  const $=id=>document.getElementById(id);
+  const toast=t=>{const e=$('toast');e.textContent=t;e.classList.add('show');setTimeout(()=>e.classList.remove('show'),1900);};
+  const gmsg=(t,x)=>{$('g-msg').className='msg '+t;$('g-msg').textContent=x;};
+
+  let A,P,session,DB,API;
+  try{
+    A=await import('./auth.js'); P=await import('./provision.js');
+    const cfg=(await import('./firebase-config.js')).firebaseConfig; DB=cfg.databaseURL.replace(/\/$/,''); API=cfg.apiKey;
+  }catch(e){
+    $('gate').style.display='none'; const s=$('setup'); s.style.display='block';
+    s.innerHTML='⚙ <b>설정 필요</b><br>콘솔 Authentication 활성화 + firebase-config.js 작성 후 새로고침.<br><span style="color:#B45309">'+(e&&e.message||e)+'</span>';
+  }
+
+  if(A){
+    $('g-btn').onclick=async()=>{
+      gmsg('','');const name=$('g-name').value.trim(),pw=$('g-pw').value,c=$('g-campus').value;
+      if(!name){gmsg('err','이름을 입력하세요.');return;}
+      $('g-btn').disabled=true;$('g-btn').textContent='로그인 중…';
+      try{
+        session=await A.loginByName(c,name,pw,['admin','super']);
+        $('gate').style.display='none';$('app').style.display='block';
+        $('whoName').textContent=session.instructorId||name;$('whoCampus').textContent=session.campus;
+        $('roleTag').textContent=session.role==='super'?'운영자(super)':'관리자';
+        await refresh();
+      }catch(e){gmsg('err',e.message||String(e));}
+      finally{$('g-btn').disabled=false;$('g-btn').textContent='로그인';}
+    };
+    $('logout').onclick=async()=>{await A.logout();location.reload();};
+
+    async function refresh(){
+      const token=await A.getIdToken();
+      const r=await fetch(DB+'/acl.json'+(token?'?auth='+token:''));
+      const all=await r.json()||{};
+      const mine=Object.entries(all).filter(([u,a])=>a&&a.role==='instructor'&&(session.role==='super'||a.campus===session.campus));
+      $('cnt').textContent=`· ${mine.length}명 (활성 ${mine.filter(([u,a])=>a.active).length})`;
+      $('rows').innerHTML=mine.map(([uid,a])=>`<tr>
+        <td><b>${a.instructorId||'(이름없음)'}</b>${session.role==='super'?` <span style="color:#94A3B8;font-size:11px">${a.campus}</span>`:''}</td>
+        <td><span class="pill ${a.active?'on':'off'}">${a.active?'활성':'비활성'}</span></td>
+        <td class="id">${window.SynthEmail.synthEmail(a.instructorId||'',a.campus)}</td>
+        <td class="act">
+          <button onclick="window._toggle('${uid}',${!a.active})">${a.active?'비활성':'활성화'}</button>
+          <button disabled title="Admin 백엔드 필요">비번 리셋</button>
+          <button disabled title="Admin 백엔드 필요">삭제</button>
+        </td></tr>`).join('') || '<tr><td colspan="4" style="text-align:center;color:#94A3B8;padding:30px">아직 강사 계정이 없습니다.</td></tr>';
+    }
+    window._toggle=async(uid,active)=>{ try{ const t=await A.getIdToken(); await P.setActive(uid,active,t); toast(active?'활성화':'비활성(즉시 차단)'); await refresh(); }catch(e){ toast(e.message||String(e)); } };
+
+    // 발급 모달
+    const genPw=()=>{const c='ABCDEFGHJKMNPQRSTUVWXYZ23456789';let s='';for(let i=0;i<8;i++)s+=c[Math.floor(Math.random()*c.length)];$('m-pw').value=s;};
+    $('addBtn').onclick=()=>{$('m-name').value='';$('m-synth').textContent='';genPw();$('ov').classList.add('on');$('m-name').focus();};
+    $('m-gen').onclick=genPw;
+    $('m-cancel').onclick=()=>$('ov').classList.remove('on');
+    $('m-name').addEventListener('input',()=>{const n=$('m-name').value.trim();$('m-synth').textContent=n?'→ 로그인 ID: '+window.SynthEmail.synthEmail(n,session.campus):'';});
+    $('m-ok').onclick=async()=>{
+      const n=$('m-name').value.trim();if(!n){$('m-name').focus();return;}
+      $('m-ok').disabled=true;
+      try{ const t=await A.getIdToken(); await P.createInstructor(session.campus,n,$('m-pw').value,t);
+        $('ov').classList.remove('on'); toast(`${n} 발급 — 임시비번 ${$('m-pw').value} 전달`); await refresh();
+      }catch(e){ toast(e.message||String(e)); }
+      finally{$('m-ok').disabled=false;}
+    };
+  }
+</script>
+</body>
+</html>
