@@ -260,6 +260,24 @@ class App:
             self._token_job = self.root.after(50 * 60 * 1000, _do)
         self._token_job = self.root.after(50 * 60 * 1000, _do)
 
+    def _logout(self):
+        """세션 종료 → 로그인 화면 복귀. refresh_token 등 자격 제거(다음 시작 시 재로그인)."""
+        if not messagebox.askyesno("로그아웃", "로그아웃하시겠습니까?", parent=self.root):
+            return
+        try:
+            if self._token_job:
+                self.root.after_cancel(self._token_job)
+        except Exception:
+            pass
+        self._token_job = None
+        for k in ('refresh_token', '_id_token', 'acl_uid'):
+            self.config.pop(k, None)
+        save_config(self.config)
+        for w in self.root.winfo_children():
+            w.destroy()
+        self._main_built = False
+        self._run_login()
+
     def _build_main_ui(self):
         """헤더 고정 + 노트북(데일리 리포트 / 메시지 발송) 레이아웃 빌드."""
         self._build_header()
@@ -1927,6 +1945,16 @@ class App:
         tk.Label(delay_grid, text="카톡 접두사", font=FS, bg=BG, fg=SUBTEXT).grid(row=2, column=0, sticky='w', pady=3, padx=(0,8))
         prefix_var = tk.StringVar(value=self.config.get('room_prefix', '오직 '))
         tk.Entry(delay_grid, textvariable=prefix_var, font=FS, relief='solid', bd=1).grid(row=2, column=1, sticky='ew', ipady=3)
+
+        # ── 계정 ──────────────────────────────────────────────
+        self._settings_section(inner, "계정")
+        acct_row = tk.Frame(inner, bg=BG)
+        acct_row.pack(fill='x', padx=16, pady=(0, 10))
+        tk.Label(acct_row, text=f"로그인: {self.config.get('instructor_id','(없음)')} · {self.config.get('firebase_path','')}",
+                 font=FS, bg=BG, fg=SUBTEXT).pack(side='left')
+        tk.Button(acct_row, text="🚪 로그아웃", font=FS, bg="#FEF2F2", fg='#DC2626', relief='flat',
+                  padx=12, pady=4, cursor='hand2',
+                  command=lambda: (win.destroy(), self._logout())).pack(side='right')
 
         # (v2.5) 🔥 연결·👤 강사 계정 탭 제거 — 로그인이 대체.
 

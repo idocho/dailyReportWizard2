@@ -6,7 +6,7 @@ import platform as _platform
 
 # ── 앱 메타 ───────────────────────────────────────────────────────────
 APP_TITLE   = "Daily Report Wizard"
-APP_VERSION = "v2.4.0"
+APP_VERSION = "v2.5.0"
 
 # ── Firebase (로그인 전환, AUTH_DESIGN) — apiKey는 공개값 ───────────────
 FIREBASE_API_KEY = "AIzaSyDaQMgeMY9D26jOzMMy65V7_l__CiXMXPY"
