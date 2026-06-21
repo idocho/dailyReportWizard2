@@ -22,6 +22,9 @@ documents/tag-mining/PROMPT.md
 documents/tag-mining/.pending.json
 scripts/.mine-creds.json
 
+# Firebase 웹 설정(환경별·로컬) — 예시(.example)만 커밋
+platform/auth/firebase-config.js
+
 # AI 도구 로컬 설정 (커밋 제외)
 .codex/
 .agents/

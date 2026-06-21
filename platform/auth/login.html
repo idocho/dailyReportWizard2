@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<!--
+  login.html — 강사 로그인 실구현 (auth.js + Firebase Web SDK). AUTH_DESIGN §3.
+  목업(../login_mockup.html)의 디자인 + 실제 Firebase 인증.
+  선행: 콘솔에서 Authentication(이메일/비번) 활성화 + 같은 폴더에 firebase-config.js 작성.
+  config 없으면 안내 표시(앱은 안 깨짐).
+-->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>DRW 강사 로그인</title>
+<style>
+  :root{--bg:#FAFAFB;--panel:#FFFFFF;--indigo:#4F46E5;--indigo-ink:#4338CA;--indigo-l:#EEF0FF;
+    --line:#ECECEF;--text:#18181B;--sub:#5C6370;--green:#16A34A;--red:#DC2626;}
+  *{box-sizing:border-box;font-family:"맑은 고딕","Malgun Gothic",system-ui,sans-serif}
+  body{margin:0;min-height:100vh;background:linear-gradient(160deg,#EEF0FF 0%,#FAFAFB 55%);
+       display:flex;align-items:center;justify-content:center;padding:24px;color:var(--text)}
+  .card{width:100%;max-width:380px;background:var(--panel);border:1px solid var(--line);
+        border-radius:18px;box-shadow:0 12px 40px rgba(79,70,229,.10);padding:30px 26px}
+  .brand{text-align:center;margin-bottom:22px}
+  .brand .logo{width:52px;height:52px;border-radius:14px;background:var(--indigo);
+        display:inline-flex;align-items:center;justify-content:center;font-size:26px;margin-bottom:10px}
+  .brand h1{margin:0;font-size:17px;font-weight:800}.brand p{margin:4px 0 0;font-size:12px;color:var(--sub)}
+  label{display:block;font-size:12px;font-weight:700;color:var(--sub);margin:14px 0 6px}
+  select,input{width:100%;padding:12px 13px;border:1px solid var(--line);border-radius:11px;font-size:14px;background:#fff;outline:none}
+  select:focus,input:focus{border-color:var(--indigo);box-shadow:0 0 0 3px var(--indigo-l)}
+  .btn{width:100%;margin-top:20px;padding:13px;border:none;border-radius:11px;background:var(--indigo);color:#fff;font-size:15px;font-weight:800;cursor:pointer}
+  .btn:hover{background:var(--indigo-ink)}.btn:disabled{opacity:.5;cursor:wait}
+  .synth{margin-top:12px;font-size:10.5px;color:#94A3B8;text-align:center;font-family:ui-monospace,monospace;word-break:break-all;min-height:14px}
+  .synth b{color:var(--indigo)}
+  .msg{margin-top:14px;padding:10px 12px;border-radius:10px;font-size:12.5px;font-weight:600;display:none}
+  .msg.err{background:#FEF2F2;color:var(--red);border:1px solid #FECACA;display:block}
+  .msg.ok{background:#F0FDF4;color:var(--green);border:1px solid #BBF7D0;display:block}
+  .foot{margin-top:16px;text-align:center;font-size:11px;color:var(--sub);line-height:1.6}
+  .setup{background:#FFFBEB;border:1px solid #FDE68A;color:#92400E;border-radius:11px;padding:14px;font-size:12px;line-height:1.7;display:none}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="brand"><div class="logo">📚</div><h1>DailyReportWizard</h1><p>강사 로그인</p></div>
+
+  <div id="setup" class="setup"></div>
+
+  <div id="form">
+    <label for="campus">캠퍼스</label>
+    <select id="campus">
+      <option value="gangnam">강남 캠퍼스</option>
+      <option value="bundang">분당 캠퍼스</option>
+      <option value="pyeongchon">평촌 캠퍼스</option>
+    </select>
+    <label for="name">이름</label>
+    <input id="name" type="text" placeholder="이름을 입력하세요" autocomplete="off">
+    <label for="pw">비밀번호</label>
+    <input id="pw" type="password" placeholder="비밀번호" autocomplete="current-password">
+    <button class="btn" id="loginBtn">로그인</button>
+    <div class="synth" id="synth"></div>
+  </div>
+
+  <!-- 첫 로그인 비번 변경 -->
+  <div id="changeForm" style="display:none">
+    <p style="font-size:13px;color:var(--sub)">첫 로그인입니다. 새 비밀번호를 설정하세요.</p>
+    <label>새 비밀번호 (8자 이상)</label><input id="np1" type="password">
+    <label>새 비밀번호 확인</label><input id="np2" type="password">
+    <button class="btn" id="changeBtn" style="background:var(--green)">변경하고 시작</button>
+  </div>
+
+  <div class="msg" id="msg"></div>
+  <div class="foot">비밀번호를 잊으셨나요? <b>관리자에게 문의</b>하세요.</div>
+</div>
+
+<script src="../synth_email.js"></script>
+<script type="module">
+  const $ = id => document.getElementById(id);
+  const setMsg = (t,x)=>{ $('msg').className='msg '+t; $('msg').textContent=x; };
+  const clr = ()=>{ $('msg').className='msg'; $('msg').textContent=''; };
+
+  // 실시간 합성 ID 미리보기 (config 없어도 동작)
+  const upd = ()=>{ const n=$('name').value.trim();
+    $('synth').innerHTML = n ? '→ 로그인 ID(자동): <b>'+window.SynthEmail.synthEmail(n,$('campus').value)+'</b>' : ''; };
+  $('name').addEventListener('input', upd);
+  $('campus').addEventListener('change', upd);
+
+  let AUTH = null;
+  try {
+    AUTH = await import('./auth.js');
+  } catch (e) {
+    // firebase-config.js 없음/오류 → 폼 비활성 + 안내
+    $('form').style.display = 'none';
+    const s = $('setup'); s.style.display = 'block';
+    s.innerHTML = '⚙ <b>설정 필요</b><br>① Firebase 콘솔 → Authentication → 이메일/비밀번호 활성화<br>'
+      + '② 이 폴더에 <code>firebase-config.js</code> 작성(예시: firebase-config.example.js)<br>'
+      + '<span style="color:#B45309">상세: '+(e && e.message ? e.message : e)+'</span>';
+  }
+
+  if (AUTH) {
+    let session = null;
+    $('loginBtn').onclick = async () => {
+      clr();
+      const name=$('name').value.trim(), pw=$('pw').value, campus=$('campus').value;
+      if(!name){ setMsg('err','이름을 입력하세요.'); return; }
+      $('loginBtn').disabled = true; $('loginBtn').textContent='로그인 중…';
+      try {
+        session = await AUTH.loginByName(campus, name, pw, ['instructor','admin','super']);
+        if (session.mustChangePw) {
+          $('form').style.display='none'; $('changeForm').style.display='block'; clr();
+        } else {
+          setMsg('ok', (session.instructorId||name)+' 강사님 로그인 성공 · '+session.campus+' / '+session.role);
+          // 실제 앱에서는 여기서 일일 리포트 화면으로 진입.
+        }
+      } catch(e) { setMsg('err', e.message || String(e)); }
+      finally { $('loginBtn').disabled=false; $('loginBtn').textContent='로그인'; }
+    };
+
+    $('changeBtn').onclick = async () => {
+      clr();
+      const a=$('np1').value, b=$('np2').value;
+      if(a!==b){ setMsg('err','두 비밀번호가 일치하지 않습니다.'); return; }
+      $('changeBtn').disabled=true;
+      try {
+        await AUTH.changePassword(a);
+        // TODO: acl.mustChangePw=false 갱신(관리툴/규칙) — 본인 acl write 권한 정책에 따라.
+        setMsg('ok','비밀번호 변경 완료. 시작합니다.');
+        $('changeForm').style.display='none';
+      } catch(e){ setMsg('err', e.message || String(e)); }
+      finally { $('changeBtn').disabled=false; }
+    };
+  }
+</script>
+</body>
+</html>
