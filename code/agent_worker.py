@@ -57,8 +57,17 @@ def _reconstruct(job):
     }
 
 
+# 톤 조절 재생성 — 웹 신규 강점. 데이터(사실)는 유지하고 어조만 조정.
+TONE_DIRECTIVES = {
+    "warm":     "더 따뜻하고 공감 어린 어조로, 격려를 담아 다시 작성하세요.",
+    "concise":  "더 간결하게 — 핵심만 한두 문장으로 다시 작성하세요.",
+    "detailed": "더 구체적으로 — 관찰된 행동·수치·사례를 짚어 다시 작성하세요.",
+}
+
+
 def generate(cfg, job, ai_call=_call_ai_hub):
-    """단건 생성 — 본인 로컬 키 사용. ai_call 주입 가능(테스트용 모킹)."""
+    """단건 생성 — 본인 로컬 키 사용. job['tone'](warm/concise/detailed)로 톤 재생성 지원.
+    ai_call 주입 가능(테스트용 모킹)."""
     engine = cfg.get("ai_engine_type", "gemini").strip().lower()
     key = cfg.get(f"{engine}_api_key", "").strip()
     if not key:
@@ -68,6 +77,12 @@ def generate(cfg, job, ai_call=_call_ai_hub):
         c["sheet"], c["cls"], c["name"], c["textbooks"],
         c["student_data"], c["progress_data"], c["note"], c["tags"],
         tb_grade=c["tb_grade"], style_block=c["style_block"], display_name=c["display"])
+    # 톤 조절: 사실은 데이터에서, 어조만 조정. 이전 작성본 참고로 연속성 유지.
+    tone = (job.get("tone") or "").strip()
+    if tone in TONE_DIRECTIVES:
+        prompt += f"\n[톤 조절 지시 — 사실·안전 규칙 유지]\n{TONE_DIRECTIVES[tone]}\n"
+        if job.get("currentDraft"):
+            prompt += f"[이전 작성본(어조 참고용, 사실은 위 데이터 우선)]\n{job['currentDraft']}\n"
     return ai_call(engine, key, prompt, max_tokens=400, temperature=0.75,
                    system=_base_conditions())
 

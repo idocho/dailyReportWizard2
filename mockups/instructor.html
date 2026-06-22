@@ -26,6 +26,9 @@
   .b{font-size:11px;font-weight:700;padding:2px 7px;border-radius:20px}.b.ok{background:var(--gl);color:var(--green)}.b.no{background:var(--rl);color:var(--red)}
   textarea{width:100%;min-height:64px;border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:13px;font-family:inherit;line-height:1.6;resize:vertical}
   .gen{width:100%;border:1px solid var(--line);border-radius:9px;padding:7px;font-size:12px;font-weight:700;background:#fff;color:var(--indigo);cursor:pointer}
+  .tones{display:flex;gap:3px;margin-top:4px}
+  .tone{flex:1;border:1px solid var(--line);border-radius:6px;background:#fff;font-size:10px;padding:4px 0;color:var(--sub);cursor:pointer}
+  .tone:hover{border-color:var(--indigo);color:var(--indigo)}
   .foot{display:flex;justify-content:flex-end;margin-top:8px}
   .ov{position:fixed;inset:0;background:rgba(15,17,31,.45);display:none;align-items:center;justify-content:center;padding:20px}.ov.on{display:flex}
   .modal{background:#fff;border-radius:14px;width:100%;max-width:360px;padding:20px}
@@ -83,10 +86,18 @@ function render(){
     return `<div class="row${ok?'':' dim'}">
       <div class="who"><b>${s.name}</b><div class="badges">${badges}</div></div>
       <textarea id="n-${s.nameKey}" ${ok?'':'disabled'} placeholder="${ok?'AI 생성 후 검토·수정':'입력 정보 없음 — 전송 제외'}">${s.note}</textarea>
-      <button class="gen" data-nk="${s.nameKey}" ${ok?'':'disabled'}>${ok?'✨ 생성':'불가'}</button>
+      <div>
+        <button class="gen" data-nk="${s.nameKey}" ${ok?'':'disabled'}>${ok?'✨ 생성':'불가'}</button>
+        ${ok?`<div class="tones">
+          <button class="tone" data-nk="${s.nameKey}" data-tone="warm" title="더 따뜻하게">따뜻</button>
+          <button class="tone" data-nk="${s.nameKey}" data-tone="concise" title="더 간결하게">간결</button>
+          <button class="tone" data-nk="${s.nameKey}" data-tone="detailed" title="더 구체적으로">구체</button>
+        </div>`:''}
+      </div>
     </div>`;
   }).join('');
-  $('list').querySelectorAll('[data-nk]').forEach(b=>b.onclick=()=>genOne(b.dataset.nk));
+  $('list').querySelectorAll('.gen[data-nk]').forEach(b=>b.onclick=()=>genOne(b.dataset.nk));
+  $('list').querySelectorAll('.tone[data-nk]').forEach(b=>b.onclick=()=>genOne(b.dataset.nk, b.dataset.tone));
 }
 
 async function pollGen(id, ms=30000){
@@ -99,17 +110,15 @@ async function pollGen(id, ms=30000){
   }
   throw new Error('생성 시간초과 — 에이전트 실행 확인');
 }
-async function genOne(nk){
+async function genOne(nk, tone){
   const s=STU.find(x=>x.nameKey===nk); if(!s) return;
-  const ta=$('n-'+nk), btn=[...document.querySelectorAll('[data-nk]')].find(b=>b.dataset.nk===nk);
-  btn.disabled=true; btn.textContent='⏳';
+  const ta=$('n-'+nk);
   const id=jid();
-  try{
-    await put(`${gp}/${id}`,{nameKey:nk,cls:s.cls,displayName:s.name,items:s.items,note:ta.value.trim(),status:'queued'});
-    ta.value='✨ AI 생성 중…';
-    ta.value=await pollGen(id);
-  }catch(e){ ta.value='['+e.message+']'; }
-  finally{ btn.disabled=false; btn.textContent='✨ 다시생성'; }
+  const job={nameKey:nk,cls:s.cls,displayName:s.name,items:s.items,note:s.note,status:'queued'};
+  if(tone){ job.tone=tone; job.currentDraft=ta.value.trim(); }  // 톤 조절: 현재 문구 어조만 조정
+  ta.value = tone?'🎚 톤 조절 중…':'✨ AI 생성 중…';
+  try{ await put(`${gp}/${id}`,job); ta.value=await pollGen(id); }
+  catch(e){ ta.value='['+e.message+']'; }
 }
 $('genAll').onclick=async()=>{ for(const s of STU.filter(eligible)) await genOne(s.nameKey); };
 
