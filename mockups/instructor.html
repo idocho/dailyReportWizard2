@@ -125,9 +125,12 @@ $('genAll').onclick=async()=>{ for(const s of STU.filter(eligible)) await genOne
 $('openSend').onclick=()=>{
   const ready=STU.filter(s=>eligible(s)&&noteOf(s.nameKey));
   const skipped=STU.filter(s=>!eligible(s)||!noteOf(s.nameKey)).map(s=>s.name);
+  const cnt={}; ready.forEach(s=>cnt[s.name]=(cnt[s.name]||0)+1);
+  const dups=[...new Set(ready.map(s=>s.name).filter(n=>cnt[n]>1))];  // 동명이인 가드
   $('modal').innerHTML=`<h3>카카오톡 전송 대상</h3>
     <div class="hint">전송 대상 ${ready.length}명 — 제외할 학생 체크 해제</div>
-    ${ready.map(s=>`<label class="ck"><input type="checkbox" checked data-snk="${s.nameKey}"> ${s.name}</label>`).join('')||'<div class="hint">생성·검토된 학생이 없습니다.</div>'}
+    ${ready.map(s=>`<label class="ck"><input type="checkbox" checked data-snk="${s.nameKey}"> ${s.name}${dups.includes(s.name)?' <span style="color:var(--red);font-size:11px">⚠동명이인</span>':''}</label>`).join('')||'<div class="hint">생성·검토된 학생이 없습니다.</div>'}
+    ${dups.length?`<div class="warn">⚠ 동명이인 ${dups.join(', ')} — 오발송 위험으로 전송에서 자동 제외됩니다(수동 전송 권장).</div>`:''}
     ${skipped.length?`<div class="warn">제외 ${skipped.length}명: ${skipped.join(', ')}</div>`:''}
     <div class="mrow"><button class="cancel" id="mc">취소</button><button class="go" id="mg" ${ready.length?'':'disabled'}>전송 시작</button></div>`;
   $('ov').classList.add('on');

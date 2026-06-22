@@ -146,32 +146,46 @@ def _send_real(cfg, msgs, item_cb):
 
 
 def process_sendjobs(cfg, db, instructor_id, token=None, real=False):
-    """본인 sendJobs 큐 처리 — per-recipient 라이브 상태 회신. 반환: 처리 건수."""
+    """본인 sendJobs 큐 처리 — 동명이인 가드 + per-recipient 라이브 상태 회신. 반환: 처리 건수."""
+    from collections import Counter
     base = f"campus/{cfg['campus']}/sendJobs/{urllib.parse.quote(instructor_id)}"
     jobs = _get(db, base, token) or {}
     pending = {jid: j for jid, j in jobs.items()
                if isinstance(j, dict) and j.get("status") == "queued"}
+    prefix = cfg.get("roomPrefix", "")
     done = 0
     for jid, job in pending.items():
         _patch(db, f"{base}/{jid}", {"status": "sending"}, token)
-        msgs = _send_msgs(cfg, job)
+        recs = job.get("recipients", [])
+        # 동명이인 오발송 가드(계승) — 같은 표시이름은 카톡방 검색이 합쳐져 타 학부모에게 갈 위험.
+        names = [r.get("name", "") for r in recs]
+        dups = {n for n, c in Counter(names).items() if n and c > 1}
+        send_idx = []
+        for i, r in enumerate(recs):
+            if r.get("name", "") in dups:
+                _patch(db, f"{base}/{jid}/recipients/{i}", {"status": "제외(동명이인)"}, token)
+            else:
+                send_idx.append(i)
+        msgs = [{"room": (prefix + (recs[i].get("name") or "")).strip(),
+                 "msg": recs[i].get("msg", "")} for i in send_idx]
         results = []
 
-        def on_item(i, ok, err=None):
+        def on_item(k, ok, err=None):
             results.append(ok)
             patch = {"status": "완료" if ok else "실패"}
             if err:
                 patch["error"] = str(err)[:120]
-            _patch(db, f"{base}/{jid}/recipients/{i}", patch, token)
+            _patch(db, f"{base}/{jid}/recipients/{send_idx[k]}", patch, token)
 
         try:
             if real:
                 _send_real(cfg, msgs, on_item)
             else:
-                for i, m in enumerate(msgs):
+                for k, m in enumerate(msgs):
                     time.sleep(0.02)
-                    on_item(i, True)
-            _patch(db, f"{base}/{jid}", {"status": "done", "fail": results.count(False)}, token)
+                    on_item(k, True)
+            _patch(db, f"{base}/{jid}",
+                   {"status": "done", "fail": results.count(False), "excluded": len(dups)}, token)
             done += 1
         except Exception as e:
             _patch(db, f"{base}/{jid}", {"status": "error", "error": str(e)[:200]}, token)
@@ -187,14 +201,65 @@ def process_once(cfg, db, instructor_id, token=None, real=False):
     return g, s
 
 
+DEFAULT_DB = "https://dailyreportwizard-default-rtdb.firebaseio.com"
+
+
 def _load_cfg():
     if not CFG_PATH.exists():
-        raise SystemExit("agent_config.json 없음 — 셋업 마법사로 생성하세요.")
+        raise SystemExit("agent_config.json 없음 — 'python agent_worker.py --setup' 로 1회 설정하세요.")
     try:
         import secret_codec
         return secret_codec.decrypt_fields(json.loads(CFG_PATH.read_text(encoding="utf-8")))
     except Exception:
         return json.loads(CFG_PATH.read_text(encoding="utf-8"))
+
+
+def write_agent_config(fields, path=CFG_PATH):
+    """1회 설정 저장 — 개인 키는 DPAPI 암호화(secret_codec). 반환: 경로."""
+    data = dict(fields)
+    try:
+        import secret_codec
+        data = secret_codec.encrypt_fields(data)
+    except Exception:
+        pass
+    path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    return path
+
+
+def register_autostart(name="DRW_Instructor_Agent"):
+    """Windows 로그인 시 자동 실행 등록(시작프로그램 .bat). 비-Windows는 no-op."""
+    import os
+    import sys
+    if sys.platform != "win32":
+        return False
+    try:
+        startup = Path(os.environ["APPDATA"]) / "Microsoft/Windows/Start Menu/Programs/Startup"
+        startup.mkdir(parents=True, exist_ok=True)
+        script = Path(__file__).resolve()
+        py = sys.executable.replace("python.exe", "pythonw.exe")  # 콘솔창 없이
+        (startup / f"{name}.bat").write_text(
+            f'@echo off\ncd /d "{script.parent}"\nstart "" "{py}" "{script}" --loop --real\n',
+            encoding="utf-8")
+        return True
+    except Exception:
+        return False
+
+
+def _setup_cli():
+    """턴키 1회 설정 — JSON 편집 없이 대화형. 끝나면 자동시작 등록 후 잊으면 됨."""
+    print("=== 강사 에이전트 설정 (1회) ===")
+    f = {}
+    f["campus"] = input("캠퍼스 id (예: dongsuwon): ").strip()
+    f["instructorId"] = input("본인 이름(로그인 id): ").strip()
+    f["dbUrl"] = input(f"DB URL [{DEFAULT_DB}]: ").strip() or DEFAULT_DB
+    f["roomPrefix"] = input('카톡 방 이름 접두사 (예: "오직 ", 없으면 빈칸): ')
+    eng = (input("AI 엔진 [gemini/claude/openai] (기본 gemini): ").strip() or "gemini").lower()
+    f["ai_engine_type"] = eng
+    f[f"{eng}_api_key"] = input(f"본인 {eng} 개인 API 키: ").strip()
+    write_agent_config(f)
+    ok = register_autostart()
+    print(f"\n설정 저장 완료(개인 키 암호화). 자동시작 등록: {'완료' if ok else '수동 필요(비-Windows)'}")
+    print("이제 안 건드려도 됩니다 — 로그인 시 자동 실행, 트레이에서 동작.")
 
 
 def main():
@@ -203,7 +268,11 @@ def main():
     ap.add_argument("--loop", action="store_true")
     ap.add_argument("--interval", type=int, default=8)
     ap.add_argument("--real", action="store_true", help="실 AI 생성 + 실 카톡 발송")
+    ap.add_argument("--setup", action="store_true", help="턴키 1회 설정(엔진·개인키·자동시작)")
     args = ap.parse_args()
+    if args.setup:
+        _setup_cli()
+        return
     cfg = _load_cfg()
     db = cfg["dbUrl"]
     instr = cfg["instructorId"]
