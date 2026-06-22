@@ -460,7 +460,7 @@ function renderSb(){
   const asgns=activeAsgns();
   if(curAI>=asgns.length)curAI=0; // admin 해제 등으로 범위 초과 시 가드
   let aHtml='';
-  if(activeTab==='input'||activeTab==='scores'){
+  if(activeTab==='input'||activeTab==='scores'||activeTab==='report'){
     aHtml=`<div class="sb-lbl">${adminOn?'전체 수업 (관리자)':'내 담당 수업'}</div>`;
     if(!asgns.length){
       aHtml+=`<div style="padding:8px 13px;font-size:11px;color:rgba(255,255,255,.3)">설정에서 추가하세요</div>`;
@@ -495,6 +495,7 @@ function renderSb(){
     <div class="sb-nav">
       <div class="sni${activeTab==='input'?' on':''}" onclick="goNav('input')">✏️ 수업 입력</div>
       <div class="sni${activeTab==='scores'?' on':''}" onclick="goNav('scores')">📊 성적 입력</div>
+      <div class="sni${activeTab==='report'?' on':''}" onclick="goNav('report')">📨 리포트 전송</div>
       <div class="sni${activeTab==='setting'?' on':''}" onclick="goNav('setting')">⚙️ 설정</div>
     </div>
     ${aHtml}
@@ -529,5 +530,6 @@ function renderMain(){
   const mc=document.getElementById('mc');if(!mc)return;
   if(activeTab==='input')renderInput(mc);
   else if(activeTab==='scores')renderScores(mc);
+  else if(activeTab==='report')renderReport(mc);
   else renderSettings(mc);
 }
