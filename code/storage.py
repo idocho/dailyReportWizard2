@@ -72,7 +72,7 @@ def load_config():
             needs_migration = secret_codec.has_plaintext_secret(cfg)
             # 폐기 키 제거(보안·정리): ai_api_key 는 엔진별 키로 대체된 deprecated 필드인데
             # 레거시 config 에 평문 API 키가 남아 있을 수 있어 적재 시 제거.
-            for _dk in ('ai_api_key', 'sheets'):
+            for _dk in ('ai_api_key', 'sheets', 'groq_api_key'):  # groq 폐기(2026-06)
                 if _dk in cfg:
                     cfg.pop(_dk, None)
                     needs_migration = True

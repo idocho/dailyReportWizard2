@@ -291,26 +291,7 @@ def _call_ai_hub(engine_type, api_key, prompt, max_tokens=300, temperature=0.5, 
     """설정창에서 선택된 특정 AI 엔진 규격에 맞추어 통신을 처리합니다."""
     engine_type = engine_type.strip().lower()
 
-    if engine_type == "groq":
-        url = "https://api.groq.com/openai/v1/chat/completions"
-        headers = {
-            "Content-Type":  "application/json",
-            "Authorization": f"Bearer {api_key}",
-            "User-Agent":    f"DailyReportWizard/{APP_VERSION.lstrip('v')}",
-        }
-        messages = []
-        if system:
-            messages.append({"role": "system", "content": system})
-        messages.append({"role": "user", "content": prompt})
-        body = {
-            "model":       "qwen/qwen3-32b",
-            "messages":    messages,
-            "max_tokens":  max_tokens,
-            "temperature": temperature,
-            "reasoning_effort": "none"
-        }
-
-    elif engine_type == "claude":
+    if engine_type == "claude":
         url = "https://api.anthropic.com/v1/messages"
         headers = {
             "X-API-Key":         api_key,

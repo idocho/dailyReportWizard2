@@ -1992,7 +1992,6 @@ class App:
             'gemini': ('무료·추천', GREEN,  '일일 한도만 있고 월 제한 없음. 처음이라면 추천.'),
             'claude': ('유료',      YELLOW, '문장력·감성 표현이 가장 자연스럽습니다.'),
             'openai': ('유료',      YELLOW, '안정적인 범용 성능.'),
-            'groq':   ('무료',      GREEN,  '응답 속도가 가장 빠릅니다.'),
         }
         eng_info = tk.Frame(ai_grid, bg=BG)
         eng_info.grid(row=1, column=1, sticky='ew', pady=(0,2))
