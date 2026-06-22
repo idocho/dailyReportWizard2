@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<!--
+  강사 데일리 — 생성·검토·전송 통합 테스트 클라이언트 (웹 통합 B)
+  genJobs/sendJobs 큐를 통해 강사 PC 에이전트(agent_worker.py)와 연동.
+  키·카톡은 에이전트(로컬)에서만. 이 페이지는 맥락 전달 + 검토 + 전송요청만(키 미접촉).
+  ※ 통합 테스트용 — 테스트 캠퍼스 오픈 DB. 프로덕션은 v2.5.0에 로그인 기반으로 통합 예정.
+-->
+<html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>강사 데일리 — 검토·전송 (통합테스트)</title>
+<style>
+  :root{--indigo:#4F46E5;--ink:#15171F;--line:#ECECEF;--soft:#F3F3F5;--sub:#5C6370;--green:#16A34A;--gl:#F0FDF4;--red:#DC2626;--rl:#FEF2F2;--amber:#D97706}
+  *{box-sizing:border-box;font-family:"맑은 고딕","Malgun Gothic",system-ui,sans-serif}
+  body{margin:0;background:#FAFAFB;color:var(--ink)}
+  .top{background:var(--ink);color:#fff;padding:12px 20px;display:flex;align-items:center;gap:10px}
+  .top b{font-size:15px}.top .tag{font-size:11px;background:var(--indigo);padding:3px 9px;border-radius:20px}
+  .top .st{margin-left:auto;font-size:12px;color:#94A3B8}
+  .wrap{max-width:920px;margin:18px auto;padding:0 16px}
+  .bar{display:flex;align-items:center;gap:8px;margin-bottom:12px}
+  .chip{font-size:13px;font-weight:700;padding:6px 12px;border-radius:20px;border:1px solid var(--line);background:#fff;cursor:pointer}
+  .chip.on{background:var(--indigo);color:#fff;border-color:var(--indigo)}
+  .btn{background:var(--indigo);color:#fff;border:none;border-radius:9px;padding:8px 14px;font-size:13px;font-weight:700;cursor:pointer}
+  .btn:disabled{opacity:.5;cursor:not-allowed}.btn.ghost{background:#fff;color:var(--indigo);border:1px solid var(--line)}
+  .row{display:grid;grid-template-columns:120px 1fr 88px;gap:12px;align-items:start;padding:12px;border:1px solid var(--line);border-radius:12px;margin-bottom:8px;background:#fff}
+  .row.dim{opacity:.5}
+  .who b{font-size:14px}.badges{margin-top:6px;display:flex;flex-wrap:wrap;gap:4px}
+  .b{font-size:11px;font-weight:700;padding:2px 7px;border-radius:20px}.b.ok{background:var(--gl);color:var(--green)}.b.no{background:var(--rl);color:var(--red)}
+  textarea{width:100%;min-height:64px;border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:13px;font-family:inherit;line-height:1.6;resize:vertical}
+  .gen{width:100%;border:1px solid var(--line);border-radius:9px;padding:7px;font-size:12px;font-weight:700;background:#fff;color:var(--indigo);cursor:pointer}
+  .foot{display:flex;justify-content:flex-end;margin-top:8px}
+  .ov{position:fixed;inset:0;background:rgba(15,17,31,.45);display:none;align-items:center;justify-content:center;padding:20px}.ov.on{display:flex}
+  .modal{background:#fff;border-radius:14px;width:100%;max-width:360px;padding:20px}
+  .modal h3{margin:0 0 4px;font-size:15px}.modal .hint{font-size:12px;color:var(--sub);margin-bottom:10px}
+  .ck{display:flex;align-items:center;gap:8px;padding:6px;border-radius:8px;font-size:13px}.ck:hover{background:var(--soft)}
+  .warn{font-size:11px;color:var(--amber);background:#FFFBEB;border-radius:8px;padding:7px 9px;margin:8px 0}
+  .mrow{display:flex;gap:8px;margin-top:12px}.mrow button{flex:1;border-radius:9px;padding:10px;font-weight:700;border:none;cursor:pointer}
+  .go{background:#FEE500;color:#3A2E00}.cancel{background:var(--soft);color:var(--sub)}
+  .jobs{margin-top:18px;border-top:1px solid var(--line);padding-top:12px}
+  .job{font-size:12px;padding:8px 0;border-bottom:1px solid var(--soft);display:flex;align-items:center;gap:8px}
+  .pill{font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;margin-left:auto}
+  .pill.q{background:#FEF3C7;color:var(--amber)}.pill.send{background:#EEF0FF;color:var(--indigo)}.pill.done{background:var(--gl);color:var(--green)}
+  .lbl{font-size:12px;color:var(--sub);margin:0 0 6px}
+</style></head>
+<body>
+<div class="top"><b>강사 데일리</b><span class="tag">검토·전송 (통합테스트)</span><span class="st" id="who"></span></div>
+<div class="wrap">
+  <div class="bar">
+    <span class="chip on">중1A</span>
+    <button class="btn ghost" id="genAll">✨ AI 일괄 생성</button>
+    <button class="btn" id="openSend" style="margin-left:auto">전송 대상 선택 →</button>
+  </div>
+  <p class="lbl" id="hint">메모/점수 입력된 학생만 생성·전송 (미입력 제외). 에이전트가 켜져 있어야 생성·전송됩니다.</p>
+  <div id="list"></div>
+  <div class="jobs"><div class="lbl">전송 작업 상태</div><div id="jobs"><div class="job">작업 없음</div></div></div>
+</div>
+
+<div class="ov" id="ov"><div class="modal" id="modal"></div></div>
+
+<script>
+const DB='https://dailyreportwizard-default-rtdb.firebaseio.com';
+const CAMPUS='zz_test', INSTR='zz_instr', PREFIX='오직 ';
+document.getElementById('who').textContent = INSTR+' @ '+CAMPUS;
+const $=id=>document.getElementById(id);
+// 샘플 학생 (통합테스트). 실제는 Firebase 명단/입력에서 로드.
+const STU=[
+  {nameKey:'101',name:'김서연',cls:'중1A',items:[{subject:'쎈수학',value:'상',progress:'p.45~52',homework:'완료'}],note:'오답 노트를 스스로 정리하기 시작'},
+  {nameKey:'102',name:'이준호',cls:'중1A',items:[{subject:'쎈수학',value:'중',progress:'p.45~52'}],note:''},
+  {nameKey:'103',name:'박지민',cls:'중1A',items:[{subject:'쎈수학',value:'상'}],note:''},
+  {nameKey:'104',name:'최유나',cls:'중1A',items:[],note:''},
+];
+const eligible = s => s.items.length>0;
+const gp=`campus/${CAMPUS}/genJobs/${INSTR}`, sp=`campus/${CAMPUS}/sendJobs/${INSTR}`;
+const put=(n,d)=>fetch(`${DB}/${n}.json`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)});
+const get=n=>fetch(`${DB}/${n}.json`).then(r=>r.json());
+const jid=()=>Date.now()+'_'+Math.floor(Math.random()*1000);
+const noteOf=nk=>$('n-'+nk)?$('n-'+nk).value.trim():'';
+
+function render(){
+  $('list').innerHTML = STU.map(s=>{
+    const ok=eligible(s);
+    const badges = ok
+      ? `<span class="b ok">점수✓</span>${s.note?'<span class="b ok">메모✓</span>':'<span class="b no">메모없음</span>'}`
+      : `<span class="b no">미입력</span>`;
+    return `<div class="row${ok?'':' dim'}">
+      <div class="who"><b>${s.name}</b><div class="badges">${badges}</div></div>
+      <textarea id="n-${s.nameKey}" ${ok?'':'disabled'} placeholder="${ok?'AI 생성 후 검토·수정':'입력 정보 없음 — 전송 제외'}">${s.note}</textarea>
+      <button class="gen" data-nk="${s.nameKey}" ${ok?'':'disabled'}>${ok?'✨ 생성':'불가'}</button>
+    </div>`;
+  }).join('');
+  $('list').querySelectorAll('[data-nk]').forEach(b=>b.onclick=()=>genOne(b.dataset.nk));
+}
+
+async function pollGen(id, ms=30000){
+  const t0=Date.now();
+  while(Date.now()-t0<ms){
+    const j=await get(`${gp}/${id}`);
+    if(j&&j.status==='done') return j.draft;
+    if(j&&j.status==='error') throw new Error(j.error||'생성 실패');
+    await new Promise(r=>setTimeout(r,800));
+  }
+  throw new Error('생성 시간초과 — 에이전트 실행 확인');
+}
+async function genOne(nk){
+  const s=STU.find(x=>x.nameKey===nk); if(!s) return;
+  const ta=$('n-'+nk), btn=[...document.querySelectorAll('[data-nk]')].find(b=>b.dataset.nk===nk);
+  btn.disabled=true; btn.textContent='⏳';
+  const id=jid();
+  try{
+    await put(`${gp}/${id}`,{nameKey:nk,cls:s.cls,displayName:s.name,items:s.items,note:ta.value.trim(),status:'queued'});
+    ta.value='✨ AI 생성 중…';
+    ta.value=await pollGen(id);
+  }catch(e){ ta.value='['+e.message+']'; }
+  finally{ btn.disabled=false; btn.textContent='✨ 다시생성'; }
+}
+$('genAll').onclick=async()=>{ for(const s of STU.filter(eligible)) await genOne(s.nameKey); };
+
+$('openSend').onclick=()=>{
+  const ready=STU.filter(s=>eligible(s)&&noteOf(s.nameKey));
+  const skipped=STU.filter(s=>!eligible(s)||!noteOf(s.nameKey)).map(s=>s.name);
+  $('modal').innerHTML=`<h3>카카오톡 전송 대상</h3>
+    <div class="hint">전송 대상 ${ready.length}명 — 제외할 학생 체크 해제</div>
+    ${ready.map(s=>`<label class="ck"><input type="checkbox" checked data-snk="${s.nameKey}"> ${s.name}</label>`).join('')||'<div class="hint">생성·검토된 학생이 없습니다.</div>'}
+    ${skipped.length?`<div class="warn">제외 ${skipped.length}명: ${skipped.join(', ')}</div>`:''}
+    <div class="mrow"><button class="cancel" id="mc">취소</button><button class="go" id="mg" ${ready.length?'':'disabled'}>전송 시작</button></div>`;
+  $('ov').classList.add('on');
+  $('mc').onclick=()=>$('ov').classList.remove('on');
+  $('mg').onclick=()=>doSend();
+};
+async function doSend(){
+  const picked=[...document.querySelectorAll('[data-snk]')].filter(c=>c.checked).map(c=>c.dataset.snk);
+  const recipients=picked.map(nk=>{const s=STU.find(x=>x.nameKey===nk);return{nameKey:nk,name:s.name,msg:noteOf(nk),status:'대기'};});
+  $('ov').classList.remove('on');
+  const id=jid();
+  await put(`${sp}/${id}`,{cls:'중1A',recipients,status:'queued',ts:Date.now()});
+  loadJobs();
+}
+async function loadJobs(){
+  const jobs=(await get(sp))||{};
+  const arr=Object.entries(jobs).sort((a,b)=>(b[1].ts||0)-(a[1].ts||0)).slice(0,6);
+  $('jobs').innerHTML=arr.length?arr.map(([id,j])=>{
+    const recs=j.recipients||[],tot=recs.length,done=recs.filter(r=>r.status==='완료').length,err=recs.filter(r=>r.status==='실패').length;
+    let st=j.status==='done'?['done',err?`완료(실패${err})`:'완료']:(j.status==='sending'||done+err>0)?['send',`전송 중 ${done+err}/${tot}`]:['q','대기'];
+    return `<div class="job">${j.cls||''} (${tot}명)<span class="pill ${st[0]}">${st[1]}</span></div>`;
+  }).join(''):'<div class="job">작업 없음</div>';
+}
+render(); loadJobs(); setInterval(loadJobs,2500);
+</script>
+</body></html>

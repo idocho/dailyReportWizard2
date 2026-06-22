@@ -12,6 +12,18 @@
       "runtimeExecutable": "python",
       "runtimeArgs": ["-m", "http.server", "8765", "--directory", "platform"],
       "port": 8765
+    },
+    {
+      "name": "campusmanager",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "http.server", "8800", "--directory", "D:/WorkSpace/Development/CampusManager/public"],
+      "port": 8800
+    },
+    {
+      "name": "drw-mockups",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "http.server", "8810", "--directory", "mockups"],
+      "port": 8810
     }
   ]
 }
