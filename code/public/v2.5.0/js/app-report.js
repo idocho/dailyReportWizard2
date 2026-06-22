@@ -7,13 +7,23 @@
 let reportDrafts = {};      // {nameKey: 검토중 문구} — 세션 보관
 let _rpJobTimer = null;
 
+// 과제수행도(assign_grade) 코드 → 수행도 라벨(이모지 제거). value 로 전달.
+function _gradeLabel(code){
+  if(!code) return '';
+  const g = (typeof ASSIGN_GRADES !== 'undefined') ? ASSIGN_GRADES.find(x => x.key === code) : null;
+  return g ? g.label.replace(/[^가-힣]/g, '').trim() : '';
+}
+
 // ── 학생 1명의 생성 맥락(genJob) — 실데이터로 build_single_prompt 입력 구성 ──
 function _reportCtx(classId, subject, nk, name){
   const pd = progressData[`${classId}|${subject}`] || {};
+  const tagsRaw = getTags(classId, nk, subject) || {};
+  const tags = { ...tagsRaw }; delete tags.assign_grade;   // 과제수행도는 value로 따로(중복 방지)
   return {
     nameKey: nk, cls: classId, displayName: name, sheet: '',
-    items: [{ subject, value: '', progress: pd.progress || '', homework: pd.homework || '' }],
-    tags: getTags(classId, nk, subject) || {},
+    items: [{ subject, value: _gradeLabel(tagsRaw.assign_grade),
+              progress: pd.progress || '', homework: pd.homework || '' }],
+    tags: tags,
     note: _readNote(nk) || '',
     status: 'queued'
   };
