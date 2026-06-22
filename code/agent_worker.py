@@ -145,8 +145,9 @@ def _send_real(cfg, msgs, item_cb):
         raise RuntimeError("발송 타임아웃 — 카톡 응답 없음")
 
 
-def process_sendjobs(cfg, db, instructor_id, token=None, real=False):
-    """본인 sendJobs 큐 처리 — 동명이인 가드 + per-recipient 라이브 상태 회신. 반환: 처리 건수."""
+def process_sendjobs(cfg, db, instructor_id, token=None, real=False, progress_cb=None):
+    """본인 sendJobs 큐 처리 — 동명이인 가드 + per-recipient 라이브 상태 회신. 반환: 처리 건수.
+    progress_cb(state): GUI 오버레이용 진행 콜백(state={active,cls,done,total,fail})."""
     from collections import Counter
     base = f"campus/{cfg['campus']}/sendJobs/{urllib.parse.quote(instructor_id)}"
     jobs = _get(db, base, token) or {}
@@ -168,6 +169,10 @@ def process_sendjobs(cfg, db, instructor_id, token=None, real=False):
                 send_idx.append(i)
         msgs = [{"room": (prefix + (recs[i].get("name") or "")).strip(),
                  "msg": recs[i].get("msg", "")} for i in send_idx]
+        total = len(msgs)
+        cls = job.get("cls", "")
+        if progress_cb:
+            progress_cb({"active": True, "cls": cls, "done": 0, "total": total, "fail": 0})
         results = []
 
         def on_item(k, ok, err=None):
@@ -176,6 +181,9 @@ def process_sendjobs(cfg, db, instructor_id, token=None, real=False):
             if err:
                 patch["error"] = str(err)[:120]
             _patch(db, f"{base}/{jid}/recipients/{send_idx[k]}", patch, token)
+            if progress_cb:
+                progress_cb({"active": True, "cls": cls, "done": len(results),
+                             "total": total, "fail": results.count(False)})
 
         try:
             if real:
@@ -184,20 +192,24 @@ def process_sendjobs(cfg, db, instructor_id, token=None, real=False):
                 for k, m in enumerate(msgs):
                     time.sleep(0.02)
                     on_item(k, True)
+            if progress_cb:
+                progress_cb({"active": False})
             _patch(db, f"{base}/{jid}",
                    {"status": "done", "fail": results.count(False), "excluded": len(dups)}, token)
             done += 1
         except Exception as e:
+            if progress_cb:
+                progress_cb({"active": False})
             _patch(db, f"{base}/{jid}", {"status": "error", "error": str(e)[:200]}, token)
     return done
 
 
 # ── 오케스트레이션 ───────────────────────────────────────────────────
-def process_once(cfg, db, instructor_id, token=None, real=False):
+def process_once(cfg, db, instructor_id, token=None, real=False, progress_cb=None):
     """생성 → 전송 큐를 한 번씩 처리. dry(real=False)=AI·카톡 모킹."""
     ai = _call_ai_hub if real else (lambda e, k, p, **kw: f"[dry] {p[:0]}AI 생성 문구(테스트)")
     g = process_genjobs(cfg, db, instructor_id, token, ai_call=ai)
-    s = process_sendjobs(cfg, db, instructor_id, token, real=real)
+    s = process_sendjobs(cfg, db, instructor_id, token, real=real, progress_cb=progress_cb)
     return g, s
 
 

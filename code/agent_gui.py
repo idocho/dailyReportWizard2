@@ -1,0 +1,230 @@
+"""
+agent_gui.py — 강사 본인 PC 에이전트 GUI (tkinter, 무추가 의존성).
+
+구성:
+  · 설정 폼      — 캠퍼스·이름·엔진·개인키·방접두사 입력 → DPAPI 저장 + 자동시작 등록 (1회)
+  · 상태창       — 🟢 작동 중 / dry·real / 시작·중지 / 마지막 활동 / 설정 열기
+  · 전송중 오버레이 — topmost "전송 중 N/M · 만지지 마세요"(비활성 창, 카톡 포커스 미탈취)
+
+워커는 agent_worker(생성+전송) 재사용. 키·카톡은 이 PC 로컬. JSON 편집 불요.
+실행:  python agent_gui.py
+"""
+import queue
+import sys
+import threading
+import time
+import tkinter as tk
+from tkinter import ttk, messagebox
+
+import agent_worker as W
+from constants import AI_ENGINE_ORDER, AI_ENGINE_LABELS
+
+INDIGO, INK, GREEN, RED, SUB = "#4F46E5", "#15171F", "#16A34A", "#DC2626", "#94A3B8"
+_Q = queue.Queue()
+
+
+def _progress(state):
+    _Q.put(state)
+
+
+class AgentGUI:
+    def __init__(self):
+        self.cfg = None
+        self.running = False
+        self.real = False
+        self.overlay = None
+        self.last = "—"
+        self.root = tk.Tk()
+        self.root.title("DRW 강사 에이전트")
+        self.root.configure(bg=INK)
+        self.root.geometry("360x300")
+        self.root.resizable(False, False)
+        try:
+            self.cfg = W._load_cfg()
+        except SystemExit:
+            self.cfg = None
+        if self.cfg:
+            self._build_status()
+        else:
+            self._build_setup()
+        self.root.after(150, self._drain)
+
+    # ── 설정 폼 ──────────────────────────────────────────────────────
+    def _build_setup(self, existing=None):
+        for w in self.root.winfo_children():
+            w.destroy()
+        self.root.geometry("360x430")
+        e = existing or {}
+        tk.Label(self.root, text="에이전트 설정 (1회)", bg=INK, fg="#fff",
+                 font=("맑은 고딕", 13, "bold")).pack(pady=(16, 2))
+        tk.Label(self.root, text="키·카톡은 이 PC를 떠나지 않습니다", bg=INK, fg=SUB,
+                 font=("맑은 고딕", 9)).pack(pady=(0, 10))
+        frm = tk.Frame(self.root, bg=INK); frm.pack(padx=22, fill="x")
+        self.vars = {}
+
+        def row(label, key, default="", show=None):
+            tk.Label(frm, text=label, bg=INK, fg="#cbd5e1", font=("맑은 고딕", 10),
+                     anchor="w").pack(fill="x", pady=(7, 1))
+            v = tk.StringVar(value=e.get(key, default))
+            ent = tk.Entry(frm, textvariable=v, font=("맑은 고딕", 11), show=show)
+            ent.pack(fill="x", ipady=3)
+            self.vars[key] = v
+            return v
+
+        row("캠퍼스 id", "campus", "dongsuwon")
+        row("본인 이름 (웹 로그인명과 동일)", "instructorId")
+        # 엔진 드롭다운
+        tk.Label(frm, text="AI 엔진", bg=INK, fg="#cbd5e1", font=("맑은 고딕", 10),
+                 anchor="w").pack(fill="x", pady=(7, 1))
+        cur_eng = e.get("ai_engine_type", AI_ENGINE_ORDER[0])
+        self.eng_var = tk.StringVar(value=AI_ENGINE_LABELS.get(cur_eng, cur_eng))
+        ttk.Combobox(frm, textvariable=self.eng_var, state="readonly",
+                     values=[AI_ENGINE_LABELS[x] for x in AI_ENGINE_ORDER],
+                     font=("맑은 고딕", 11)).pack(fill="x")
+        # 키는 엔진별 — 현재 엔진 키 프리필
+        cur_key = e.get(f"{cur_eng}_api_key", "")
+        row("개인 API 키", "_api_key", cur_key, show="•")
+        row('카톡 방 접두사 (예: "오직 ")', "roomPrefix", e.get("roomPrefix", ""))
+
+        self.auto_var = tk.BooleanVar(value=True)
+        tk.Checkbutton(frm, text="Windows 시작 시 자동 실행", variable=self.auto_var,
+                       bg=INK, fg="#cbd5e1", selectcolor=INK, activebackground=INK,
+                       font=("맑은 고딕", 9)).pack(anchor="w", pady=(8, 0))
+        tk.Button(self.root, text="저장하고 시작", command=self._save_setup, bg=INDIGO, fg="#fff",
+                  relief="flat", font=("맑은 고딕", 11, "bold"), cursor="hand2").pack(pady=14, ipadx=10, ipady=4)
+
+    def _eng_id(self):
+        lbl = self.eng_var.get()
+        for k, v in AI_ENGINE_LABELS.items():
+            if v == lbl:
+                return k
+        return AI_ENGINE_ORDER[0]
+
+    def _save_setup(self):
+        v = {k: var.get().strip() for k, var in self.vars.items()}
+        if not v["campus"] or not v["instructorId"] or not v["_api_key"]:
+            messagebox.showwarning("입력 필요", "캠퍼스·이름·API 키는 필수입니다.")
+            return
+        eng = self._eng_id()
+        fields = {
+            "campus": v["campus"], "instructorId": v["instructorId"],
+            "dbUrl": W.DEFAULT_DB, "roomPrefix": v.get("roomPrefix", ""),
+            "ai_engine_type": eng, f"{eng}_api_key": v["_api_key"],
+        }
+        W.write_agent_config(fields)
+        if self.auto_var.get():
+            W.register_autostart()
+        self.cfg = W._load_cfg()
+        self._build_status()
+        messagebox.showinfo("완료", "설정 저장 완료. 이제 안 건드려도 됩니다.")
+
+    # ── 상태창 ───────────────────────────────────────────────────────
+    def _build_status(self):
+        for w in self.root.winfo_children():
+            w.destroy()
+        self.root.geometry("360x300")
+        tk.Label(self.root, text="DRW 강사 에이전트", bg=INK, fg="#cbd5e1",
+                 font=("맑은 고딕", 10)).pack(pady=(16, 2))
+        row = tk.Frame(self.root, bg=INK); row.pack(pady=4)
+        self.dot = tk.Label(row, text="●", bg=INK, fg=SUB, font=("맑은 고딕", 14)); self.dot.pack(side="left")
+        self.state_lbl = tk.Label(row, text="중지됨", bg=INK, fg="#fff",
+                                  font=("맑은 고딕", 13, "bold")); self.state_lbl.pack(side="left", padx=6)
+        tk.Label(self.root, text=f"{self.cfg['instructorId']} @ {self.cfg['campus']} · "
+                 f"{AI_ENGINE_LABELS.get(self.cfg.get('ai_engine_type'),'?')}",
+                 bg=INK, fg=SUB, font=("맑은 고딕", 10)).pack()
+        self.last_lbl = tk.Label(self.root, text="마지막 활동: —", bg=INK, fg=SUB,
+                                 font=("맑은 고딕", 9)); self.last_lbl.pack(pady=(4, 10))
+
+        self.real_var = tk.BooleanVar(value=False)
+        tk.Checkbutton(self.root, text="실 발송 (체크 해제 = dry, 카톡 미발송)", variable=self.real_var,
+                       bg=INK, fg="#FCA5A5", selectcolor=INK, activebackground=INK,
+                       font=("맑은 고딕", 9), command=self._toggle_real).pack()
+        btns = tk.Frame(self.root, bg=INK); btns.pack(pady=12)
+        self.start_btn = tk.Button(btns, text="시작", command=self._toggle_run, bg=INDIGO, fg="#fff",
+                                   relief="flat", font=("맑은 고딕", 11, "bold"), cursor="hand2", width=8)
+        self.start_btn.pack(side="left", padx=4, ipady=3)
+        tk.Button(btns, text="설정", command=lambda: self._build_setup(self.cfg), bg="#2A2D3A", fg="#cbd5e1",
+                  relief="flat", font=("맑은 고딕", 10), cursor="hand2", width=6).pack(side="left", padx=4, ipady=3)
+        tk.Button(self.root, text="종료", command=self._quit, bg="#2A2D3A", fg=SUB,
+                  relief="flat", font=("맑은 고딕", 9), cursor="hand2").pack(pady=(6, 0))
+
+    def _toggle_real(self):
+        self.real = self.real_var.get()
+
+    def _toggle_run(self):
+        if self.running:
+            self.running = False
+            self.start_btn.config(text="시작")
+            self.dot.config(fg=SUB); self.state_lbl.config(text="중지됨")
+        else:
+            self.running = True
+            self.start_btn.config(text="중지")
+            self.dot.config(fg=GREEN); self.state_lbl.config(text="작동 중 (대기)")
+            threading.Thread(target=self._worker, daemon=True).start()
+
+    def _worker(self):
+        db = self.cfg["dbUrl"]; instr = self.cfg["instructorId"]
+        while self.running:
+            try:
+                g, s = W.process_once(self.cfg, db, instr, real=self.real, progress_cb=_progress)
+                if g or s:
+                    _Q.put({"_log": f"생성 {g} · 전송 {s}"})
+            except Exception as ex:
+                _Q.put({"_log": "ERROR: " + str(ex)[:60]})
+            time.sleep(self.cfg.get("interval", 6))
+
+    # ── 오버레이 ─────────────────────────────────────────────────────
+    def _make_overlay(self):
+        ov = tk.Toplevel(self.root)
+        ov.overrideredirect(True); ov.attributes("-topmost", True)
+        try: ov.attributes("-alpha", 0.95)
+        except tk.TclError: pass
+        w, h = 460, 140; sw = ov.winfo_screenwidth()
+        ov.geometry(f"{w}x{h}+{(sw - w) // 2}+24"); ov.configure(bg=INDIGO)
+        tk.Label(ov, text="전송 중", bg=INDIGO, fg="#fff", font=("맑은 고딕", 18, "bold")).pack(pady=(14, 2))
+        self.ov_sub = tk.Label(ov, text="", bg=INDIGO, fg="#E0E7FF", font=("맑은 고딕", 12)); self.ov_sub.pack()
+        self.ov_bar = ttk.Progressbar(ov, length=400, mode="determinate"); self.ov_bar.pack(pady=9)
+        tk.Label(ov, text="⚠  마우스·키보드를 건드리지 마세요", bg=INDIGO, fg="#FEF08A",
+                 font=("맑은 고딕", 11, "bold")).pack()
+        self.overlay = ov
+        if sys.platform == "win32":
+            try:
+                import ctypes
+                GWL_EXSTYLE, NOACT, TOP = -20, 0x08000000, 0x8
+                ov.update_idletasks()
+                h2 = ctypes.windll.user32.GetParent(ov.winfo_id()) or ov.winfo_id()
+                cur = ctypes.windll.user32.GetWindowLongW(h2, GWL_EXSTYLE)
+                ctypes.windll.user32.SetWindowLongW(h2, GWL_EXSTYLE, cur | NOACT | TOP)
+            except Exception:
+                pass
+
+    def _drain(self):
+        try:
+            while True:
+                st = _Q.get_nowait()
+                if "_log" in st:
+                    self.last = time.strftime("%H:%M:%S") + " " + st["_log"]
+                    if hasattr(self, "last_lbl"): self.last_lbl.config(text="마지막 활동: " + self.last)
+                elif st.get("active"):
+                    if not self.overlay: self._make_overlay()
+                    d, t = st.get("done", 0), st.get("total", 0)
+                    self.ov_sub.config(text=f"{st.get('cls','')} · {d}/{t}")
+                    self.ov_bar["maximum"] = max(1, t); self.ov_bar["value"] = d
+                    self.overlay.deiconify(); self.overlay.lift()
+                else:
+                    if self.overlay: self.overlay.withdraw()
+        except queue.Empty:
+            pass
+        self.root.after(150, self._drain)
+
+    def _quit(self):
+        self.running = False
+        self.root.destroy()
+        sys.exit(0)
+
+    def run(self):
+        self.root.mainloop()
+
+
+if __name__ == "__main__":
+    AgentGUI().run()
