@@ -53,12 +53,18 @@ class AgentGUI:
     def _build_setup(self, existing=None):
         for w in self.root.winfo_children():
             w.destroy()
-        self.root.geometry("360x430")
+        self.root.geometry("380x560")
+        self.root.resizable(True, True)   # 배율(125/150%)로 잘릴 때 대비
+        self.root.minsize(360, 420)
         e = existing or {}
         tk.Label(self.root, text="에이전트 설정 (1회)", bg=INK, fg="#fff",
                  font=("맑은 고딕", 13, "bold")).pack(pady=(16, 2))
         tk.Label(self.root, text="키·카톡은 이 PC를 떠나지 않습니다", bg=INK, fg=SUB,
                  font=("맑은 고딕", 9)).pack(pady=(0, 10))
+        # 저장 버튼을 하단 고정(항상 보이게) — frm보다 먼저 side=bottom 배치
+        tk.Button(self.root, text="저장하고 시작", command=self._save_setup, bg=INDIGO, fg="#fff",
+                  relief="flat", font=("맑은 고딕", 12, "bold"), cursor="hand2"
+                  ).pack(side="bottom", fill="x", padx=22, pady=14, ipady=5)
         frm = tk.Frame(self.root, bg=INK); frm.pack(padx=22, fill="x")
         self.vars = {}
 
@@ -90,8 +96,7 @@ class AgentGUI:
         tk.Checkbutton(frm, text="Windows 시작 시 자동 실행", variable=self.auto_var,
                        bg=INK, fg="#cbd5e1", selectcolor=INK, activebackground=INK,
                        font=("맑은 고딕", 9)).pack(anchor="w", pady=(8, 0))
-        tk.Button(self.root, text="저장하고 시작", command=self._save_setup, bg=INDIGO, fg="#fff",
-                  relief="flat", font=("맑은 고딕", 11, "bold"), cursor="hand2").pack(pady=14, ipadx=10, ipady=4)
+        # (저장 버튼은 위에서 하단 고정으로 배치됨)
 
     def _eng_id(self):
         lbl = self.eng_var.get()
@@ -122,7 +127,7 @@ class AgentGUI:
     def _build_status(self):
         for w in self.root.winfo_children():
             w.destroy()
-        self.root.geometry("360x300")
+        self.root.geometry("360x300"); self.root.resizable(False, False)
         tk.Label(self.root, text="DRW 강사 에이전트", bg=INK, fg="#cbd5e1",
                  font=("맑은 고딕", 10)).pack(pady=(16, 2))
         row = tk.Frame(self.root, bg=INK); row.pack(pady=4)
