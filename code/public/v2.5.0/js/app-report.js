@@ -5,7 +5,7 @@
 
 let reportDrafts = {};      // {nameKey: 검토중 특이사항}
 let _rpJobTimer = null;
-let _rpPv = {};             // {nameKey: 미리보기 펼침}
+let _rpActive = null;       // 우측 미리보기 대상 학생(nameKey)
 
 // 문체 옵션 (ai_style.py STYLE_ORDER/LABELS 미러)
 const RP_STYLES = [
@@ -81,6 +81,7 @@ function renderReport(mc){
   if(curAI >= asgns.length) curAI = 0;
   const a = asgns[curAI]; const { classId, subject } = a;
   const students = _rpStudents();
+  if(!_rpActive || !students.some(s => s.nameKey === _rpActive)) _rpActive = students[0]?.nameKey || null;
   const styleLbl = (RP_STYLES.find(s => s[0] === (instructor?.ai_style_mode || 'auto')) || RP_STYLES[0])[1];
 
   const rows = students.map(s => {
@@ -91,68 +92,57 @@ function renderReport(mc){
     const summary = d.subjects.map(sub => {
       const ci = d.classInfo[sub], ag = d.assignMap[sub];
       const bits = [ci.progress && `진도 ${esc(ci.progress)}`, ci.homework && `과제 ${esc(ci.homework)}`, ag && `수행도 ${esc(ag)}`].filter(Boolean).join(' · ');
-      return bits ? `<div class="rp-sub"><b>${esc(d.subjects.length > 1 ? sub : '')}</b> ${bits || '입력 없음'}</div>` : '';
+      return bits ? `<div class="rp-sub"><b>${esc(d.subjects.length > 1 ? sub : '')}</b> ${bits}</div>` : '';
     }).join('') || `<div class="rp-sub" style="color:var(--gray)">진도·과제·수행도 미입력</div>`;
-    const pvOpen = _rpPv[nk];
-    return `<div class="rp-row">
+    return `<div class="rp-row${nk === _rpActive ? ' active' : ''}" data-nk="${esc(nk)}" onclick="setRpActive('${esc(nk)}')">
       <div class="rp-head"><span class="dot ${dot}"></span><b>${esc(name)}</b>
-        ${note.trim() ? `<span class="rp-badge ok">검토중</span>` : `<span class="rp-badge no">미생성</span>`}
-        <a class="rp-pv-toggle" onclick="toggleRpPv('${esc(nk)}')">${pvOpen ? '미리보기 닫기' : '미리보기'}</a></div>
+        ${note.trim() ? `<span class="rp-badge ok">검토중</span>` : `<span class="rp-badge no">미생성</span>`}</div>
       ${summary}
-      <textarea class="rp-ta" id="rp-${esc(nk)}" oninput="onRpEdit('${esc(nk)}',this)" placeholder="AI 생성 후 검토·수정 — 직접 메모는 반드시 반영됩니다">${esc(note)}</textarea>
+      <textarea class="rp-ta" id="rp-${esc(nk)}" onfocus="setRpActive('${esc(nk)}')" oninput="onRpEdit('${esc(nk)}',this)" placeholder="AI 생성 후 검토·수정 — 직접 메모는 반드시 반영됩니다">${esc(note)}</textarea>
       <div class="rp-act">
-        <button class="rp-gen" onclick="genReportOne('${esc(nk)}')">✨ ${note.trim() ? '다시생성' : '생성'}</button>
+        <button class="rp-gen" onclick="event.stopPropagation();genReportOne('${esc(nk)}')">✨ ${note.trim() ? '다시생성' : '생성'}</button>
         <div class="rp-tones">
-          <button class="rp-tone" onclick="genReportOne('${esc(nk)}','warm')">따뜻</button>
-          <button class="rp-tone" onclick="genReportOne('${esc(nk)}','concise')">간결</button>
-          <button class="rp-tone" onclick="genReportOne('${esc(nk)}','detailed')">구체</button>
+          <button class="rp-tone" onclick="event.stopPropagation();genReportOne('${esc(nk)}','warm')">따뜻</button>
+          <button class="rp-tone" onclick="event.stopPropagation();genReportOne('${esc(nk)}','concise')">간결</button>
+          <button class="rp-tone" onclick="event.stopPropagation();genReportOne('${esc(nk)}','detailed')">구체</button>
         </div>
       </div>
-      ${pvOpen ? `<div class="rp-preview"><div class="rp-pv-hd">📨 실제 발송 미리보기 · <span class="rp-len">${_buildMessage(classId, nk, name, note).length}자</span></div><pre class="rp-pv-body">${esc(_buildMessage(classId, nk, name, note))}</pre></div>` : ''}
     </div>`;
   }).join('') || `<div class="empty">이 반에 학생이 없습니다.</div>`;
 
   mc.innerHTML = makeTb('리포트', `${classId} · ${subject}`) + `
-    <div class="rp-wrap">
-      <div class="rp-bar">
-        <span class="rp-ctx">문체: ${esc(styleLbl)}</span>
-        <button class="rp-btn ghost" onclick="openAiSettings()">⚙ AI 설정</button>
-        <button class="rp-btn ghost" onclick="genReportAll()">✨ 일괄 생성</button>
-        <button class="rp-btn" onclick="openReportSend()">전송 대상 선택 →</button>
+    <div class="rp-2col">
+      <div class="rp-left">
+        <div class="rp-bar">
+          <span class="rp-ctx">문체: ${esc(styleLbl)}</span>
+          <button class="rp-btn ghost" onclick="genReportAll()">✨ 일괄 생성</button>
+          <button class="rp-btn" onclick="openReportSend()">전송 →</button>
+        </div>
+        <div class="rp-list">${rows}</div>
+        <div class="rp-jobs"><div class="rp-jobs-hd">전송 상태</div><div id="rp-jobs"><div class="rp-job">작업 없음</div></div></div>
       </div>
-      <div class="rp-list">${rows}</div>
-      <div class="rp-jobs"><div class="rp-jobs-hd">전송 상태</div><div id="rp-jobs"><div class="rp-job">작업 없음</div></div></div>
+      <div class="rp-right" id="rp-right"></div>
     </div>`;
+  _renderRpPreview();
   loadReportJobs();
   clearInterval(_rpJobTimer); _rpJobTimer = setInterval(loadReportJobs, 2500);
 }
 
-function onRpEdit(nk, el){ reportDrafts[nk] = el.value; if(_rpPv[nk]) renderMain(); }
-function toggleRpPv(nk){ _rpPv[nk] = !_rpPv[nk]; renderMain(); }
-
-// ── AI 설정 (문체·지침) — config/instructors 에 저장 ─────────────────
-function openAiSettings(){
-  const mode = instructor?.ai_style_mode || 'auto';
-  const custom = instructor?.ai_custom_prompt || '';
-  const opts = RP_STYLES.map(([k, l]) => `<option value="${k}"${k === mode ? ' selected' : ''}>${esc(l)}</option>`).join('');
-  _rpModal(`<h3>AI 설정</h3>
-    <div class="rp-hint">AI 엔진·키는 본인 PC 에이전트에서 설정합니다. 여기선 문체·지침만.</div>
-    <label class="rp-lbl">문체(말투)</label>
-    <select id="ai-style" class="rp-sel">${opts}</select>
-    <label class="rp-lbl">개별 지침 (선택)</label>
-    <textarea id="ai-custom" class="rp-ta2" placeholder="예: 마지막에 다음 수업 준비물을 안내해 주세요">${esc(custom)}</textarea>
-    <div class="rp-mrow"><button class="rp-btn ghost" onclick="closeRpModal()">취소</button>
-      <button class="rp-btn" onclick="saveAiSettings()">저장</button></div>`);
+// 좌측 학생 편집 → 우측 미리보기 (전체 재렌더 없이 우측만 갱신 = 타이핑 무지연)
+function onRpEdit(nk, el){ reportDrafts[nk] = el.value; if(nk === _rpActive) _renderRpPreview(); }
+function setRpActive(nk){
+  _rpActive = nk;
+  document.querySelectorAll('.rp-row').forEach(r => r.classList.toggle('active', r.dataset.nk === nk));
+  _renderRpPreview();
 }
-async function saveAiSettings(){
-  const mode = document.getElementById('ai-style').value;
-  const custom = document.getElementById('ai-custom').value.trim();
-  if(!instructor) return;
-  instructor.ai_style_mode = mode; instructor.ai_custom_prompt = custom;
-  try{ saveLocal(); }catch(_){}
-  try{ await fbPatch(`config/instructors/${encodeURIComponent(instructor.id)}`, { ai_style_mode: mode, ai_custom_prompt: custom }); toast('AI 설정 저장'); }
-  catch(e){ toast('저장 실패: ' + (e.message || e)); }
-  closeRpModal(); renderMain();
+function _renderRpPreview(){
+  const el = document.getElementById('rp-right'); if(!el) return;
+  const a = activeAsgns()[curAI];
+  const s = a && _rpActive ? _rpStudents().find(x => x.nameKey === _rpActive) : null;
+  if(!s){ el.innerHTML = `<div class="rp-pv-empty">학생을 선택하면<br>실제 발송 미리보기가 표시됩니다.</div>`; return; }
+  const msg = _buildMessage(a.classId, _rpActive, s.name, _curNote(_rpActive));
+  el.innerHTML = `<div class="rp-pv-hd">📨 ${esc(s.name)} · 발송 미리보기 <span class="rp-len">${msg.length}자</span></div>`
+    + `<pre class="rp-pv-body">${esc(msg)}</pre>`;
 }
 
 // ── 생성 ──────────────────────────────────────────────────────────────
@@ -195,7 +185,7 @@ async function genReportOne(nk, tone){
   try{
     await fbPut(`genJobs/${instructor.id}/${jid}`, _genCtx(a.classId, nk, name, tone));
     const draft = await _pollDraft(jid);
-    reportDrafts[nk] = draft;
+    reportDrafts[nk] = draft; _rpActive = nk;
     renderMain();
   }catch(e){ if(ta) ta.value = '[' + (e.message || e) + ']'; toast('생성 실패 — 에이전트 확인'); }
 }

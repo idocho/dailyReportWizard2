@@ -192,6 +192,29 @@ function renderSettings(mc){
       <div class="sa-body${openSaIds.has('sa-reset')?' open':''}">${resetHtml}</div>
     </div>`;
 
+  // ── AI 문체·지침 (리포트 생성) ──
+  const _AISTYLES=(typeof RP_STYLES!=='undefined')?RP_STYLES:[['auto','✍️ 내 말투 자동']];
+  const aiMode=instr.ai_style_mode||'auto', aiCustom=instr.ai_custom_prompt||'';
+  const SA_AISTYLE=`
+    <div class="sa" id="sa-aistyle">
+      <div class="sa-hdr${openSaIds.has('sa-aistyle')?' open':''}" onclick="_saToggle('sa-aistyle')">
+        <span class="sa-ico">✍️</span>
+        <span class="sa-lbl">AI 문체 · 지침</span>
+        <span class="sa-sub">리포트 생성</span>
+        <span class="sa-chv">›</span>
+      </div>
+      <div class="sa-body${openSaIds.has('sa-aistyle')?' open':''}">
+        <div style="padding:10px 12px">
+          <div class="sl">문체(말투)</div>
+          <select class="inp sm" id="aiStyleMode">${_AISTYLES.map(([k,l])=>`<option value="${esc(k)}"${k===aiMode?' selected':''}>${esc(l)}</option>`).join('')}</select>
+          <div class="sl" style="margin-top:10px">개별 지침 (선택)</div>
+          <textarea class="inp sm" id="aiCustom" style="min-height:62px;resize:vertical" placeholder="예: 마지막에 다음 수업 준비물을 안내해 주세요">${esc(aiCustom)}</textarea>
+          <div style="font-size:10px;color:var(--gray);margin:6px 0 8px">AI 엔진·API 키는 본인 PC 에이전트에서 설정합니다.</div>
+          <button class="btn bsm" onclick="saveAiStyle()">💾 저장</button>
+        </div>
+      </div>
+    </div>`;
+
   const SA_FOOT=`
     <div class="stg-foot">
       <button class="btn bsm" style="width:100%;justify-content:center;display:flex;gap:6px" onclick="doLogout()">🚪 로그아웃</button>
@@ -216,7 +239,7 @@ function renderSettings(mc){
     </div>
     <div class="stg-panes">
       ${_pane('account',SA_ASGN+SA_CLS)}
-      ${_pane('data',SA_PRESET+SA_RESET)}
+      ${_pane('data',SA_PRESET+SA_AISTYLE+SA_RESET)}
       ${adminOn?_pane('admin',tbMgmtHtml+tbListHtml+instrMgmt):''}
       ${_pane('system',SA_FOOT)}
     </div>
@@ -531,6 +554,17 @@ function saveFb(){
   dbSecret=document.getElementById('sSec')?.value.trim()||'';
   SS('drw_db_url',dbUrl);SS('drw_db_path',dbPath);SS('drw_db_secret',dbSecret);
   saveLocal();toast('Firebase 설정 저장됨 ✅');
+}
+
+async function saveAiStyle(){
+  if(!instructor){toast('강사 미선택');return;}
+  const mode=document.getElementById('aiStyleMode')?.value||'auto';
+  const custom=(document.getElementById('aiCustom')?.value||'').trim();
+  instructor.ai_style_mode=mode; instructor.ai_custom_prompt=custom; saveLocal();
+  try{
+    if(dbUrl&&dbPath&&instructor.id) await fbPatch(`config/instructors/${encodeURIComponent(instructor.id)}`,{ai_style_mode:mode,ai_custom_prompt:custom});
+    toast('AI 문체·지침 저장 ✅');
+  }catch(e){toast('저장 실패: '+(e.message||e));}
 }
 
 async function lookupInstr(){
