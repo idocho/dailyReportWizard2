@@ -20,6 +20,7 @@ import urllib.parse
 from pathlib import Path
 
 from ai_engine import build_single_prompt, _call_ai_hub, _base_conditions
+import ai_style
 
 CFG_PATH = Path(__file__).resolve().parent / "agent_config.json"
 
@@ -65,26 +66,37 @@ TONE_DIRECTIVES = {
 }
 
 
-def generate(cfg, job, ai_call=_call_ai_hub):
-    """단건 생성 — 본인 로컬 키 사용. job['tone'](warm/concise/detailed)로 톤 재생성 지원.
-    ai_call 주입 가능(테스트용 모킹)."""
+def generate(cfg, job, ai_call=_call_ai_hub, notes_provider=None):
+    """단건 생성 — 본인 로컬 키 + 문체(ai_style)·개별지침 적용(PC앱 gen_single 동일).
+    job['tone']로 톤 재생성. notes_provider=AUTO 말투 학습용 강사 노트 공급자."""
     engine = cfg.get("ai_engine_type", "gemini").strip().lower()
     key = cfg.get(f"{engine}_api_key", "").strip()
     if not key:
         raise RuntimeError(f"개인 {engine} API 키 미설정 — 에이전트 설정에서 입력 필요")
     c = _reconstruct(job)
+    # 문체 블록: 프리셋이면 해당 지침, auto면 강사 전송노트 학습(notes_provider)
+    try:
+        guidance, examples = ai_style.resolve_style(job.get("styleMode") or "auto",
+                                                    notes_provider or (lambda: []))
+        style_block = ai_style.style_prompt_block(guidance, examples)
+    except Exception:
+        style_block = ""
     prompt = build_single_prompt(
         c["sheet"], c["cls"], c["name"], c["textbooks"],
         c["student_data"], c["progress_data"], c["note"], c["tags"],
-        tb_grade=c["tb_grade"], style_block=c["style_block"], display_name=c["display"])
+        tb_grade=c["tb_grade"], style_block=style_block, display_name=c["display"])
     # 톤 조절: 사실은 데이터에서, 어조만 조정. 이전 작성본 참고로 연속성 유지.
     tone = (job.get("tone") or "").strip()
     if tone in TONE_DIRECTIVES:
         prompt += f"\n[톤 조절 지시 — 사실·안전 규칙 유지]\n{TONE_DIRECTIVES[tone]}\n"
         if job.get("currentDraft"):
             prompt += f"[이전 작성본(어조 참고용, 사실은 위 데이터 우선)]\n{job['currentDraft']}\n"
-    return ai_call(engine, key, prompt, max_tokens=400, temperature=0.75,
-                   system=_base_conditions())
+    # system = 공통 지침 + 강사 개별 지침
+    system = _base_conditions()
+    custom = (job.get("customPrompt") or "").strip()
+    if custom:
+        system += ("\n\n[강사 개별 지침 — 위 작성 지침과 사실·안전 규칙을 위반하지 않는 선에서 반영]\n" + custom)
+    return ai_call(engine, key, prompt, max_tokens=400, temperature=0.75, system=system)
 
 
 # ── Firebase REST (genJobs 큐) ───────────────────────────────────────
@@ -106,6 +118,23 @@ def _patch(db, node, data, token):
         return json.loads(r.read())
 
 
+def _fetch_instructor_notes(db, cfg, instructor_id, token):
+    """history/ 에서 해당 강사가 전송한 노트 본문(최신순 일부) — AUTO 말투 학습용."""
+    try:
+        hist = _get(db, f"campus/{cfg['campus']}/history", token) or {}
+    except Exception:
+        return []
+    rows = []
+    for nk, days in hist.items():
+        if not isinstance(days, dict):
+            continue
+        for d, rec in days.items():
+            if isinstance(rec, dict) and (rec.get("note") or "").strip() and rec.get("instructor", "") == instructor_id:
+                rows.append((d, rec["note"]))
+    rows.sort(key=lambda x: x[0], reverse=True)
+    return [n for _, n in rows[:40]]
+
+
 def process_genjobs(cfg, db, instructor_id, token=None, ai_call=_call_ai_hub):
     """본인 genJobs 큐의 queued 작업을 생성 처리. 반환: 처리 건수."""
     base = f"campus/{cfg['campus']}/genJobs/{urllib.parse.quote(instructor_id)}"
@@ -113,9 +142,14 @@ def process_genjobs(cfg, db, instructor_id, token=None, ai_call=_call_ai_hub):
     pending = {jid: j for jid, j in jobs.items()
                if isinstance(j, dict) and j.get("status") == "queued"}
     done = 0
+    _notes = [None]   # AUTO 말투 학습 노트 — 1회 fetch 캐시
+    def _np():
+        if _notes[0] is None:
+            _notes[0] = _fetch_instructor_notes(db, cfg, instructor_id, token)
+        return _notes[0]
     for jid, job in pending.items():
         try:
-            draft = generate(cfg, job, ai_call=ai_call)
+            draft = generate(cfg, job, ai_call=ai_call, notes_provider=_np)
             _patch(db, f"{base}/{jid}", {"draft": draft, "status": "done"}, token)
             done += 1
         except Exception as e:
