@@ -335,8 +335,12 @@ body{font-family:'Pretendard','Malgun Gothic','맑은 고딕',-apple-system,sans
 .rp-head{display:flex;align-items:center;gap:6px;font-size:13px;margin-bottom:5px}
 .rp-pv-toggle{margin-left:auto;font-size:11px;color:var(--indigo);cursor:pointer;font-weight:700}
 .rp-sub{font-size:11px;color:var(--sub);line-height:1.6}.rp-sub b{color:var(--indigo);font-weight:700}
-.rp-obs{display:flex;flex-wrap:wrap;gap:4px;margin:3px 0 2px}
-.rp-tag{font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;background:var(--indigo-l,#EEF0FF);color:var(--indigo)}
+.rp-obs{display:flex;flex-wrap:wrap;gap:5px;margin:5px 0 1px}
+.rp-tag{font-size:10.5px;font-weight:600;padding:3px 9px;border-radius:7px;border:1px solid transparent;line-height:1.4;white-space:nowrap}
+.rp-tag.k-pos{background:rgba(34,197,94,.13);color:#4ade80;border-color:rgba(34,197,94,.25)}
+.rp-tag.k-warn{background:rgba(245,158,11,.14);color:#fbbf24;border-color:rgba(245,158,11,.28)}
+.rp-tag.k-neutral{background:var(--bg);color:var(--sub);border-color:var(--border)}
+.rp-tag.k-assign{background:rgba(148,163,184,.13);color:var(--sub);border-color:rgba(148,163,184,.25)}
 .rp-preview{margin-top:8px;border:1px solid var(--border);border-radius:8px;overflow:hidden}
 .rp-pv-hd{font-size:11px;color:var(--sub);background:var(--bg);padding:6px 10px;border-bottom:1px solid var(--border)}
 .rp-len{color:var(--indigo);font-weight:700}

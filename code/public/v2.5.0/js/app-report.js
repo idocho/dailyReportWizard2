@@ -21,16 +21,17 @@ function _assignText(code){
   const g = (typeof ASSIGN_GRADES !== 'undefined') ? ASSIGN_GRADES.find(x => x.key === code) : null;
   return g ? g.label.replace(/[^가-힣]/g, '').trim() : '';
 }
-// 입력된 관찰 태그(obs) → 표시 라벨 목록 (입력 탭과 동일 정보 표시)
+// 입력된 관찰 태그(obs) → {label, kind} 목록. kind=의미별 색상(pos/warn/neutral/assign)
 function _obsTagLabels(tags){
   if(!tags || typeof TAGS === 'undefined') return [];
   const out = [];
-  if(tags.condition){ const t = TAGS.condition.find(x => x.key === tags.condition); if(t) out.push('컨디션 ' + t.label); }
-  if(tags.understand){ const t = TAGS.understand.find(x => x.key === tags.understand); if(t) out.push('이해 ' + t.label); }
+  if(tags.condition){ const t = TAGS.condition.find(x => x.key === tags.condition); if(t) out.push({ label: '컨디션 ' + t.label, kind: 'neutral' }); }
+  if(tags.understand){ const t = TAGS.understand.find(x => x.key === tags.understand); if(t) out.push({ label: '이해 ' + t.label, kind: 'neutral' }); }
+  const KIND = { understand_sub: 'pos', engage: 'pos', highlight: 'pos', caution: 'warn', extra: 'neutral' };
   ['understand_sub', 'engage', 'caution', 'extra', 'highlight'].forEach(g => {
-    (tags[g] || []).forEach(k => { const t = (TAGS[g] || []).find(x => x.key === k); if(t) out.push(t.label); });
+    (tags[g] || []).forEach(k => { const t = (TAGS[g] || []).find(x => x.key === k); if(t) out.push({ label: t.label, kind: KIND[g] || 'neutral' }); });
   });
-  (tags.assign_tags || []).forEach(p => out.push(p));
+  (tags.assign_tags || []).forEach(p => out.push({ label: p, kind: 'assign' }));
   return out;
 }
 // 과정+교재 라벨 (constants.grade_label 미러) — 다과목일 때만
@@ -108,7 +109,7 @@ function renderReport(mc){
       const ci = d.classInfo[sub], ag = d.assignMap[sub];
       const bits = [ci.progress && `진도 ${esc(ci.progress)}`, ci.homework && `과제 ${esc(ci.homework)}`, ag && `수행도 ${esc(ag)}`].filter(Boolean).join(' · ');
       const obs = _obsTagLabels(getTags(classId, nk, sub));
-      const obsHtml = obs.length ? `<div class="rp-obs">${obs.map(t => `<span class="rp-tag">${esc(t)}</span>`).join('')}</div>` : '';
+      const obsHtml = obs.length ? `<div class="rp-obs">${obs.map(o => `<span class="rp-tag k-${o.kind}">${esc(o.label)}</span>`).join('')}</div>` : '';
       return (bits || obs.length) ? `<div class="rp-sub"><b>${esc(d.subjects.length > 1 ? sub : '')}</b> ${bits}</div>${obsHtml}` : '';
     }).join('') || `<div class="rp-sub" style="color:var(--gray)">진도·과제·수행도·관찰 미입력</div>`;
     return `<div class="rp-row${nk === _rpActive ? ' active' : ''}" data-nk="${esc(nk)}" onclick="setRpActive('${esc(nk)}')">
