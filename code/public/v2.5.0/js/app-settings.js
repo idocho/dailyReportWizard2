@@ -227,21 +227,24 @@ function renderSettings(mc){
     </div>`;
 
   // 활성 탭 (관리자 탭은 adminOn일 때만) — 잡다한 단일 스크롤 → 4탭 좌측 레일
-  const T=(stgTab==='admin'&&!adminOn)?'account':stgTab;
+  // IA 정리: 개인(내 설정) / 공유(명단) / 관리자 / 시스템 — 레벨 일관, 초기화는 시스템으로
+  const _valid=['account','roster','admin','system'];
+  let T=_valid.includes(stgTab)?stgTab:'account';
+  if(T==='admin'&&!adminOn)T='account';
   const _tab=(k,ic,lb)=>`<button class="stg-tab${T===k?' on':''}" data-stg="${k}" onclick="setStg('${k}')">${ic} ${lb}</button>`;
   const _pane=(k,html)=>`<div class="stg-pane${T===k?' on':''}" data-stg="${k}">${html}</div>`;
   mc.innerHTML=makeTb('설정')+`<div class="stg">
     <div class="stg-rail">
-      ${_tab('account','👤','수업')}
-      ${_tab('data','💬','문구·데이터')}
+      ${_tab('account','👤','내 설정')}
+      ${_tab('roster','🏫','명단')}
       ${adminOn?_tab('admin','👑','관리자'):''}
       ${_tab('system','⚙️','시스템')}
     </div>
     <div class="stg-panes">
-      ${_pane('account',SA_ASGN+SA_CLS)}
-      ${_pane('data',SA_PRESET+SA_AISTYLE+SA_RESET)}
+      ${_pane('account',SA_ASGN+SA_AISTYLE+SA_PRESET)}
+      ${_pane('roster',SA_CLS)}
       ${adminOn?_pane('admin',tbMgmtHtml+tbListHtml+instrMgmt):''}
-      ${_pane('system',SA_FOOT)}
+      ${_pane('system',SA_RESET+SA_FOOT)}
     </div>
   </div>`;
 
