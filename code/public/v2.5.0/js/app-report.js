@@ -45,10 +45,13 @@ function _nickSuffix(full){
 }
 function _todayStr(){ const d = new Date(); return `${d.getMonth() + 1}/${d.getDate()} (${'일월화수목금토'[d.getDay()]})`; }
 
-// 학생 1명의 메시지 데이터 집계 (반 전체 과목)
+// 학생 1명의 메시지 데이터 집계 — 내가 담당하는 과목만(옛/타 교재 노출 방지)
 function _rpData(classId, nk){
   const courses = (typeof activeCourses === 'function') ? (activeCourses(config.classes[classId] || {}) || {}) : {};
-  const subjects = Object.keys(courses).sort();
+  // 담당 과목(assignments, admin이면 activeAsgns 확장 포함) ∩ 현재 활성 과목
+  const mine = (typeof activeAsgns === 'function' ? activeAsgns() : (instructor?.assignments || []))
+    .filter(a => a.classId === classId).map(a => a.subject);
+  const subjects = [...new Set(mine)].filter(s => courses[s]).sort();
   const classInfo = {}, assignMap = {}, tbGrade = {};
   subjects.forEach(sub => {
     const pd = progressData[`${classId}|${sub}`] || {};
