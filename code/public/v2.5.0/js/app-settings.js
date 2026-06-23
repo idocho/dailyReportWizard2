@@ -227,26 +227,46 @@ function renderSettings(mc){
     </div>`;
 
   // 활성 탭 (관리자 탭은 adminOn일 때만) — 잡다한 단일 스크롤 → 4탭 좌측 레일
-  // 기능별 분류: 수업(담당) / 작성(AI문체·문구) / 명단(학급·학생) / 관리자 / 시스템
-  const _valid=['account','compose','roster','admin','system'];
-  let T=_valid.includes(stgTab)?stgTab:'account';
-  if(T==='admin'&&!adminOn)T='account';
-  const _tab=(k,ic,lb)=>`<button class="stg-tab${T===k?' on':''}" data-stg="${k}" onclick="setStg('${k}')">${ic} ${lb}</button>`;
-  const _pane=(k,html)=>`<div class="stg-pane${T===k?' on':''}" data-stg="${k}">${html}</div>`;
+  // ── 평탄화: 탭 = 기능 1개, 아코디언(이중구조) 제거 → 카드 직접 표시 ──
+  const _card=(ic,title,sub,body)=>`<div class="stg-card"><div class="stg-card-h"><span>${ic}</span><b>${esc(title)}</b>${sub?`<span class="stg-csub">${esc(sub)}</span>`:''}</div><div class="stg-card-b">${body}</div></div>`;
+  const _aiBody=`<div style="padding:12px"><div class="sl">문체(말투)</div><select class="inp sm" id="aiStyleMode">${_AISTYLES.map(([k,l])=>`<option value="${esc(k)}"${k===aiMode?' selected':''}>${esc(l)}</option>`).join('')}</select><div class="sl" style="margin-top:10px">개별 지침 (선택)</div><textarea class="inp sm" id="aiCustom" style="min-height:64px;resize:vertical" placeholder="예: 마지막에 다음 수업 준비물을 안내해 주세요">${esc(aiCustom)}</textarea><div style="font-size:10px;color:var(--gray);margin:6px 0 10px">AI 엔진·API 키는 본인 PC 에이전트에서 설정합니다.</div><button class="btn bsm" onclick="saveAiStyle()">💾 저장</button></div>`;
+  const _presetBody=`${presetChips||'<div style="padding:10px 12px;font-size:12px;color:var(--gray)">등록된 문구가 없습니다.</div>'}<div style="padding:8px 12px;border-top:1px solid var(--border);display:flex;gap:6px"><input class="inp sm" id="pInput" placeholder="새 문구 입력" style="flex:1" onkeydown="if(event.key==='Enter')addPreset()"><button class="btn bsm" onclick="addPreset()">+ 추가</button></div>`;
+  const _sysBody=`<div style="padding:12px;display:flex;flex-direction:column;gap:8px"><button class="btn bsm" style="width:100%;justify-content:center;display:flex;gap:6px" onclick="doLogout()">🚪 로그아웃</button><button class="adm-btn${adminOn?' on':''}" onclick="toggleAdmin()" id="admBtn"><span>${adminOn?'🔓':'🔒'}</span> <span id="admBtnLbl">${adminOn?'관리자 모드 해제':'관리자 모드'}</span></button>${adminOn?`<button class="btn bsm" style="width:100%;justify-content:center" onclick="changeAdminPw()">🔑 관리자 암호 변경</button>`:''}<div style="font-size:10px;color:var(--gray);text-align:center">DailyReportWizard ${APP_VERSION} · Crafted by IDO · Powered by Claude AI</div></div>`;
+  let _subjBody='',_bookBody='';
+  if(adminOn){
+    const sm=new Map();
+    for(const clsD of Object.values(config?.classes||{}))for(const[s,c]of Object.entries(clsD.courses||{})){const ar=!!(c&&c.archived);sm.set(s,sm.has(s)?(sm.get(s)&&ar):ar);}
+    _subjBody=[...sm.keys()].sort((a,b)=>a.localeCompare(b,'ko')).map(n=>`<div style="display:flex;align-items:center;padding:6px 12px;border-bottom:1px solid var(--border);gap:8px"><span style="flex:1;font-size:12px;font-weight:600${sm.get(n)?';color:var(--gray)':''}">${esc(n)}</span>${sm.get(n)?'<span style="font-size:9px;background:#F1F5F9;color:#64748B;border-radius:8px;padding:1px 6px;font-weight:700">보관</span>':''}</div>`).join('')||'<div style="padding:8px 12px;font-size:11px;color:var(--gray)">등록된 과목 없음</div>';
+    const bn=Object.keys(config?.textbooks||{}).sort((a,b)=>a.localeCompare(b,'ko'));
+    _bookBody=`<div style="padding:6px 12px;font-size:11px;color:var(--gray)">반 삭제와 무관하게 보존되는 전역 교재 목록(자동완성).</div>`+(bn.map(n=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 12px;border-bottom:1px solid var(--border)"><span style="font-size:12px;font-weight:600">${esc(n)}</span><button style="background:none;border:none;cursor:pointer;color:var(--red);font-size:13px;padding:0 2px" onclick="rmTbName('${esc(n)}')">✕</button></div>`).join('')||'<div style="padding:8px 12px;font-size:11px;color:var(--gray)">등록된 교재명 없음</div>')+`<div style="display:flex;gap:6px;padding:10px 12px"><input class="inp sm" id="newTbName" placeholder="교재명 직접 추가" style="flex:1" onkeydown="if(event.key==='Enter'){event.preventDefault();addTbName();}"><button class="btn bp bsm" onclick="addTbName()">+ 추가</button></div>`;
+  }
+  const _valid=['asgn','style','preset','roster','subj','book','instr','reset','system'];
+  let T=_valid.includes(stgTab)?stgTab:'asgn';
+  if(['subj','book','instr'].includes(T)&&!adminOn)T='asgn';
+  const _tab=(k,ic,lb,adm)=> (adm&&!adminOn)?'' : `<button class="stg-tab${T===k?' on':''}" data-stg="${k}" onclick="setStg('${k}')">${ic} ${lb}</button>`;
+  const _pane=(k,html,adm)=> (adm&&!adminOn)?'' : `<div class="stg-pane${T===k?' on':''}" data-stg="${k}">${html}</div>`;
   mc.innerHTML=makeTb('설정')+`<div class="stg">
     <div class="stg-rail">
-      ${_tab('account','👤','수업')}
-      ${_tab('compose','✍️','작성')}
+      ${_tab('asgn','👤','수업')}
+      ${_tab('style','✍️','문체')}
+      ${_tab('preset','💬','문구')}
       ${_tab('roster','🏫','명단')}
-      ${adminOn?_tab('admin','👑','관리자'):''}
+      ${_tab('subj','📖','과목',true)}
+      ${_tab('book','📚','교재',true)}
+      ${_tab('instr','👥','강사',true)}
+      ${_tab('reset','🗑','초기화')}
       ${_tab('system','⚙️','시스템')}
     </div>
     <div class="stg-panes">
-      ${_pane('account',SA_ASGN)}
-      ${_pane('compose',SA_AISTYLE+SA_PRESET)}
-      ${_pane('roster',SA_CLS)}
-      ${adminOn?_pane('admin',tbMgmtHtml+tbListHtml+instrMgmt):''}
-      ${_pane('system',SA_RESET+SA_FOOT)}
+      ${_pane('asgn',_card('👤','담당 수업',asgns.length+'개',asgRows+addAsgn))}
+      ${_pane('style',_card('✍️','AI 문체·지침','',_aiBody))}
+      ${_pane('preset',_card('💬','자주 쓰는 문구',myPresets.length+'개',_presetBody))}
+      ${_pane('roster',_card('🏫','학급 · 학생','',renderClsMgmt()))}
+      ${_pane('subj',_card('📖','과목 목록','관리자',_subjBody),true)}
+      ${_pane('book',_card('📚','교재 명단','관리자',_bookBody),true)}
+      ${_pane('instr',_card('👥','강사 관리','관리자','<div id="instrMgmtCard"><div style="padding:10px 12px;font-size:12px;color:var(--gray)">불러오는 중...</div></div>'),true)}
+      ${_pane('reset',_card('🗑','초기화','',resetHtml))}
+      ${_pane('system',_card('⚙️','시스템','',_sysBody))}
     </div>
   </div>`;
 
