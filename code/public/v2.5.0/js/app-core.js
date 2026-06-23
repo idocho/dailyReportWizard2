@@ -431,10 +431,31 @@ function curAsgn(){
 }
 
 let _lessonStage='input';   // '수업' 탭 내부 단계: input(입력) | report(리포트·전송)
+function _lessonProgress(){
+  // 현재 반 파이프라인 진척: 입력(메모/수행도) · 발송문(생성) — 한 흐름 가시화
+  const a=(typeof activeAsgns==='function')?activeAsgns()[curAI]:null;
+  if(!a) return null;
+  const st=(config?._classStudents||{})[a.classId]||[]; const M=st.length;
+  const tdk=todayKey();
+  const hasInput=s=>{
+    if(typeof _readNote==='function' && _readNote(s.nameKey)) return true;
+    const t=tagData[s.nameKey]||{};
+    return Object.values(t).some(bd=>bd&&bd[tdk]&&bd[tdk].assign_grade);
+  };
+  const hasDraft=s=>{
+    if(typeof reportDrafts!=='undefined' && reportDrafts[s.nameKey]) return true;
+    const d=(inputData[s.nameKey]||{}).__draft__; return !!(d&&d.date===tdk&&d.value);
+  };
+  return {classId:a.classId, M, inN:st.filter(hasInput).length, genN:st.filter(hasDraft).length};
+}
 function _stageBar(cur){
+  const p=_lessonProgress();
+  const done=p&&p.M&&p.inN>=p.M;
+  const prog=p?`<span class="ls-prog">${esc(p.classId)} · 입력 <b>${p.inN}/${p.M}</b> · 발송문 <b>${p.genN}/${p.M}</b></span>`:'';
   return `<div class="lesson-stage">
-    <button class="ls-tab${cur==='input'?' on':''}" onclick="goNav('input')">① 입력</button>
+    <button class="ls-tab${cur==='input'?' on':''}" onclick="goNav('input')">① 입력${done?' ✓':''}</button>
     <button class="ls-tab${cur==='report'?' on':''}" onclick="goNav('report')">② 리포트 · 전송</button>
+    ${prog}
   </div>`;
 }
 function goNav(n){
