@@ -128,7 +128,7 @@ function renderReport(mc){
     </div>`;
   }).join('') || `<div class="empty">이 반에 학생이 없습니다.</div>`;
 
-  mc.innerHTML = makeTb('리포트', `${classId} · ${subject}`) + `
+  mc.innerHTML = makeTb('리포트', `${classId} · ${subject}`) + _stageBar('report') + `
     <div class="rp-2col">
       <div class="rp-left">
         <div class="rp-bar">

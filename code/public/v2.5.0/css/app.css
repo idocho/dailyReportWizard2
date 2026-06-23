@@ -368,4 +368,8 @@ body{font-family:'Pretendard','Malgun Gothic','맑은 고딕',-apple-system,sans
 .stg-card-h{display:flex;align-items:center;gap:8px;padding:11px 14px;border-bottom:1px solid var(--border);font-size:13px;background:var(--bg)}
 .stg-card-h b{font-weight:700}
 .stg-csub{margin-left:auto;font-size:11px;color:var(--sub);font-weight:400}
+/* 수업 단계 토글(입력 ↔ 리포트) */
+.lesson-stage{display:flex;gap:6px;padding:10px 14px 2px}
+.ls-tab{flex:1;padding:9px;border-radius:9px;border:1px solid var(--border);background:var(--bg);color:var(--sub);font-size:13px;font-weight:700;cursor:pointer;font-family:inherit}
+.ls-tab.on{background:var(--indigo);color:#fff;border-color:var(--indigo)}
 </style>

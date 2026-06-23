@@ -223,7 +223,7 @@ function renderInput(mc){
   }
 
   const noStu=`<div class="empty" style="padding:20px;font-size:12px">이 반에 학생이 없습니다.</div>`;
-  mc.innerHTML=makeTb(`${classId} · ${gsLabel?gsLabel+' ':''}${subject}`,today())+mTabs+
+  mc.innerHTML=makeTb(`${classId} · ${gsLabel?gsLabel+' ':''}${subject}`,today())+_stageBar('input')+mTabs+
     `<div style="padding:14px 14px 10px"><div class="card">${pForm}</div></div>
      <div style="padding:0 14px 14px">
        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">

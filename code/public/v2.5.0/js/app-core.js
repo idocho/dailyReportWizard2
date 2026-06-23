@@ -430,8 +430,16 @@ function curAsgn(){
   return l[curAI];
 }
 
+let _lessonStage='input';   // '수업' 탭 내부 단계: input(입력) | report(리포트·전송)
+function _stageBar(cur){
+  return `<div class="lesson-stage">
+    <button class="ls-tab${cur==='input'?' on':''}" onclick="goNav('input')">① 입력</button>
+    <button class="ls-tab${cur==='report'?' on':''}" onclick="goNav('report')">② 리포트 · 전송</button>
+  </div>`;
+}
 function goNav(n){
   activeTab=n;
+  if(n==='input'||n==='report')_lessonStage=n;
   if(n==='scores'){scoreView='list';scoreEditing=null;_loadScoreDataIfNeeded();}
   ['input','scores','setting'].forEach(x=>{const e=document.getElementById('nav_'+x);if(e)e.classList.toggle('on',x===n);});
   renderSb();renderMain();
@@ -493,9 +501,8 @@ function renderSb(){
       </div>
     </div>
     <div class="sb-nav">
-      <div class="sni${activeTab==='input'?' on':''}" onclick="goNav('input')">✏️ 수업 입력</div>
+      <div class="sni${(activeTab==='input'||activeTab==='report')?' on':''}" onclick="goNav(_lessonStage)">📚 수업 (입력·리포트)</div>
       <div class="sni${activeTab==='scores'?' on':''}" onclick="goNav('scores')">📊 성적 입력</div>
-      <div class="sni${activeTab==='report'?' on':''}" onclick="goNav('report')">📨 리포트 전송</div>
       <div class="sni${activeTab==='bulk'?' on':''}" onclick="goNav('bulk')">📢 일괄 공지</div>
       <div class="sni${activeTab==='setting'?' on':''}" onclick="goNav('setting')">⚙️ 설정</div>
     </div>
