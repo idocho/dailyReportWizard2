@@ -169,7 +169,7 @@ class AgentGUI:
 
     def _worker(self):
         db = self.cfg["dbUrl"]; instr = self.cfg["instructorId"]
-        idle = self.cfg.get("interval", 3)
+        idle = self.cfg.get("interval", 2)   # 큐 픽업 지연 단축(2s) — sonnet 호출 구조는 불변
         while self.running:
             try:
                 g, s = W.process_once(self.cfg, db, instr, real=self.real, progress_cb=_progress)
