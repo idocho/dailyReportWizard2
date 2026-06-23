@@ -189,10 +189,38 @@ async function genReportOne(nk, tone){
     renderMain();
   }catch(e){ if(ta) ta.value = '[' + (e.message || e) + ']'; toast('생성 실패 — 에이전트 확인'); }
 }
+async function _pollDrafts(jid, ms = 180000){   // 배치 — 더 긴 여유
+  const t0 = Date.now();
+  while(Date.now() - t0 < ms){
+    const j = await fbGet(`genJobs/${instructor.id}/${jid}`);
+    if(j && j.status === 'done') return j.drafts || {};
+    if(j && j.status === 'error') throw new Error(j.error || '생성 실패');
+    await new Promise(r => setTimeout(r, 1200));
+  }
+  throw new Error('생성 지연 — 에이전트 상태를 확인하세요');
+}
 async function genReportAll(){
-  if(!activeAsgns()[curAI]) return;
-  toast('일괄 생성 — 에이전트가 순차 처리합니다');
-  for(const s of _rpStudents()){ await genReportOne(s.nameKey); }
+  const a = activeAsgns()[curAI]; if(!a) return;
+  const classId = a.classId;
+  const students = _rpStudents().filter(s => _rpData(classId, s.nameKey).subjects.length);
+  if(!students.length) return toast('생성 대상이 없습니다');
+  const list = students.map(s => {
+    const c = _genCtx(classId, s.nameKey, s.name);   // 단건 맥락 재사용
+    return { nameKey: s.nameKey, displayName: s.name, items: c.items, tags: c.tags, note: c.note };
+  });
+  const job = { batch: true, cls: classId, students: list,
+    styleMode: instructor?.ai_style_mode || 'auto', customPrompt: instructor?.ai_custom_prompt || '', status: 'queued' };
+  toast(`일괄 생성 ${list.length}명 — 한 번에 처리합니다`);
+  students.forEach(s => { const t = document.getElementById('rp-' + s.nameKey); if(t) t.value = '✨ 생성 중…'; });
+  const jid = Date.now() + '_' + Math.floor(Math.random() * 1000);
+  try{
+    await fbPut(`genJobs/${instructor.id}/${jid}`, job);
+    const drafts = await _pollDrafts(jid);
+    Object.entries(drafts).forEach(([nk, note]) => { reportDrafts[nk] = note; });
+    const got = Object.keys(drafts).length;
+    toast(got ? `${got}명 생성 완료` : '생성 결과 없음 — 입력/에이전트 확인');
+    renderMain();
+  }catch(e){ toast('일괄 생성 실패: ' + (e.message || e)); renderMain(); }
 }
 
 // ── 전송 (실제 메시지 = build_message 전체) ──────────────────────────

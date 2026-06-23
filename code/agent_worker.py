@@ -19,7 +19,8 @@ import urllib.request
 import urllib.parse
 from pathlib import Path
 
-from ai_engine import build_single_prompt, _call_ai_hub, _base_conditions
+from ai_engine import build_single_prompt, build_batch_prompt, _call_ai_hub, _base_conditions
+from constants import grade_label
 import ai_style
 
 CFG_PATH = Path(__file__).resolve().parent / "agent_config.json"
@@ -99,6 +100,53 @@ def generate(cfg, job, ai_call=_call_ai_hub, notes_provider=None):
     return ai_call(engine, key, prompt, max_tokens=400, temperature=0.75, system=system)
 
 
+def generate_batch(cfg, job, ai_call=_call_ai_hub, notes_provider=None):
+    """반 전체 1회 호출 생성(PC gen_all 동일) — build_batch_prompt. 반환: {nameKey: note}."""
+    engine = cfg.get("ai_engine_type", "gemini").strip().lower()
+    key = cfg.get(f"{engine}_api_key", "").strip()
+    if not key:
+        raise RuntimeError(f"개인 {engine} API 키 미설정 — 에이전트 설정에서 입력 필요")
+    students = job.get("students", [])
+    targets = []
+    for st in students:
+        cls = st.get("cls") or job.get("cls", "")
+        data, progress = {}, {}
+        for it in st.get("items", []):
+            sub = it.get("subject");
+            if not sub:
+                continue
+            label = grade_label(it.get("gradeLabel", ""), sub)
+            if it.get("value"):
+                data[label] = it["value"]
+            if it.get("progress") or it.get("homework"):
+                progress[label] = {"progress": it.get("progress", ""), "homework": it.get("homework", "")}
+        targets.append({"sheet": "", "cls": cls, "name": st.get("displayName", ""),
+                        "data": data, "progress": progress,
+                        "existing": (st.get("note") or "").strip(), "tags": st.get("tags") or {}})
+    if not targets:
+        return {}
+    try:
+        guidance, examples = ai_style.resolve_style(job.get("styleMode") or "auto", notes_provider or (lambda: []))
+        style_block = ai_style.style_prompt_block(guidance, examples)
+    except Exception:
+        style_block = ""
+    custom = (job.get("customPrompt") or "").strip()
+    custom_block = (f"[강사 개별 지침 — 위 작성 지침과 사실·안전 규칙을 위반하지 않는 선에서 반영]\n{custom}" if custom else "")
+    prompt = build_batch_prompt(targets, style_block=style_block, custom_block=custom_block)
+    raw = ai_call(engine, key, prompt, max_tokens=min(4096, 256 * len(targets) + 400),
+                  temperature=0.75, system=_base_conditions())
+    clean = raw.replace("```json", "").replace("```", "").strip()
+    parsed = json.loads(clean)
+    name_to_key = {st.get("displayName"): st.get("nameKey") for st in students}
+    drafts = {}
+    for item in (parsed if isinstance(parsed, list) else []):
+        dn = (item.get("name") or "").strip(); note = (item.get("note") or "").strip()
+        nk = name_to_key.get(dn)
+        if dn and note and nk:
+            drafts[nk] = note
+    return drafts
+
+
 # ── Firebase REST (genJobs 큐) ───────────────────────────────────────
 def _url(db, node, token):
     u = f"{db.rstrip('/')}/{node}.json"
@@ -149,8 +197,12 @@ def process_genjobs(cfg, db, instructor_id, token=None, ai_call=_call_ai_hub):
         return _notes[0]
     for jid, job in pending.items():
         try:
-            draft = generate(cfg, job, ai_call=ai_call, notes_provider=_np)
-            _patch(db, f"{base}/{jid}", {"draft": draft, "status": "done"}, token)
+            if job.get("batch"):
+                drafts = generate_batch(cfg, job, ai_call=ai_call, notes_provider=_np)
+                _patch(db, f"{base}/{jid}", {"drafts": drafts, "status": "done"}, token)
+            else:
+                draft = generate(cfg, job, ai_call=ai_call, notes_provider=_np)
+                _patch(db, f"{base}/{jid}", {"draft": draft, "status": "done"}, token)
             done += 1
         except Exception as e:
             _patch(db, f"{base}/{jid}", {"status": "error", "error": str(e)[:200]}, token)
