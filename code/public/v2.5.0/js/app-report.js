@@ -89,15 +89,15 @@ function renderReport(mc){
 function onRpEdit(nk, el){ reportDrafts[nk] = el.value; }
 
 // ── 생성 (개별/톤/일괄) ──────────────────────────────────────────────
-async function _pollDraft(jid, ms = 30000){
+async function _pollDraft(jid, ms = 120000){   // 실 AI 호출 여유 — 최대 120초
   const t0 = Date.now();
   while(Date.now() - t0 < ms){
     const j = await fbGet(`genJobs/${instructor.id}/${jid}`);
     if(j && j.status === 'done') return j.draft;
     if(j && j.status === 'error') throw new Error(j.error || '생성 실패');
-    await new Promise(r => setTimeout(r, 800));
+    await new Promise(r => setTimeout(r, 1000));
   }
-  throw new Error('시간초과 — 에이전트 실행 확인');
+  throw new Error('생성 지연 — 잠시 후 다시 생성하거나 에이전트 상태를 확인하세요');
 }
 
 async function genReportOne(nk, tone){

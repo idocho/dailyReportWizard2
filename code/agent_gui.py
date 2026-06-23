@@ -169,14 +169,16 @@ class AgentGUI:
 
     def _worker(self):
         db = self.cfg["dbUrl"]; instr = self.cfg["instructorId"]
+        idle = self.cfg.get("interval", 3)
         while self.running:
             try:
                 g, s = W.process_once(self.cfg, db, instr, real=self.real, progress_cb=_progress)
                 if g or s:
                     _Q.put({"_log": f"생성 {g} · 전송 {s}"})
+                    continue   # 처리분 있으면 즉시 다음 루프 — 백로그 빠르게 소진
             except Exception as ex:
                 _Q.put({"_log": "ERROR: " + str(ex)[:60]})
-            time.sleep(self.cfg.get("interval", 6))
+            time.sleep(idle)   # 대기분 없을 때만 짧게 대기(기본 3s)
 
     # ── 오버레이 ─────────────────────────────────────────────────────
     def _make_overlay(self):
