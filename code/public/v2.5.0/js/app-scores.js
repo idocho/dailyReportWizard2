@@ -558,6 +558,16 @@ function init(){
       if(obsD)Object.assign(tagData,obsD);
       if(scD&&typeof scD==='object')scoreData=scD;
       if(inpD||sessD||obsD)saveLocal();
+      // 로그인 주입은 assignments=[] 이므로 config/instructors에서 하이드레이트
+      // (없으면 _syncAssignments가 빈 채로 두어 리프레쉬 시 담당 수업 소실)
+      const _rec=instructor&&config.instructors&&config.instructors[instructor.id];
+      if(_rec){
+        if((!instructor.assignments||!instructor.assignments.length)&&Array.isArray(_rec.assignments))instructor.assignments=_rec.assignments;
+        if((!instructor.presets||!instructor.presets.length)&&Array.isArray(_rec.presets))instructor.presets=_rec.presets;
+        if(_rec.ai_style_mode&&!instructor.ai_style_mode)instructor.ai_style_mode=_rec.ai_style_mode;
+        if(_rec.ai_custom_prompt!=null&&instructor.ai_custom_prompt==null)instructor.ai_custom_prompt=_rec.ai_custom_prompt;
+        saveLocal();
+      }
       _syncAssignments();
       renderMain();renderSb();
     }).catch(()=>{setSync(false);renderMain();});
