@@ -21,6 +21,18 @@ function _assignText(code){
   const g = (typeof ASSIGN_GRADES !== 'undefined') ? ASSIGN_GRADES.find(x => x.key === code) : null;
   return g ? g.label.replace(/[^가-힣]/g, '').trim() : '';
 }
+// 입력된 관찰 태그(obs) → 표시 라벨 목록 (입력 탭과 동일 정보 표시)
+function _obsTagLabels(tags){
+  if(!tags || typeof TAGS === 'undefined') return [];
+  const out = [];
+  if(tags.condition){ const t = TAGS.condition.find(x => x.key === tags.condition); if(t) out.push('컨디션 ' + t.label); }
+  if(tags.understand){ const t = TAGS.understand.find(x => x.key === tags.understand); if(t) out.push('이해 ' + t.label); }
+  ['understand_sub', 'engage', 'caution', 'extra', 'highlight'].forEach(g => {
+    (tags[g] || []).forEach(k => { const t = (TAGS[g] || []).find(x => x.key === k); if(t) out.push(t.label); });
+  });
+  (tags.assign_tags || []).forEach(p => out.push(p));
+  return out;
+}
 // 과정+교재 라벨 (constants.grade_label 미러) — 다과목일 때만
 function _subjLabel(gs, subject){
   gs = (gs || '').trim();
@@ -92,8 +104,10 @@ function renderReport(mc){
     const summary = d.subjects.map(sub => {
       const ci = d.classInfo[sub], ag = d.assignMap[sub];
       const bits = [ci.progress && `진도 ${esc(ci.progress)}`, ci.homework && `과제 ${esc(ci.homework)}`, ag && `수행도 ${esc(ag)}`].filter(Boolean).join(' · ');
-      return bits ? `<div class="rp-sub"><b>${esc(d.subjects.length > 1 ? sub : '')}</b> ${bits}</div>` : '';
-    }).join('') || `<div class="rp-sub" style="color:var(--gray)">진도·과제·수행도 미입력</div>`;
+      const obs = _obsTagLabels(getTags(classId, nk, sub));
+      const obsHtml = obs.length ? `<div class="rp-obs">${obs.map(t => `<span class="rp-tag">${esc(t)}</span>`).join('')}</div>` : '';
+      return (bits || obs.length) ? `<div class="rp-sub"><b>${esc(d.subjects.length > 1 ? sub : '')}</b> ${bits}</div>${obsHtml}` : '';
+    }).join('') || `<div class="rp-sub" style="color:var(--gray)">진도·과제·수행도·관찰 미입력</div>`;
     return `<div class="rp-row${nk === _rpActive ? ' active' : ''}" data-nk="${esc(nk)}" onclick="setRpActive('${esc(nk)}')">
       <div class="rp-head"><span class="dot ${dot}"></span><b>${esc(name)}</b>
         ${note.trim() ? `<span class="rp-badge ok">검토중</span>` : `<span class="rp-badge no">미생성</span>`}</div>
