@@ -210,11 +210,17 @@ def process_genjobs(cfg, db, instructor_id, token=None, ai_call=_call_ai_hub):
 
 
 # ── 전송 워커 (sendJobs, 본인 카톡) ──────────────────────────────────
-def _send_msgs(cfg, job):
-    """sendJob.recipients(검토 끝난 per-student msg) → kakao_send 입력."""
-    prefix = cfg.get("roomPrefix", "")
-    return [{"room": (prefix + (r.get("name") or "")).strip(), "msg": r.get("msg", "")}
-            for r in job.get("recipients", [])]
+def decode_image(data_url):
+    """job.image(base64 dataURL) → 임시파일 경로(일괄 공지 이미지 첨부). 없으면 None."""
+    if not data_url or "," not in data_url:
+        return None
+    import base64, os, tempfile
+    header, b64 = data_url.split(",", 1)
+    ext = "png" if "png" in header.lower() else "jpg"
+    path = os.path.join(tempfile.gettempdir(), f"_drw_send_{os.getpid()}.{ext}")
+    with open(path, "wb") as f:
+        f.write(base64.b64decode(b64))
+    return path
 
 
 def _send_real(cfg, msgs, item_cb):
@@ -253,8 +259,11 @@ def process_sendjobs(cfg, db, instructor_id, token=None, real=False, progress_cb
                 _patch(db, f"{base}/{jid}/recipients/{i}", {"status": "제외(동명이인)"}, token)
             else:
                 send_idx.append(i)
+        img_path = decode_image(job.get("image")) if job.get("image") else None   # 일괄 공지 이미지
         msgs = [{"room": (prefix + (recs[i].get("name") or "")).strip(),
-                 "msg": recs[i].get("msg", "")} for i in send_idx]
+                 "msg": recs[i].get("msg", ""),
+                 **({"image": img_path, "image_first": bool(job.get("imageFirst"))} if img_path else {})}
+                for i in send_idx]
         total = len(msgs)
         cls = job.get("cls", "")
         if progress_cb:
@@ -287,6 +296,13 @@ def process_sendjobs(cfg, db, instructor_id, token=None, real=False, progress_cb
             if progress_cb:
                 progress_cb({"active": False})
             _patch(db, f"{base}/{jid}", {"status": "error", "error": str(e)[:200]}, token)
+        finally:
+            if img_path:
+                try:
+                    import os
+                    os.remove(img_path)
+                except OSError:
+                    pass
     return done
 
 

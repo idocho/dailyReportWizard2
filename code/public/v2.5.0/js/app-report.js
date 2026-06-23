@@ -292,6 +292,103 @@ async function loadReportJobs(){
   }).join('') : `<div class="rp-job">작업 없음</div>`;
 }
 
+// ══════════════════════════════════════════════════════════════════════
+//  일괄 공지 전송 (PC _build_bulk_tab 이식) — 템플릿 메시지를 담당 학생에게 일괄
+// ══════════════════════════════════════════════════════════════════════
+let _bulkSel = new Set(), _bulkImg = null, _bulkImgName = '';
+function _bulkStudents(){
+  const a = activeAsgns()[curAI]; if(!a) return [];
+  return sortStu((config._classStudents || {})[a.classId] || []);
+}
+function _bulkRender(tmpl, name, cls){
+  const d = new Date();
+  return String(tmpl || '').replace(/\{이름\}/g, name || '').replace(/\{반\}/g, cls || '')
+    .replace(/\{날짜\}/g, `${d.getMonth() + 1}/${d.getDate()}`);
+}
+function renderBulk(mc){
+  renderMhdr('일괄 공지');
+  if(!config){ mc.innerHTML = makeTb('일괄 공지') + `<div class="empty">⚙️ 설정 후 이용하세요.</div>`; return; }
+  const asgns = instructor?.assignments || [];
+  if(!asgns.length){ mc.innerHTML = makeTb('일괄 공지') + `<div class="empty">설정 → 담당 수업을 추가해 주세요.</div>`; return; }
+  if(curAI >= asgns.length) curAI = 0;
+  const classId = asgns[curAI].classId;
+  const students = _bulkStudents();
+  if(!_bulkSel.size) students.forEach(s => _bulkSel.add(s.nameKey));
+  for(const k of [..._bulkSel]) if(!students.some(s => s.nameKey === k)) _bulkSel.delete(k);
+  const tmpl = (typeof _bulkTmplCache === 'string') ? _bulkTmplCache : '';
+  const imgPv = _bulkImg ? `<div class="rp-imgpv"><img src="${_bulkImg}"><span>${esc(_bulkImgName)}</span><button class="rp-btn ghost" onclick="bulkClearImg()">제거</button><label class="rp-imgopt"><input type="checkbox" id="bulk-imgfirst">이미지 먼저</label></div>` : '';
+  const chips = students.map(s => `<label class="rp-ck"><input type="checkbox" ${_bulkSel.has(s.nameKey) ? 'checked' : ''} onchange="bulkToggle('${esc(s.nameKey)}',this.checked)"> ${esc(s.name)}</label>`).join('') || '<div class="rp-hint">학생 없음</div>';
+
+  mc.innerHTML = makeTb('일괄 공지', `${classId} · 담당 학생에게 같은 메시지 일괄 발송`) + `
+    <div class="rp-2col">
+      <div class="rp-left">
+        <div class="bulk-vars">변수:
+          <button class="rp-tag k-neutral" onclick="bulkInsertVar('{이름}')">{이름}</button>
+          <button class="rp-tag k-neutral" onclick="bulkInsertVar('{반}')">{반}</button>
+          <button class="rp-tag k-neutral" onclick="bulkInsertVar('{날짜}')">{날짜}</button>
+        </div>
+        <textarea class="rp-ta" id="bulk-tmpl" oninput="bulkOnInput(this)" placeholder="예: 안녕하세요 {이름} 학부모님. {날짜} {반} 공지드립니다.">${esc(tmpl)}</textarea>
+        <div class="rp-bar" style="margin-top:8px">
+          <input type="file" id="bulk-imgfile" accept="image/*" onchange="bulkPickImg(event)" style="font-size:12px;flex:1">
+        </div>
+        ${imgPv}
+        <div class="rp-bar" style="margin-top:10px">
+          <span class="rp-ctx">수신자 <b id="bulk-cnt">${[..._bulkSel].length}</b>/${students.length}명</span>
+          <a class="rp-pv-toggle" onclick="bulkAll(true)">전체</a>
+          <a class="rp-pv-toggle" onclick="bulkAll(false)">해제</a>
+          <button class="rp-btn" onclick="bulkSend()" style="margin-left:auto">📢 일괄 전송 →</button>
+        </div>
+        <div class="rp-cks" style="max-height:200px">${chips}</div>
+        <div class="rp-jobs"><div class="rp-jobs-hd">전송 상태</div><div id="rp-jobs"><div class="rp-job">작업 없음</div></div></div>
+      </div>
+      <div class="rp-right" id="rp-right"></div>
+    </div>`;
+  bulkPreview();
+  loadReportJobs();
+  clearInterval(_rpJobTimer); _rpJobTimer = setInterval(loadReportJobs, 2500);
+}
+let _bulkTmplCache = '';
+function bulkOnInput(el){ _bulkTmplCache = el.value; bulkPreview(); }
+function bulkToggle(nk, on){ on ? _bulkSel.add(nk) : _bulkSel.delete(nk); const c = document.getElementById('bulk-cnt'); if(c) c.textContent = [..._bulkSel].length; bulkPreview(); }
+function bulkAll(on){ const st = _bulkStudents(); _bulkSel = new Set(on ? st.map(s => s.nameKey) : []); renderBulk(document.getElementById('mc')); }
+function bulkInsertVar(v){ const ta = document.getElementById('bulk-tmpl'); if(!ta) return; const s = ta.selectionStart, e = ta.selectionEnd; ta.value = ta.value.slice(0, s) + v + ta.value.slice(e); ta.selectionStart = ta.selectionEnd = s + v.length; ta.focus(); _bulkTmplCache = ta.value; bulkPreview(); }
+function bulkPreview(){
+  const ta = document.getElementById('bulk-tmpl'), el = document.getElementById('rp-right'); if(!el) return;
+  const a = activeAsgns()[curAI]; const first = _bulkStudents().find(s => _bulkSel.has(s.nameKey));
+  const msg = _bulkRender(ta ? ta.value : '', first ? first.name : '○○○', a ? a.classId : '');
+  el.innerHTML = `<div class="rp-pv-hd">📨 ${first ? esc(first.name) : '예시'} · 미리보기 <span class="rp-len">${msg.length}자</span></div>`
+    + (_bulkImg ? `<img src="${_bulkImg}" style="max-width:100%;border-radius:8px;margin:8px">` : '')
+    + `<pre class="rp-pv-body">${esc(msg) || '<span style="color:var(--gray)">메시지를 입력하세요</span>'}</pre>`;
+}
+function bulkPickImg(e){
+  const f = e.target.files && e.target.files[0]; if(!f){ bulkClearImg(); return; }
+  const rd = new FileReader();
+  rd.onload = () => { const img = new Image(); img.onload = () => {
+    const max = 1280; let { width: w, height: h } = img;
+    if(w > max || h > max){ const r = Math.min(max / w, max / h); w = Math.round(w * r); h = Math.round(h * r); }
+    const cv = document.createElement('canvas'); cv.width = w; cv.height = h; cv.getContext('2d').drawImage(img, 0, 0, w, h);
+    _bulkImg = cv.toDataURL('image/jpeg', 0.82); _bulkImgName = f.name; renderBulk(document.getElementById('mc'));
+  }; img.src = rd.result; };
+  rd.readAsDataURL(f);
+}
+function bulkClearImg(){ _bulkImg = null; _bulkImgName = ''; renderBulk(document.getElementById('mc')); }
+async function bulkSend(){
+  const a = activeAsgns()[curAI]; if(!a) return;
+  const classId = a.classId;
+  const tmpl = (document.getElementById('bulk-tmpl')?.value || '').trim();
+  if(!tmpl) return toast('메시지를 입력하세요');
+  const students = _bulkStudents().filter(s => _bulkSel.has(s.nameKey));
+  if(!students.length) return toast('수신자를 선택하세요');
+  const recipients = students.map(s => ({ nameKey: s.nameKey, name: s.name, msg: _bulkRender(tmpl, s.name, classId), status: '대기' }));
+  const job = { cls: classId, recipients, status: 'queued', ts: Date.now() };
+  if(_bulkImg){ job.image = _bulkImg; job.imageName = _bulkImgName; job.imageFirst = document.getElementById('bulk-imgfirst')?.checked || false; }
+  try{
+    await fbPut(`sendJobs/${instructor.id}/${Date.now()}_${Math.floor(Math.random() * 1000)}`, job);
+    toast(`일괄 전송 작업 생성 (${recipients.length}명${_bulkImg ? ' · 이미지' : ''}) — 에이전트가 발송`);
+    _bulkImg = null; _bulkImgName = ''; loadReportJobs();
+  }catch(e){ toast('전송 요청 실패: ' + (e.message || e)); }
+}
+
 // ── 모달 유틸 ─────────────────────────────────────────────────────────
 function _rpModal(html){
   let ov = document.getElementById('rp-ov');

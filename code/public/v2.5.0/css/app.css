@@ -358,4 +358,9 @@ body{font-family:'Pretendard','Malgun Gothic','맑은 고딕',-apple-system,sans
 .rp-right .rp-pv-body{border:none;border-radius:0}
 .rp-pv-empty{padding:34px 18px;text-align:center;color:var(--gray);font-size:12px;line-height:1.9}
 @media(max-width:880px){.rp-2col{grid-template-columns:1fr}.rp-right{position:static;max-height:none}}
+.bulk-vars{font-size:11px;color:var(--sub);display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:6px}
+.bulk-vars button{cursor:pointer}
+.rp-imgpv{display:flex;align-items:center;gap:8px;margin-top:8px;font-size:11px;color:var(--sub);background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:6px 8px}
+.rp-imgpv img{width:48px;height:48px;object-fit:cover;border-radius:6px}
+.rp-imgopt{display:flex;align-items:center;gap:4px;margin-left:auto;white-space:nowrap}
 </style>
