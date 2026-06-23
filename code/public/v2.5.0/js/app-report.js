@@ -86,7 +86,18 @@ function _rpStudents(){
   const a = activeAsgns()[curAI]; if(!a) return [];
   return sortStu((config._classStudents || {})[a.classId] || []);
 }
-function _curNote(nk){ return (nk in reportDrafts) ? reportDrafts[nk] : (_readNote(nk) || ''); }
+// 발송 특이사항(발송문) — 세션 편집 > 저장된 오늘 draft > 빈값. (강사 원천 메모와 별개)
+function _curDraft(nk){
+  if(nk in reportDrafts) return reportDrafts[nk];
+  const d = (inputData[nk] || {}).__draft__;
+  return (d && d.date === todayKey()) ? (d.value || '') : '';
+}
+function _saveDraft(nk, val){
+  reportDrafts[nk] = val;
+  if(!inputData[nk]) inputData[nk] = {};
+  inputData[nk].__draft__ = { value: val, date: todayKey() };
+  try{ fbPatch(`input/${nk}/__draft__`, { value: val, date: todayKey() }); }catch(_){}
+}
 
 // ── 메인 렌더 ─────────────────────────────────────────────────────────
 function renderReport(mc){
@@ -102,7 +113,8 @@ function renderReport(mc){
 
   const rows = students.map(s => {
     const nk = s.nameKey, name = s.name;
-    const note = _curNote(nk);
+    const note = _curDraft(nk);
+    const memo = _readNote(nk) || '';
     const d = _rpData(classId, nk);
     const dot = dotClass(classId, nk, subject);
     const summary = d.subjects.map(sub => {
@@ -116,7 +128,9 @@ function renderReport(mc){
       <div class="rp-head"><span class="dot ${dot}"></span><b>${esc(name)}</b>
         ${note.trim() ? `<span class="rp-badge ok">검토중</span>` : `<span class="rp-badge no">미생성</span>`}</div>
       ${summary}
-      <textarea class="rp-ta" id="rp-${esc(nk)}" onfocus="setRpActive('${esc(nk)}')" oninput="onRpEdit('${esc(nk)}',this)" placeholder="AI 생성 후 검토·수정 — 직접 메모는 반드시 반영됩니다">${esc(note)}</textarea>
+      ${memo ? `<div class="rp-memo">📝 강사 메모: <b>${esc(memo)}</b> <span>· 입력에서 수정</span></div>` : ''}
+      <div class="rp-lbl">발송 특이사항 <span class="hint">AI 생성·검토 · 자동 저장</span></div>
+      <textarea class="rp-ta" id="rp-${esc(nk)}" onfocus="setRpActive('${esc(nk)}')" oninput="onRpEdit('${esc(nk)}',this)" onchange="_saveDraft('${esc(nk)}',this.value)" placeholder="✨ 생성을 누르면 강사 메모·데이터로 발송문을 만듭니다 — 검토·수정 후 전송">${esc(note)}</textarea>
       <div class="rp-act">
         <button class="rp-gen" onclick="event.stopPropagation();genReportOne('${esc(nk)}')">✨ ${note.trim() ? '다시생성' : '생성'}</button>
         <div class="rp-tones">
@@ -158,7 +172,7 @@ function _renderRpPreview(){
   const a = activeAsgns()[curAI];
   const s = a && _rpActive ? _rpStudents().find(x => x.nameKey === _rpActive) : null;
   if(!s){ el.innerHTML = `<div class="rp-pv-empty">학생을 선택하면<br>실제 발송 미리보기가 표시됩니다.</div>`; return; }
-  const msg = _buildMessage(a.classId, _rpActive, s.name, _curNote(_rpActive));
+  const msg = _buildMessage(a.classId, _rpActive, s.name, _curDraft(_rpActive));
   el.innerHTML = `<div class="rp-pv-hd">📨 ${esc(s.name)} · 발송 미리보기 <span class="rp-len">${msg.length}자</span></div>`
     + `<pre class="rp-pv-body">${esc(msg)}</pre>`;
 }
@@ -203,7 +217,7 @@ async function genReportOne(nk, tone){
   try{
     await fbPut(`genJobs/${instructor.id}/${jid}`, _genCtx(a.classId, nk, name, tone));
     const draft = await _pollDraft(jid);
-    reportDrafts[nk] = draft; _rpActive = nk;
+    _saveDraft(nk, draft); _rpActive = nk;
     renderMain();
   }catch(e){ if(ta) ta.value = '[' + (e.message || e) + ']'; toast('생성 실패 — 에이전트 확인'); }
 }
@@ -234,7 +248,7 @@ async function genReportAll(){
   try{
     await fbPut(`genJobs/${instructor.id}/${jid}`, job);
     const drafts = await _pollDrafts(jid);
-    Object.entries(drafts).forEach(([nk, note]) => { reportDrafts[nk] = note; });
+    Object.entries(drafts).forEach(([nk, note]) => _saveDraft(nk, note));
     const got = Object.keys(drafts).length;
     toast(got ? `${got}명 생성 완료` : '생성 결과 없음 — 입력/에이전트 확인');
     renderMain();
@@ -245,8 +259,8 @@ async function genReportAll(){
 function openReportSend(){
   const a = activeAsgns()[curAI]; if(!a) return;
   const students = _rpStudents();
-  const ready = students.filter(s => _curNote(s.nameKey).trim());
-  const skipped = students.filter(s => !_curNote(s.nameKey).trim()).map(s => s.name);
+  const ready = students.filter(s => _curDraft(s.nameKey).trim());
+  const skipped = students.filter(s => !_curDraft(s.nameKey).trim()).map(s => s.name);
   const cnt = {}; ready.forEach(s => cnt[s.name] = (cnt[s.name] || 0) + 1);
   const dups = [...new Set(ready.map(s => s.name).filter(n => cnt[n] > 1))];
   _rpModal(`<h3>카카오톡 전송 대상</h3>
@@ -264,7 +278,7 @@ async function doReportSend(){
   const students = _rpStudents();
   const recipients = picked.map(nk => {
     const s = students.find(x => x.nameKey === nk) || {};
-    return { nameKey: nk, name: s.name || nk, msg: _buildMessage(classId, nk, s.name || nk, _curNote(nk)), status: '대기' };
+    return { nameKey: nk, name: s.name || nk, msg: _buildMessage(classId, nk, s.name || nk, _curDraft(nk)), status: '대기' };
   });
   closeRpModal();
   if(!recipients.length) return;
