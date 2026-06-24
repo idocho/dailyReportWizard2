@@ -75,9 +75,9 @@ function _rpData(classId, nk){
   const classInfo = {}, assignMap = {}, tbGrade = {};
   subjects.forEach(sub => {
     const pd = progressData[`${classId}|${sub}`] || {};
-    const ex = _excludeProg.has(`${classId}|${sub}`);   // 발송 제외 → 진도/과제 빈값(메시지·생성 동시 제외, PC와 동일)
+    const ex = _excludeProg.has(`${classId}|${sub}`);   // 발송 제외 → 그 교재의 진도·과제·수행도 전부 빈값(메시지·생성 동시 제외)
     classInfo[sub] = { progress: ex ? '' : (pd.progress || ''), homework: ex ? '' : (pd.homework || '') };
-    assignMap[sub] = _assignText((getTags(classId, nk, sub) || {}).assign_grade);
+    assignMap[sub] = ex ? '' : _assignText((getTags(classId, nk, sub) || {}).assign_grade);
     tbGrade[sub] = courses[sub].curriculum || '';
   });
   return { subjects, classInfo, assignMap, tbGrade };
