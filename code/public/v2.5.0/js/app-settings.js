@@ -249,7 +249,7 @@ function renderSettings(mc){
   mc.innerHTML=makeTb('설정')+`<div class="stg">
     <div class="stg-rail">
       ${_tab('asgn','👤','수업')}
-      ${_tab('style','✍️','문체')}
+      ${_tab('style','✍️','AI설정')}
       ${_tab('preset','💬','문구')}
       ${_tab('roster','🏫','명단')}
       ${_tab('subj','📖','과목',true)}
