@@ -429,7 +429,7 @@ def send_messages(msgs, wait_time=0.5, status_cb=None, done_cb=None, wait_ctrl=N
             if status_cb:
                 status_cb(f"전송 중... ({i+1}/{total})  {m['room']}")
             # 매 건 전 메인 창 재포커스 — 전송 중 사용자가 다른 창을 만져도 복구
-            if i > 0 and not focus_kakao(0.3):
+            if i > 0 and not focus_kakao(0.2):
                 if status_cb:
                     status_cb(f"❌ 카톡 창 소실 — {sent}/{total}건에서 중단")
                 if done_cb:
@@ -484,7 +484,7 @@ def send_messages(msgs, wait_time=0.5, status_cb=None, done_cb=None, wait_ctrl=N
                     lingering.append(m["room"])
                 elif _IS_WIN:
                     for _ in range(4):
-                        pyautogui.press("esc"); time.sleep(0.2)
+                        pyautogui.press("esc"); time.sleep(0.12)
                         if not room_opened(m["room"], tries=1, interval=0):
                             break
                 else:
@@ -497,7 +497,7 @@ def send_messages(msgs, wait_time=0.5, status_cb=None, done_cb=None, wait_ctrl=N
                 lingering.append(m["room"])   # 오류 중단 방도 열려 있을 수 있음
                 if item_cb:
                     item_cb(i, False, m["room"], str(e))
-            time.sleep(0.3)  # 게이트 검증으로 단축(기존 0.8)
+            time.sleep(0.1)  # 학생 간 간격 — 게이트(room_opened) 검증이 보호하므로 최소화(0.3→0.1)
         # 전체 전송 완료 → 자동화로 열어둔 잔류 창 일괄 닫기.
         # 2초 유예: 마지막 이미지 업로드 여유 — 그래도 진행 중이면 카톡이 닫기를
         # 보류하므로 그 창만 남고 업로드는 보호됨(자동 확인 안 함).
