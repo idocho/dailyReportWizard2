@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<!-- 목업(미승인·실코드 아님): 리포트·전송 3열 레이아웃 검토용. FHD 풀폭으로 열어 확인. -->
+<html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>리포트·전송 3열 목업</title>
+<style>
+:root{--bg:#FAFAFB;--panel:#fff;--panel2:#F7F7F9;--border:#ECECEF;--line:#F3F3F5;
+ --indigo:#4F46E5;--indigo-ink:#4338CA;--indigo-l:#EEF0FF;--gray:#9CA3AF;--text:#18181B;--sub:#5C6370;}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Pretendard','Malgun Gothic',sans-serif;background:var(--bg);color:var(--text);font-size:14px;letter-spacing:-.01em}
+.top{height:54px;background:var(--panel);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:14px;padding:0 18px}
+.top .ttl{font-weight:800;font-size:15px}.top .ttl small{color:var(--sub);font-weight:600;margin-left:6px;font-size:12px}
+.top select{padding:7px 10px;border:1px solid var(--border);border-radius:8px;font-size:12.5px;background:var(--panel)}
+.top .prog{margin-left:auto;font-size:12px;color:var(--sub)}.top .prog b{color:var(--indigo-ink)}
+.btn{padding:8px 14px;border-radius:9px;border:1px solid var(--border);background:var(--panel);font-size:12.5px;font-weight:700;cursor:pointer}
+.btn.p{background:var(--indigo);color:#fff;border-color:var(--indigo)}
+.exbar{display:flex;gap:7px;align-items:center;padding:8px 18px;background:var(--panel);border-bottom:1px solid var(--border);font-size:11px;color:var(--sub)}
+.extag{font-size:11px;font-weight:700;padding:3px 9px;border-radius:10px;border:1px solid #34d39966;background:#34d3991f;color:#16a34a;cursor:pointer}
+.extag.off{border-color:#94a3b866;background:#94a3b81f;color:#94a3b8;text-decoration:line-through}
+.wrap{display:flex;height:calc(100vh - 54px - 37px)}
+/* ① 학생 레일 */
+.rail{width:220px;flex-shrink:0;border-right:1px solid var(--border);background:var(--panel);overflow-y:auto}
+.rail-h{padding:10px 14px;font-size:11px;color:var(--sub);border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--panel)}
+.rail-h b{color:var(--indigo-ink)}
+.si{display:flex;align-items:center;gap:8px;padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--line);border-left:3px solid transparent}
+.si:hover{background:var(--panel2)}
+.si.on{background:var(--indigo-l);border-left-color:var(--indigo)}
+.si .dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.dot.ok{background:#22c55e}.dot.no{background:#d1d5db}
+.si .nm{flex:1;font-size:13px;font-weight:600}
+.si .bd{font-size:9px;font-weight:700;padding:1px 6px;border-radius:7px}
+.bd.ok{background:#dcfce7;color:#16a34a}.bd.no{background:#f1f5f9;color:#94a3b8}
+/* ② 편집 */
+.edit{flex:1;overflow-y:auto;padding:18px 22px;min-width:0}
+.edit h2{font-size:18px;font-weight:800;margin-bottom:2px}
+.edit .sub{font-size:12px;color:var(--sub);margin-bottom:14px}
+.sumcard{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:12px 14px;margin-bottom:12px}
+.sumrow{font-size:13px;margin-bottom:8px}.sumrow b{color:var(--sub);font-weight:600;margin-right:4px}
+.tags{display:flex;flex-wrap:wrap;gap:5px}
+.tag{font-size:11px;font-weight:600;padding:3px 9px;border-radius:9px}
+.tag.pos{background:#dcfce7;color:#15803d}.tag.warn{background:#fef3c7;color:#b45309}.tag.neu{background:#eef2ff;color:#4338ca}
+.memo{background:#FFFBEB;border:1px solid #FDE68A;border-radius:10px;padding:9px 12px;font-size:12.5px;color:#92400e;margin-bottom:14px}
+.memo b{font-weight:700}
+.lbl{font-size:12px;color:var(--sub);font-weight:700;margin-bottom:6px}
+textarea{width:100%;min-height:180px;border:1px solid var(--border);border-radius:11px;padding:13px;font-size:14px;font-family:inherit;line-height:1.6;resize:vertical}
+textarea:focus{outline:none;border-color:var(--indigo);box-shadow:0 0 0 3px var(--indigo-l)}
+.acts{display:flex;gap:8px;margin-top:12px}
+.gen{background:var(--indigo);color:#fff;border:none;padding:10px 18px;border-radius:9px;font-weight:700;font-size:13px;cursor:pointer}
+.tone{background:var(--panel);border:1px solid var(--border);padding:10px 14px;border-radius:9px;font-size:12.5px;font-weight:600;cursor:pointer;color:var(--sub)}
+/* ③ 미리보기 */
+.pv{width:380px;flex-shrink:0;border-left:1px solid var(--border);background:var(--panel2);overflow-y:auto;padding:16px}
+.pv-h{font-size:12px;font-weight:700;color:var(--sub);margin-bottom:10px;display:flex;justify-content:space-between}
+.pv-h .len{color:var(--gray);font-weight:600}
+.pv-body{background:var(--panel);border:1px solid var(--border);border-radius:11px;padding:14px;font-size:13px;line-height:1.7;white-space:pre-wrap}
+</style></head>
+<body>
+<div class="top">
+  <div class="ttl">수업 · 리포트 <small>중2A · 쎈</small></div>
+  <span style="font-size:12px;color:var(--sub)">문체 <b style="color:var(--indigo-ink)">정돈·균형형</b> <a href="#" style="color:var(--indigo);font-size:11px">AI설정에서 변경</a></span>
+  <button class="btn">✨ 일괄 생성</button>
+  <button class="btn p">전송 →</button>
+  <span class="prog">입력 <b>12/12</b> · 발송문 <b>9/12</b></span>
+</div>
+<div class="exbar">발송 진도/과제:
+  <button class="extag">✓ 쎈 중2-1</button>
+  <button class="extag off">✕ 개념원리</button>
+</div>
+<div class="wrap">
+  <div class="rail" id="rail"></div>
+  <div class="edit" id="edit"></div>
+  <div class="pv" id="pv"></div>
+</div>
+<script>
+const STU=[
+ {nk:'1',name:'김서연',ok:true,
+  prog:'이차방정식 근의 공식',hw:'쎈 p.84~89',grade:'대부분',
+  tags:[['컨디션 좋음','neu'],['심화도전','pos'],['개념완전습득','pos']],
+  memo:'근의 공식 유도 과정 스스로 설명함',
+  draft:'이차방정식 근의 공식을 완전히 습득하였습니다. 설명을 듣는 즉시 이해하고 응용 문제까지 막힘 없이 풀어냈으며, 심화 유형에도 적극적으로 도전하는 모습이 인상적이었습니다.'},
+ {nk:'2',name:'이준호',ok:true,
+  prog:'이차방정식 근의 공식',hw:'쎈 p.84~89',grade:'절반',
+  tags:[['컨디션 보통','neu'],['계산실수','warn'],['풀이 느림','warn']],
+  memo:'계산 단계 검토 습관 강조함',
+  draft:'근의 공식을 다루며 대부분의 내용을 잘 따라왔습니다. 계산 과정에서 실수가 반복되는 부분이 있어, 풀이 단계를 꼼꼼히 확인하는 습관을 함께 강조하였습니다.'},
+ {nk:'3',name:'박지민',ok:false,
+  prog:'이차방정식 근의 공식',hw:'쎈 p.84~89',grade:'일부',
+  tags:[['컨디션 낮음','neu'],['헷갈림','warn']],
+  memo:'',
+  draft:''},
+ {nk:'4',name:'최유나',ok:true,
+  prog:'이차방정식 근의 공식',hw:'쎈 p.84~89',grade:'완료',
+  tags:[['컨디션 최상','neu'],['혼자해결','pos'],['만점·완벽','pos']],
+  memo:'오답노트 꼼꼼히 작성',
+  draft:'오늘 진행한 범위를 정확히 소화하며 안정적으로 수업을 마쳤습니다. 틀린 문제는 스스로 다시 풀어 오답노트에 꼼꼼히 정리하는 좋은 습관을 보여주었습니다.'},
+];
+let cur='1';
+function renderRail(){
+ document.getElementById('rail').innerHTML=
+  `<div class="rail-h">학생 <b>${STU.length}</b>명 · 발송문 <b>${STU.filter(s=>s.draft).length}</b></div>`+
+  STU.map(s=>`<div class="si${s.nk===cur?' on':''}" onclick="sel('${s.nk}')">
+    <span class="dot ${s.draft?'ok':'no'}"></span><span class="nm">${s.name}</span>
+    <span class="bd ${s.draft?'ok':'no'}">${s.draft?'검토중':'미생성'}</span></div>`).join('');
+}
+function renderEdit(){
+ const s=STU.find(x=>x.nk===cur);
+ document.getElementById('edit').innerHTML=`
+  <h2>${s.name} <span class="bd ${s.draft?'ok':'no'}" style="font-size:10px;vertical-align:middle">${s.draft?'검토중':'미생성'}</span></h2>
+  <div class="sub">중2A · 쎈 중2-1</div>
+  <div class="sumcard">
+   <div class="sumrow"><b>진도</b>${s.prog} <b style="margin-left:10px">과제</b>${s.hw} <b style="margin-left:10px">수행도</b>${s.grade}</div>
+   <div class="tags">${s.tags.map(t=>`<span class="tag ${t[1]}">${t[0]}</span>`).join('')}</div>
+  </div>
+  ${s.memo?`<div class="memo">📝 강사 메모: <b>${s.memo}</b></div>`:''}
+  <div class="lbl">발송 특이사항 <span style="font-weight:400;color:var(--gray)">· AI 생성·검토 · 자동 저장</span></div>
+  <textarea placeholder="✨ 생성을 누르면 강사 메모·데이터로 발송문을 만듭니다">${s.draft}</textarea>
+  <div class="acts">
+   <button class="gen">✨ ${s.draft?'다시 생성':'생성'}</button>
+  </div>`;
+}
+function renderPv(){
+ const s=STU.find(x=>x.nk===cur);
+ const msg=`[데일리 리포트] 6/24 (화)\n-------------------------\n▶ 오늘의 진도\n${s.prog}\n\n▶ 오늘의 과제\n${s.hw}\n\n▶ 과제 수행도\n${s.grade}\n\n▶ 오늘의 ${s.name.slice(1)}는?\n${s.draft||'(미생성)'}`;
+ document.getElementById('pv').innerHTML=`<div class="pv-h"><span>📨 ${s.name} · 발송 미리보기</span><span class="len">${msg.length}자</span></div><div class="pv-body">${msg}</div>`;
+}
+function sel(nk){cur=nk;renderRail();renderEdit();renderPv();}
+renderRail();renderEdit();renderPv();
+</script>
+</body></html>

@@ -153,11 +153,6 @@ function renderReport(mc){
       <textarea class="rp-ta" id="rp-${esc(nk)}" onfocus="setRpActive('${esc(nk)}')" oninput="onRpEdit('${esc(nk)}',this)" onchange="_saveDraft('${esc(nk)}',this.value)" placeholder="✨ 생성을 누르면 강사 메모·데이터로 발송문을 만듭니다 — 검토·수정 후 전송">${esc(note)}</textarea>
       <div class="rp-act">
         <button class="rp-gen" onclick="event.stopPropagation();genReportOne('${esc(nk)}')">✨ ${note.trim() ? '다시생성' : '생성'}</button>
-        <div class="rp-tones">
-          <button class="rp-tone" onclick="event.stopPropagation();genReportOne('${esc(nk)}','warm')">따뜻</button>
-          <button class="rp-tone" onclick="event.stopPropagation();genReportOne('${esc(nk)}','concise')">간결</button>
-          <button class="rp-tone" onclick="event.stopPropagation();genReportOne('${esc(nk)}','detailed')">구체</button>
-        </div>
       </div>
     </div>`;
   }).join('') || `<div class="empty">이 반에 학생이 없습니다.</div>`;
@@ -224,7 +219,7 @@ async function _pollDraft(jid, ms = 120000){
   }
   throw new Error('생성 지연 — 잠시 후 다시 생성하거나 에이전트 상태를 확인하세요');
 }
-function _genCtx(classId, nk, name, tone){
+function _genCtx(classId, nk, name){
   const d = _rpData(classId, nk);
   const items = d.subjects.map(sub => ({
     subject: sub, value: d.assignMap[sub],
@@ -241,17 +236,16 @@ function _genCtx(classId, nk, name, tone){
     customPrompt: instructor?.ai_custom_prompt || '',
     status: 'queued',
   };
-  if(tone){ job.tone = tone; job.currentDraft = reportDrafts[nk] || ''; }
   return job;
 }
-async function genReportOne(nk, tone){
+async function genReportOne(nk){
   const a = activeAsgns()[curAI]; if(!a) return;
   const name = (_rpStudents().find(s => s.nameKey === nk) || {}).name || nk;
   const ta = document.getElementById('rp-' + nk);
-  if(ta){ ta.value = tone ? '🎚 톤 조절 중…' : '✨ AI 생성 중…'; }
+  if(ta){ ta.value = '✨ AI 생성 중…'; }
   const jid = Date.now() + '_' + Math.floor(Math.random() * 1000);
   try{
-    await fbPut(`genJobs/${instructor.id}/${jid}`, _genCtx(a.classId, nk, name, tone));
+    await fbPut(`genJobs/${instructor.id}/${jid}`, _genCtx(a.classId, nk, name));
     const draft = await _pollDraft(jid);
     _saveDraft(nk, draft); _rpActive = nk;
     renderMain();
