@@ -35,3 +35,4 @@ code/skills-lock.json
 
 # 강사 에이전트 로컬 설정(개인 키 포함 가능)
 code/agent_config.json
+migration/
