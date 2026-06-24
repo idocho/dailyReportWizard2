@@ -362,8 +362,29 @@ def _call_ai_hub(engine_type, api_key, prompt, max_tokens=300, temperature=0.5, 
         method='POST'
     )
 
-    with urllib.request.urlopen(req, timeout=40) as r:
-        resp = json.loads(r.read().decode('utf-8'))
+    # 일시적 서버 오류(503 과부하·429 레이트·500/502/504) 백오프 재시도.
+    # Gemini 무료티어는 503 "overloaded"가 잦아 재시도로 대부분 해소.
+    _RETRY = {429, 500, 502, 503, 504}
+    last_err = None
+    for _attempt in range(4):
+        try:
+            with urllib.request.urlopen(req, timeout=40) as r:
+                resp = json.loads(r.read().decode('utf-8'))
+            break
+        except urllib.error.HTTPError as he:
+            last_err = he
+            if he.code in _RETRY and _attempt < 3:
+                time.sleep(2 ** _attempt)   # 1·2·4초
+                continue
+            raise
+        except urllib.error.URLError as ue:   # 네트워크 일시 단절
+            last_err = ue
+            if _attempt < 3:
+                time.sleep(2 ** _attempt)
+                continue
+            raise
+    else:
+        raise last_err
 
     # 엔진별 리턴 데이터 매핑 구조 분기 파싱
     if engine_type == "claude":

@@ -7,6 +7,41 @@ let reportDrafts = {};      // {nameKey: 검토중 특이사항}
 let _rpJobTimer = null;
 let _rpActive = null;       // 우측 미리보기 대상 학생(nameKey)
 let _excludeProg = new Set(); // {classId|subject} — 이번 발송 메시지서 진도/과제 제외 (세션 메모리, PC _toggle_exclude_prog 이식)
+let _rpActiveCls = null;      // 트리서 선택한 활성 학생의 반(리포트 편집/전송 스코프)
+let _treeOpen = {};           // {classId: bool} 트리 펼침 상태
+
+// ── 디렉토리 트리 레일 (리포트·일괄 공통) ──────────────────────────────
+function _myClassList(){   // 내 담당 반들(중복 제거, classId별 1개 + group)
+  const seen = {}, out = [];
+  (activeAsgns() || []).forEach(a => { if(!seen[a.classId]){ seen[a.classId] = 1; out.push({ classId: a.classId, group: a.group || '' }); } });
+  return out;
+}
+function _clsStudents(classId){ return sortStu((config._classStudents || {})[classId] || []); }
+function _allMyStudents(){ const m = {}; _myClassList().forEach(c => _clsStudents(c.classId).forEach(s => { m[s.nameKey] = { name: s.name, classId: c.classId }; })); return m; }
+function _todayGroup(){ const dow = (typeof _devDate !== 'undefined' && _devDate ? new Date(_devDate) : new Date()).getDay(); return [1,3,5].includes(dow) ? 'M' : ([2,4,6].includes(dow) ? 'T' : ''); }
+function _isTodayCls(c){ const tg = _todayGroup(); return !!c.group && !!tg && c.group.toUpperCase() === tg; }
+function _clsOpen(c, mode){ return (c.classId in _treeOpen) ? _treeOpen[c.classId] : (mode === 'bulk' ? true : _isTodayCls(c)); }
+function toggleTreeCls(cid, mode){ const c = _myClassList().find(x => x.classId === cid) || { classId: cid }; _treeOpen[cid] = !_clsOpen(c, mode); renderMain(); }
+// mode: 'report'(학생 클릭 단일선택) | 'bulk'(체크박스 다중선택)
+function _railTreeHtml(mode){
+  const classes = _myClassList();
+  if(!classes.length) return `<div class="rp-hint" style="padding:12px">담당 수업 없음</div>`;
+  return classes.map(c => {
+    const cid = c.classId, opened = _clsOpen(c, mode), studs = _clsStudents(cid);
+    const today = _isTodayCls(c) ? '<span class="rp-today">오늘</span>' : '';
+    const cb = mode === 'bulk'
+      ? `<input type="checkbox" onclick="event.stopPropagation();bulkChkCls('${esc(cid)}',this.checked)" ${studs.length && studs.every(s => _bulkSel.has(s.nameKey)) ? 'checked' : ''}>` : '';
+    const head = `<div class="rp-cls-h" onclick="toggleTreeCls('${esc(cid)}','${mode}')"><span class="rp-arw">${opened ? '▾' : '▸'}</span>${cb}<span class="rp-cls-nm">${esc(cid)}</span>${today}<span class="rp-cls-cnt">${studs.length}</span></div>`;
+    let rows = '';
+    if(opened) rows = studs.map(s => {
+      if(mode === 'bulk') return `<label class="rp-stu"><input type="checkbox" onclick="bulkChk('${esc(s.nameKey)}',this.checked)" ${_bulkSel.has(s.nameKey) ? 'checked' : ''}><span class="rp-stu-nm">${esc(s.name)}</span></label>`;
+      const has = !!_curDraft(s.nameKey).trim();
+      const on = (s.nameKey === _rpActive && cid === _rpActiveCls) ? ' on' : '';
+      return `<div class="rp-stu${on}" data-nk="${esc(s.nameKey)}" onclick="setRpActive('${esc(cid)}','${esc(s.nameKey)}')"><span class="rp-stu-nm">${esc(s.name)}</span><span class="rp-badge ${has ? 'ok' : 'no'}">${has ? '검토중' : '미생성'}</span></div>`;
+    }).join('');
+    return `<div class="rp-cls">${head}${rows}</div>`;
+  }).join('');
+}
 
 // 문체 옵션 (ai_style.py STYLE_ORDER/LABELS 미러)
 const RP_STYLES = [
@@ -104,10 +139,6 @@ function _buildMessage(classId, nk, name, note){
     + `▶ 오늘의 ${_nickSuffix(name)}?\n${note || ''}`;
 }
 
-function _rpStudents(){
-  const a = activeAsgns()[curAI]; if(!a) return [];
-  return sortStu((config._classStudents || {})[a.classId] || []);
-}
 // 발송 특이사항(발송문) — 세션 편집 > 저장된 오늘 draft > 빈값. (강사 원천 메모와 별개)
 function _curDraft(nk){
   if(nk in reportDrafts) return reportDrafts[nk];
@@ -155,40 +186,37 @@ function renderReport(mc){
   const asgns = instructor?.assignments || [];
   if(!asgns.length){ mc.innerHTML = makeTb('리포트') + `<div class="empty">설정 → 담당 수업을 추가해 주세요.</div>`; return; }
   if(curAI >= asgns.length) curAI = 0;
-  const a = asgns[curAI]; const { classId, subject } = a;
-  const students = _rpStudents();
-  if(!_rpActive || !students.some(s => s.nameKey === _rpActive)) _rpActive = students[0]?.nameKey || null;
+  const classes = _myClassList();
+  // 활성 반 기본값: 기존 유효하면 유지, 아니면 오늘 수업(또는 첫 반)
+  if(!_rpActiveCls || !classes.some(c => c.classId === _rpActiveCls)){
+    _rpActiveCls = (classes.find(_isTodayCls) || classes[0] || {}).classId || null;
+  }
+  const actStu = _rpActiveCls ? _clsStudents(_rpActiveCls) : [];
+  if(!_rpActive || !actStu.some(s => s.nameKey === _rpActive)) _rpActive = actStu[0]?.nameKey || null;
   const styleLbl = (RP_STYLES.find(s => s[0] === (instructor?.ai_style_mode || 'auto')) || RP_STYLES[0])[1];
+  const todayN = classes.filter(_isTodayCls).length;
+  const draftAll = Object.keys(_allMyStudents()).filter(nk => _curDraft(nk).trim()).length;
 
-  // ① 학생 레일(전환용 thin list) — 점·이름·검토상태만. 편집은 가운데 열에서.
-  const rail = students.map(s => {
-    const nk = s.nameKey;
-    const has = !!_curDraft(nk).trim();
-    return `<div class="rp-si${nk === _rpActive ? ' on' : ''}" data-nk="${esc(nk)}" onclick="setRpActive('${esc(nk)}')">
-      <span class="rp-si-nm">${esc(s.name)}</span>
-      <span class="rp-badge ${has ? 'ok' : 'no'}">${has ? '검토중' : '미생성'}</span></div>`;
-  }).join('') || `<div class="rp-hint" style="padding:12px">이 반에 학생이 없습니다.</div>`;
-  const draftN = students.filter(s => _curDraft(s.nameKey).trim()).length;
-
-  // 발송 제외 토글 — 진도/과제가 입력된 담당 과목만 노출(제외할 게 있을 때만)
-  const exSubs = [...new Set((activeAsgns() || []).filter(x => x.classId === classId).map(x => x.subject))]
-    .filter(sub => { const pd = progressData[`${classId}|${sub}`] || {}; return pd.progress || pd.homework; }).sort();
-  const exBar = exSubs.length ? `<div class="rp-exbar">발송 진도/과제: ${exSubs.map(sub => {
-    const off = _excludeProg.has(`${classId}|${sub}`);
-    return `<button class="rp-extag${off ? ' off' : ''}" onclick="toggleExProg('${esc(classId)}','${esc(sub)}')" title="${off ? '발송 제외됨 — 누르면 포함' : '발송에 포함 — 누르면 제외'}">${off ? '✕' : '✓'} ${esc(sub)}</button>`;
+  // 발송 제외 토글 — 활성 반의 진도/과제 입력 과목만
+  const cid0 = _rpActiveCls;
+  const exSubs = cid0 ? [...new Set((activeAsgns() || []).filter(x => x.classId === cid0).map(x => x.subject))]
+    .filter(sub => { const pd = progressData[`${cid0}|${sub}`] || {}; return pd.progress || pd.homework; }).sort() : [];
+  const exBar = exSubs.length ? `<div class="rp-exbar">발송 진도/과제(${esc(cid0)}): ${exSubs.map(sub => {
+    const off = _excludeProg.has(`${cid0}|${sub}`);
+    return `<button class="rp-extag${off ? ' off' : ''}" onclick="toggleExProg('${esc(cid0)}','${esc(sub)}')" title="${off ? '발송 제외됨 — 누르면 포함' : '발송에 포함 — 누르면 제외'}">${off ? '✕' : '✓'} ${esc(sub)}</button>`;
   }).join('')}</div>` : '';
 
-  mc.innerHTML = makeTb('리포트·전송', `${classId} · ${subject}`) + `
+  mc.innerHTML = makeTb('리포트·전송', `활성 반 ${cid0 || '—'}`) + `
     <div class="rp-bar">
       <span class="rp-ctx">문체 <b>${esc(styleLbl)}</b> <a class="rp-ctx-link" onclick="goAiSettings()">AI설정에서 변경</a></span>
-      <button class="rp-btn ghost" onclick="genReportAll()" style="margin-left:auto">✨ 일괄 생성</button>
+      <button class="rp-btn ghost" onclick="genReportAll()" style="margin-left:auto">✨ 일괄 생성(${esc(cid0 || '')})</button>
       <button class="rp-btn" onclick="openReportSend()">전송 →</button>
     </div>
     ${exBar}
     <div class="rp-grid">
       <div class="rp-rail">
-        <div class="rp-rail-h">학생 <b>${students.length}</b>명 · 발송문 <b>${draftN}</b></div>
-        <div class="rp-rail-list">${rail}</div>
+        <div class="rp-rail-h">오늘 수업 <b>${todayN}</b>반 · 발송문 <b>${draftAll}</b></div>
+        <div class="rp-rail-list">${_railTreeHtml('report')}</div>
       </div>
       <div class="rp-edit" id="rp-edit"></div>
       <div class="rp-right" id="rp-right"></div>
@@ -216,10 +244,9 @@ function goAiSettings(){ goNav('setting'); if(typeof setStg === 'function') setS
 // 가운데 편집 열 = 선택 학생 1명 (요약·메모·발송문·생성)
 function _renderRpEditor(){
   const el = document.getElementById('rp-edit'); if(!el) return;
-  const a = activeAsgns()[curAI];
-  const s = a && _rpActive ? _rpStudents().find(x => x.nameKey === _rpActive) : null;
-  if(!s){ el.innerHTML = `<div class="rp-pv-empty">왼쪽에서 학생을 선택하세요.</div>`; return; }
-  const nk = s.nameKey, classId = a.classId;
+  const s = _rpActiveCls && _rpActive ? _clsStudents(_rpActiveCls).find(x => x.nameKey === _rpActive) : null;
+  if(!s){ el.innerHTML = `<div class="rp-pv-empty">왼쪽 트리에서 학생을 선택하세요.</div>`; return; }
+  const nk = s.nameKey, classId = _rpActiveCls;
   const note = _curDraft(nk), memo = _readNote(nk) || '';
   const d = _rpData(classId, nk);
   const exCnt = d.subjects.filter(sub => _excludeProg.has(`${classId}|${sub}`)).length;
@@ -237,7 +264,7 @@ function _renderRpEditor(){
     || `<div class="rp-sub" style="color:var(--gray)">${exCnt ? '발송 제외된 교재만 있습니다 (상단에서 포함 가능)' : '진도·과제·수행도·관찰 미입력'}</div>`;
   el.innerHTML = `
     <div class="rp-ed-h">
-      <div><h2>${esc(s.name)}</h2><div class="rp-ed-meta">${esc(classId)}${d.subjects[0] ? ' · ' + esc(multi ? a.subject : d.subjects[0]) : ''} · ${note.trim() ? '검토중' : '미생성'}</div></div></div>
+      <div><h2>${esc(s.name)}</h2><div class="rp-ed-meta">${esc(classId)}${d.subjects[0] ? ' · ' + esc(multi ? (d.subjects.length + '과목') : d.subjects[0]) : ''} · ${note.trim() ? '검토중' : '미생성'}</div></div></div>
     <div class="rp-ed-sum">${summary}</div>
     ${memo ? `<div class="rp-memo">📝 강사 메모: <b>${esc(memo)}</b> <span>· 입력에서 수정</span></div>` : ''}
     <div class="rp-lbl">발송 특이사항 <span class="hint">AI 생성·검토 · 자동 저장</span></div>
@@ -247,17 +274,18 @@ function _renderRpEditor(){
 
 // 학생 편집 → 미리보기 즉시 갱신 (타이핑 무지연)
 function onRpEdit(nk, el){ reportDrafts[nk] = el.value; if(nk === _rpActive) _renderRpPreview(); }
-function setRpActive(nk){
-  _rpActive = nk;
-  document.querySelectorAll('.rp-si').forEach(r => r.classList.toggle('on', r.dataset.nk === nk));
+function setRpActive(cid, nk){
+  const clsChanged = cid !== _rpActiveCls;
+  _rpActiveCls = cid; _rpActive = nk;
+  if(clsChanged){ renderMain(); return; }   // 반 바뀌면 발송제외 바 등 반-종속 갱신 위해 전체 재렌더
+  document.querySelectorAll('.rp-stu').forEach(r => r.classList.toggle('on', r.dataset.nk === nk));
   _renderRpEditor(); _renderRpPreview();
 }
 function _renderRpPreview(){
   const el = document.getElementById('rp-right'); if(!el) return;
-  const a = activeAsgns()[curAI];
-  const s = a && _rpActive ? _rpStudents().find(x => x.nameKey === _rpActive) : null;
+  const s = _rpActiveCls && _rpActive ? _clsStudents(_rpActiveCls).find(x => x.nameKey === _rpActive) : null;
   if(!s){ el.innerHTML = `<div class="rp-pv-empty">학생을 선택하면<br>실제 발송 미리보기가 표시됩니다.</div>`; return; }
-  const msg = _buildMessage(a.classId, _rpActive, s.name, _curDraft(_rpActive));
+  const msg = _buildMessage(_rpActiveCls, _rpActive, s.name, _curDraft(_rpActive));
   el.innerHTML = `<div class="rp-pv-hd">📨 ${esc(s.name)} · 발송 미리보기 <span class="rp-len">${msg.length}자</span></div>`
     + `<pre class="rp-pv-body">${esc(msg)}</pre>`;
 }
@@ -295,13 +323,13 @@ function _genCtx(classId, nk, name){
 }
 async function genReportOne(nk, force){
   if(!force && !await _agentAlive()){ _agentGuide(() => genReportOne(nk, true)); return; }
-  const a = activeAsgns()[curAI]; if(!a) return;
-  const name = (_rpStudents().find(s => s.nameKey === nk) || {}).name || nk;
+  const cid = _rpActiveCls; if(!cid) return;
+  const name = (_clsStudents(cid).find(s => s.nameKey === nk) || {}).name || nk;
   const ta = document.getElementById('rp-' + nk);
   if(ta){ ta.value = '✨ AI 생성 중…'; }
   const jid = Date.now() + '_' + Math.floor(Math.random() * 1000);
   try{
-    await fbPut(`genJobs/${instructor.id}/${jid}`, _genCtx(a.classId, nk, name));
+    await fbPut(`genJobs/${instructor.id}/${jid}`, _genCtx(cid, nk, name));
     const draft = await _pollDraft(jid);
     _saveDraft(nk, draft); _rpActive = nk;
     renderMain();
@@ -319,9 +347,8 @@ async function _pollDrafts(jid, ms = 180000){   // 배치 — 더 긴 여유
 }
 async function genReportAll(force){
   if(!force && !await _agentAlive()){ _agentGuide(() => genReportAll(true)); return; }
-  const a = activeAsgns()[curAI]; if(!a) return;
-  const classId = a.classId;
-  const students = _rpStudents().filter(s => _rpData(classId, s.nameKey).subjects.length);
+  const classId = _rpActiveCls; if(!classId) return;
+  const students = _clsStudents(classId).filter(s => _rpData(classId, s.nameKey).subjects.length);
   if(!students.length) return toast('생성 대상이 없습니다');
   const list = students.map(s => {
     const c = _genCtx(classId, s.nameKey, s.name);   // 단건 맥락 재사용
@@ -345,13 +372,13 @@ async function genReportAll(force){
 // ── 전송 (실제 메시지 = build_message 전체) ──────────────────────────
 async function openReportSend(force){
   if(!force && !await _agentAlive()){ _agentGuide(() => openReportSend(true)); return; }
-  const a = activeAsgns()[curAI]; if(!a) return;
-  const students = _rpStudents();
+  const cid = _rpActiveCls; if(!cid) return;
+  const students = _clsStudents(cid);
   const ready = students.filter(s => _curDraft(s.nameKey).trim());
   const skipped = students.filter(s => !_curDraft(s.nameKey).trim()).map(s => s.name);
   const cnt = {}; ready.forEach(s => cnt[s.name] = (cnt[s.name] || 0) + 1);
   const dups = [...new Set(ready.map(s => s.name).filter(n => cnt[n] > 1))];
-  _rpModal(`<h3>카카오톡 전송 대상</h3>
+  _rpModal(`<h3>카카오톡 전송 — ${esc(cid)}</h3>
     <div class="rp-hint">전송 대상 ${ready.length}명 — 제외할 학생 체크 해제. 실제 발송 형식으로 전송됩니다.</div>
     <div class="rp-cks">${ready.map(s => `<label class="rp-ck"><input type="checkbox" checked data-snk="${esc(s.nameKey)}"> ${esc(s.name)}${dups.includes(s.name) ? ` <span class="rp-warn-i">⚠동명이인</span>` : ``}</label>`).join('') || `<div class="rp-hint">생성·검토된 학생이 없습니다.</div>`}</div>
     ${dups.length ? `<div class="rp-warn">⚠ 동명이인 ${esc(dups.join(', '))} — 자동 제외(수동 전송 권장)</div>` : ``}
@@ -360,10 +387,9 @@ async function openReportSend(force){
       <button class="rp-btn" ${ready.length ? '' : 'disabled'} onclick="doReportSend()">전송 시작</button></div>`);
 }
 async function doReportSend(){
-  const a = activeAsgns()[curAI]; if(!a) return;
-  const classId = a.classId;
+  const classId = _rpActiveCls; if(!classId) return;
   const picked = [...document.querySelectorAll('#rp-ov [data-snk]')].filter(c => c.checked).map(c => c.dataset.snk);
-  const students = _rpStudents();
+  const students = _clsStudents(classId);
   const recipients = picked.map(nk => {
     const s = students.find(x => x.nameKey === nk) || {};
     const note = _curDraft(nk);   // 발송 특이사항 — history 누적 원료(전송 성공 시 에이전트가 기록)
@@ -437,10 +463,6 @@ async function clearDoneJobs(){
 //  일괄 공지 전송 (PC _build_bulk_tab 이식) — 템플릿 메시지를 담당 학생에게 일괄
 // ══════════════════════════════════════════════════════════════════════
 let _bulkSel = new Set(), _bulkImg = null, _bulkImgName = '';
-function _bulkStudents(){
-  const a = activeAsgns()[curAI]; if(!a) return [];
-  return sortStu((config._classStudents || {})[a.classId] || []);
-}
 function _bulkRender(tmpl, name, cls){
   const d = new Date();
   return String(tmpl || '').replace(/\{이름\}/g, name || '').replace(/\{반\}/g, cls || '')
@@ -449,47 +471,45 @@ function _bulkRender(tmpl, name, cls){
 function renderBulk(mc){
   renderMhdr('일괄 공지');
   if(!config){ mc.innerHTML = makeTb('일괄 공지') + `<div class="empty">⚙️ 설정 후 이용하세요.</div>`; return; }
-  const asgns = instructor?.assignments || [];
-  if(!asgns.length){ mc.innerHTML = makeTb('일괄 공지') + `<div class="empty">설정 → 담당 수업을 추가해 주세요.</div>`; return; }
-  if(curAI >= asgns.length) curAI = 0;
-  const classId = asgns[curAI].classId;
-  const students = _bulkStudents();
-  if(!_bulkSel.size) students.forEach(s => _bulkSel.add(s.nameKey));
-  for(const k of [..._bulkSel]) if(!students.some(s => s.nameKey === k)) _bulkSel.delete(k);
+  if(!(instructor?.assignments || []).length){ mc.innerHTML = makeTb('일괄 공지') + `<div class="empty">설정 → 담당 수업을 추가해 주세요.</div>`; return; }
+  // 트리 선택서 사라진 학생 정리
+  const valid = _allMyStudents();
+  for(const k of [..._bulkSel]) if(!valid[k]) _bulkSel.delete(k);
   const tmpl = (typeof _bulkTmplCache === 'string') ? _bulkTmplCache : '';
-  const imgPv = _bulkImg ? `<div class="rp-imgpv"><img src="${_bulkImg}"><span>${esc(_bulkImgName)}</span><button class="rp-btn ghost" onclick="bulkClearImg()">제거</button><label class="rp-imgopt"><input type="checkbox" id="bulk-imgfirst">이미지 먼저</label></div>` : '';
-  const chips = students.map(s => `<label class="rp-ck"><input type="checkbox" ${_bulkSel.has(s.nameKey) ? 'checked' : ''} onchange="bulkToggle('${esc(s.nameKey)}',this.checked)"> ${esc(s.name)}</label>`).join('') || '<div class="rp-hint">학생 없음</div>';
-
   const tmplOpts = _bulkTemplates().map(t => `<option value="${esc(t.name)}">${esc(t.name)}</option>`).join('');
-
-  mc.innerHTML = makeTb('일괄 공지', `${classId} · 담당 학생에게 같은 메시지 일괄 발송`) + `
-    <div class="rp-2col">
-      <div class="rp-left">
-        <div class="bulk-tmpls">저장 템플릿:
-          <select id="bulk-tsel" onchange="bulkLoadTmpl(this.value)"><option value="">— 불러오기 —</option>${tmplOpts}</select>
-          <button class="rp-btn ghost" onclick="bulkSaveTmpl()" title="현재 메시지를 이름 붙여 저장">💾 저장</button>
-          <button class="rp-btn ghost" onclick="bulkDelTmpl()" title="선택한 템플릿 삭제">🗑</button>
-        </div>
-        <div class="bulk-vars">변수:
-          <button class="rp-tag k-neutral" onclick="bulkInsertVar('{이름}')">{이름}</button>
-          <button class="rp-tag k-neutral" onclick="bulkInsertVar('{반}')">{반}</button>
-          <button class="rp-tag k-neutral" onclick="bulkInsertVar('{날짜}')">{날짜}</button>
-        </div>
-        <textarea class="rp-ta" id="bulk-tmpl" oninput="bulkOnInput(this)" placeholder="예: 안녕하세요 {이름} 학부모님. {날짜} {반} 공지드립니다.">${esc(tmpl)}</textarea>
-        <div class="rp-bar" style="margin-top:8px">
-          <input type="file" id="bulk-imgfile" accept="image/*" onchange="bulkPickImg(event)" style="font-size:12px;flex:1">
-        </div>
-        ${imgPv}
-        <div class="rp-bar" style="margin-top:10px">
-          <span class="rp-ctx">수신자 <b id="bulk-cnt">${[..._bulkSel].length}</b>/${students.length}명</span>
-          <a class="rp-pv-toggle" onclick="bulkAll(true)">전체</a>
-          <a class="rp-pv-toggle" onclick="bulkAll(false)">해제</a>
-          <button class="rp-btn" onclick="bulkSend()" style="margin-left:auto">📢 일괄 전송 →</button>
-        </div>
-        <div class="rp-cks" style="max-height:200px">${chips}</div>
-        <div class="rp-jobs"><div class="rp-jobs-hd">전송 상태</div><div id="rp-jobs"><div class="rp-job">작업 없음</div></div></div>
+  const imgPv = _bulkImg ? `<div class="rp-imgpv"><img src="${_bulkImg}"><span>${esc(_bulkImgName)}</span><button class="rp-btn ghost" onclick="bulkClearImg()">제거</button><label class="rp-imgopt"><input type="checkbox" id="bulk-imgfirst">이미지 먼저</label></div>` : '';
+  const composer = `<div style="padding:16px 18px">
+      <div class="bulk-tmpls">저장 템플릿:
+        <select id="bulk-tsel" onchange="bulkLoadTmpl(this.value)"><option value="">— 불러오기 —</option>${tmplOpts}</select>
+        <button class="rp-btn ghost" onclick="bulkSaveTmpl()" title="현재 메시지를 이름 붙여 저장">💾 저장</button>
+        <button class="rp-btn ghost" onclick="bulkDelTmpl()" title="선택한 템플릿 삭제">🗑</button>
       </div>
+      <div class="bulk-vars">변수:
+        <button class="rp-tag k-neutral" onclick="bulkInsertVar('{이름}')">{이름}</button>
+        <button class="rp-tag k-neutral" onclick="bulkInsertVar('{반}')">{반}</button>
+        <button class="rp-tag k-neutral" onclick="bulkInsertVar('{날짜}')">{날짜}</button>
+      </div>
+      <textarea class="rp-ta" id="bulk-tmpl" oninput="bulkOnInput(this)" placeholder="예: 안녕하세요 {이름} 학부모님. {날짜} {반} 공지드립니다.">${esc(tmpl)}</textarea>
+      <div class="rp-bar" style="margin-top:8px"><input type="file" id="bulk-imgfile" accept="image/*" onchange="bulkPickImg(event)" style="font-size:12px;flex:1"></div>
+      ${imgPv}
+    </div>`;
+  mc.innerHTML = makeTb('일괄 공지', '여러 반 가로질러 선택 — 같은 메시지 발송') + `
+    <div class="rp-bar">
+      <span class="rp-ctx">📢 트리에서 반·학생 체크 · 선택 <b id="bulk-cnt">${_bulkSel.size}</b>명</span>
+      <button class="rp-btn ghost" onclick="bulkAll(false)" style="margin-left:auto">선택 해제</button>
+      <button class="rp-btn" onclick="bulkSend()">📢 일괄 전송 →</button>
+    </div>
+    <div class="rp-grid">
+      <div class="rp-rail">
+        <div class="rp-rail-h">수신자 선택 <b id="bulk-cnt2">${_bulkSel.size}</b>명</div>
+        <div class="rp-rail-list">${_railTreeHtml('bulk')}</div>
+      </div>
+      <div class="rp-edit" id="rp-edit" style="padding:0">${composer}</div>
       <div class="rp-right" id="rp-right"></div>
+      <div class="rp-statcol">
+        <div class="rp-rail-h">전송 모니터 <span class="rp-live"><i></i>실시간</span></div>
+        <div id="rp-jobs" class="rp-statcol-list"><div class="rp-job">작업 없음</div></div>
+      </div>
     </div>`;
   bulkPreview();
   loadReportJobs();
@@ -522,14 +542,17 @@ function bulkDelTmpl(){
   if(!confirm(`템플릿 "${name}" 삭제할까요?`)) return;
   _saveBulkTemplates(_bulkTemplates().filter(x => x.name !== name)); toast('삭제됨: ' + name); renderBulk(document.getElementById('mc'));
 }
-function bulkToggle(nk, on){ on ? _bulkSel.add(nk) : _bulkSel.delete(nk); const c = document.getElementById('bulk-cnt'); if(c) c.textContent = [..._bulkSel].length; bulkPreview(); }
-function bulkAll(on){ const st = _bulkStudents(); _bulkSel = new Set(on ? st.map(s => s.nameKey) : []); renderBulk(document.getElementById('mc')); }
+function _bulkCnt(){ ['bulk-cnt', 'bulk-cnt2'].forEach(id => { const c = document.getElementById(id); if(c) c.textContent = _bulkSel.size; }); }
+function _bulkRefreshTree(){ const list = document.querySelector('.rp-grid .rp-rail-list'); if(list) list.innerHTML = _railTreeHtml('bulk'); _bulkCnt(); bulkPreview(); }
+function bulkChk(nk, on){ on ? _bulkSel.add(nk) : _bulkSel.delete(nk); _bulkCnt(); bulkPreview(); }   // 체크박스는 사용자 클릭상태 유지 → 트리 미재렌더
+function bulkChkCls(cid, on){ _clsStudents(cid).forEach(s => on ? _bulkSel.add(s.nameKey) : _bulkSel.delete(s.nameKey)); _bulkRefreshTree(); }
+function bulkAll(on){ if(on){ Object.keys(_allMyStudents()).forEach(nk => _bulkSel.add(nk)); } else { _bulkSel.clear(); } _bulkRefreshTree(); }
 function bulkInsertVar(v){ const ta = document.getElementById('bulk-tmpl'); if(!ta) return; const s = ta.selectionStart, e = ta.selectionEnd; ta.value = ta.value.slice(0, s) + v + ta.value.slice(e); ta.selectionStart = ta.selectionEnd = s + v.length; ta.focus(); _bulkTmplCache = ta.value; bulkPreview(); }
 function bulkPreview(){
   const ta = document.getElementById('bulk-tmpl'), el = document.getElementById('rp-right'); if(!el) return;
-  const a = activeAsgns()[curAI]; const first = _bulkStudents().find(s => _bulkSel.has(s.nameKey));
-  const msg = _bulkRender(ta ? ta.value : '', first ? first.name : '○○○', a ? a.classId : '');
-  el.innerHTML = `<div class="rp-pv-hd">📨 ${first ? esc(first.name) : '예시'} · 미리보기 <span class="rp-len">${msg.length}자</span></div>`
+  const all = _allMyStudents(); const firstNk = [..._bulkSel][0]; const info = firstNk ? all[firstNk] : null;
+  const msg = _bulkRender(ta ? ta.value : '', info ? info.name : '○○○', info ? info.classId : '');
+  el.innerHTML = `<div class="rp-pv-hd">📨 ${info ? esc(info.name) : '예시'} · 미리보기 <span class="rp-len">${msg.length}자</span></div>`
     + (_bulkImg ? `<img src="${_bulkImg}" style="max-width:100%;border-radius:8px;margin:8px">` : '')
     + `<pre class="rp-pv-body">${esc(msg) || '<span style="color:var(--gray)">메시지를 입력하세요</span>'}</pre>`;
 }
@@ -546,19 +569,20 @@ function bulkPickImg(e){
 }
 function bulkClearImg(){ _bulkImg = null; _bulkImgName = ''; renderBulk(document.getElementById('mc')); }
 async function bulkSend(force){
-  const a = activeAsgns()[curAI]; if(!a) return;
-  const classId = a.classId;
   const tmpl = (document.getElementById('bulk-tmpl')?.value || '').trim();
   if(!tmpl) return toast('메시지를 입력하세요');
   if(!force && !await _agentAlive()){ _agentGuide(() => bulkSend(true)); return; }
-  const students = _bulkStudents().filter(s => _bulkSel.has(s.nameKey));
-  if(!students.length) return toast('수신자를 선택하세요');
-  const recipients = students.map(s => ({ nameKey: s.nameKey, name: s.name, msg: _bulkRender(tmpl, s.name, classId), status: '대기' }));
-  const job = { cls: classId, recipients, status: 'queued', ts: Date.now() };
+  const all = _allMyStudents();
+  const sel = [..._bulkSel].filter(nk => all[nk]);   // 여러 반 가로질러 선택된 수신자
+  if(!sel.length) return toast('수신자를 선택하세요(트리에서 체크)');
+  const recipients = sel.map(nk => ({ nameKey: nk, name: all[nk].name, msg: _bulkRender(tmpl, all[nk].name, all[nk].classId), status: '대기' }));
+  const clsSet = [...new Set(sel.map(nk => all[nk].classId))];
+  // bulk = 공지(데일리리포트 아님) → date 없음(history 미기록). cls는 표시용.
+  const job = { cls: clsSet.length > 1 ? `일괄 ${clsSet.length}반` : (clsSet[0] || '일괄'), recipients, status: 'queued', ts: Date.now() };
   if(_bulkImg){ job.image = _bulkImg; job.imageName = _bulkImgName; job.imageFirst = document.getElementById('bulk-imgfirst')?.checked || false; }
   try{
     await fbPut(`sendJobs/${instructor.id}/${Date.now()}_${Math.floor(Math.random() * 1000)}`, job);
-    toast(`일괄 전송 작업 생성 (${recipients.length}명${_bulkImg ? ' · 이미지' : ''}) — 에이전트가 발송`);
+    toast(`일괄 전송 작업 생성 (${recipients.length}명·${clsSet.length}반${_bulkImg ? ' · 이미지' : ''}) — 에이전트가 발송`);
     _bulkImg = null; _bulkImgName = ''; loadReportJobs();
   }catch(e){ toast('전송 요청 실패: ' + (e.message || e)); }
 }
