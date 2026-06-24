@@ -96,6 +96,11 @@ def _build_tags_context(tags: dict) -> str:
     if cond and cond in _CONDITION_TEXT:
         lines.append(f"- 수업 컨디션: {_CONDITION_TEXT[cond]}")
 
+    # 과제 커스텀 프리셋(자유 텍스트, 복수) — 강사가 직접 등록한 문구 그대로 전달
+    assign_extra = [t for t in (tags.get("assign_tags") or []) if t]
+    if assign_extra:
+        lines.append("- 과제 관련 특이사항: " + ", ".join(assign_extra))
+
     und = tags.get("understand")
     if und and und in _UNDERSTAND_TEXT:
         lines.append(f"- 이해 속도: {_UNDERSTAND_TEXT[und]}")
