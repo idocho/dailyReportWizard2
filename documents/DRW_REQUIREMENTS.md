@@ -1,7 +1,7 @@
 # DailyReportWizard — 요구사항 명세서
 
 **Crafted by IDO(idocho@kakao.com) · Powered by Claude AI**  
-**문서 버전**: 8.55 · **앱 버전**: v2.5.0(로그인 전환·개발 라인)/v2.4.0(이전) · **최종 수정**: 2026-06-24
+**문서 버전**: 8.56 · **앱 버전**: v2.5.0(로그인 전환·개발 라인)/v2.4.0(이전) · **최종 수정**: 2026-06-24
 
 > Firebase 스키마 전체 명세: [ClassManager/documents/DB_SCHEMA.md](../../ClassManager/documents/DB_SCHEMA.md)
 
@@ -11,6 +11,7 @@
 
 | 문서 버전 | 날짜 | 주요 변경 |
 |-----------|------|-----------|
+| 8.56 | 2026-06-24 | **입력↔리포트 탭 분리 + 전송상태 팝오버 (v2.5.0 JS v279·CSS v20260625)**. 입력(교재별 grain)과 전송/리포트(학생별 grain)의 UX 일관성 문제로 통합 「수업」 탭(Form A 스테이지 토글)을 **분리**: 사이드바 nav를 `✏️ 수업 입력`(`goNav('input')`) / `📤 리포트·전송`(`goNav('report')`) 2개 독립 항목으로. `_stageBar` 토글 호출 제거(input·report 양쪽 — 함수는 잔존하나 미사용). **전송상태**: 리포트 3열 레일 하단(부적절 위치)에서 **상단 전송 버튼 옆 팝오버**로 이동 — `전송상태` 버튼 + 진행/대기 건수 pill(닫혀도 표시), 클릭 시 `.rp-stat-pop` 드롭다운에 작업 목록·정리(`toggleRpStatus`, `loadReportJobs`가 `#rp-jobs`+pill 갱신). 레일은 학생 전환 전용으로 정리. |
 | 8.55 | 2026-06-24 | **문체 설명·예시 문구 복원 (v2.5.0 캐시 v271)**. 웹 설정 「문체」 탭이 라벨 드롭다운만 있고 각 문체의 **설명(guidance)·예시 문구**가 없던 문제(ai_style.py STYLE_PRESETS 내용이 JS 미반영, RP_STYLES는 라벨뿐). `app-report.js`에 `RP_STYLE_INFO`(STYLE_PRESETS의 desc+예시 미러) 추가, `app-settings.js` 문체 드롭다운 아래 안내 박스(`#aiStyleInfo`)에 선택 문체의 설명+예시 렌더(`_aiStyleInfoHtml`/`renderAiStyleInfo`, select onchange 갱신). auto는 '본인 노트 학습' 안내. CSS `.ai-style-info`/`.asi-*` 추가. |
 | 8.54 | 2026-06-24 | **카톡 전송 속도 — 학습값 영속(진짜 적응형) develop**. 기존: `SmartWait`(AIMD+EMA 자동 가감속)이 매 sendJob마다 시드 0.5에서 재학습 → 잡 간 학습 소실(docstring '학습값 영속' 의도 미구현). 수정(`agent_worker._send_real`): 잡 종료 시 학습된 `sw.wait`를 ① **cfg 인메모리**(세션 내 다음 잡 warm-start) ② **디스크**(`_persist_smartwait` → `agent_config.json.smartWait`, 재시작 후 warm-start) 양쪽 영속. `_persist_smartwait`는 raw JSON의 `smartWait`(평문·비민감)만 갱신 — 암호화 키 필드(`*_api_key`, DPAPI) 미열람·미변경. 완료·타임아웃 무관하게 그 시점 운영점 보존. 수동 속도 옵션(PC 고정 프리셋 0.3~2.0s)은 폐기 유지 — 자동 적응이 대체(턴키 UX). 격리 테스트: 영속·warm-start·키필드 보존 확인. |
 | 8.53 | 2026-06-24 | **history 누적 웹 이관 — 8.52 미해결 해소 (v2.5.0 캐시 v270)**. PC `_push_history`(전송 확정 시 `history/{nameKey}/{date}={note,instructor}` 기록) 동작을 웹+에이전트 경로로 이관. **웹**(`doReportSend`): sendJob 각 수신자에 `note`(발송 특이사항=`_curDraft`) 동봉 + 잡에 `date`(todayKey)·`instructor` 추가. **에이전트**(`process_sendjobs.on_item`): 카톡 전송 **성공한 수신자만** `campus/{campus}/history/{nameKey}/{date}={note,instructor}` PATCH 누적 — **real 발송 한정**(dry 제외)·**`date` 있는 리포트 잡만**(bulk 공지 제외). 실패분은 미기록(PC가 실패 학생 제외하던 동작 계승). Analyzer가 obs/·scores/와 nameKey+date로 조인하는 원료 복구. PC의 `__note__` 소거(import 브리지 anti-staleness)는 모바일 가져오기 폐기로 불요(웹 `__draft__`는 todayKey date-gating 자연 만료). 격리 테스트: real 리포트→3명 history 기록·스키마 일치, dry·bulk→미기록 확인. |

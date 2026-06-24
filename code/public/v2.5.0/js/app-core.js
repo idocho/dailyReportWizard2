@@ -522,7 +522,8 @@ function renderSb(){
       </div>
     </div>
     <div class="sb-nav">
-      <div class="sni${(activeTab==='input'||activeTab==='report')?' on':''}" onclick="goNav(_lessonStage)">📚 수업 (입력·리포트)</div>
+      <div class="sni${activeTab==='input'?' on':''}" onclick="goNav('input')">✏️ 수업 입력</div>
+      <div class="sni${activeTab==='report'?' on':''}" onclick="goNav('report')">📤 리포트·전송</div>
       <div class="sni${activeTab==='scores'?' on':''}" onclick="goNav('scores')">📊 성적 입력</div>
       <div class="sni${activeTab==='bulk'?' on':''}" onclick="goNav('bulk')">📢 일괄 공지</div>
       <div class="sni${activeTab==='setting'?' on':''}" onclick="goNav('setting')">⚙️ 설정</div>
