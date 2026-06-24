@@ -1,6 +1,6 @@
 {
-  "last_run_date": "2026-06-16",
-  "runs": 2,
+  "last_run_date": "2026-06-24",
+  "runs": 4,
   "candidates": {
     "errnote_missing": {
       "theme": "오답노트 미작성/미제출",
@@ -101,39 +101,49 @@
       "last_seen": "2026-06-14"
     },
     "hw_incomplete": {
-      "theme": "과제 미완수·별표만 표시하고 넘어감",
+      "theme": "과제 미완수·미비·밀린 과제 누적",
       "category": "caution",
       "suggested_label": "📋 과제 미완",
-      "suggested_phrase": "과제를 끝까지 해결하지 못하고 일부를 별표·미풀이로 남겨, 끝까지 마무리하는 습관 형성이 필요함",
+      "suggested_phrase": "과제를 끝까지 해오지 못하거나 미완 과제가 누적되어, 계획적으로 끝까지 마무리하는 습관 형성이 필요함",
       "first_seen": "2026-06-16",
       "history": [
         {
           "date": "2026-06-16",
           "freq": 9,
           "rec": "new_tag"
+        },
+        {
+          "date": "2026-06-24",
+          "freq": 45,
+          "rec": "new_tag"
         }
       ],
-      "streak": 1,
-      "last_seen": "2026-06-16"
+      "streak": 0,
+      "last_seen": "2026-06-24"
     },
     "rushing": {
       "theme": "성급한 풀이·검토(검산) 습관 부족",
       "category": "caution",
       "suggested_label": "🏃 성급한 풀이",
-      "suggested_phrase": "문제를 충분히 고민·검토하지 않고 서둘러 풀어 조건을 놓치는 경향이 있어, 끝까지 꼼꼼히 읽고 검산하는 습관이 필요함",
+      "suggested_phrase": "문제를 충분히 검토하지 않고 서둘러 풀어 실수가 나와, 차분히 풀이를 확인·검산하는 습관이 필요함",
       "first_seen": "2026-06-16",
       "history": [
         {
           "date": "2026-06-16",
           "freq": 8,
           "rec": "new_tag"
+        },
+        {
+          "date": "2026-06-24",
+          "freq": 22,
+          "rec": "new_tag"
         }
       ],
-      "streak": 1,
-      "last_seen": "2026-06-16"
+      "streak": 0,
+      "last_seen": "2026-06-24"
     },
     "absent": {
-      "theme": "결석",
+      "theme": "결석·병결·결시",
       "category": "caution",
       "suggested_label": "🚫 결석",
       "suggested_phrase": "오늘 수업에 결석하여, 진도·과제를 다음 수업 전 보완하도록 안내함",
@@ -143,42 +153,57 @@
           "date": "2026-06-16",
           "freq": 3,
           "rec": "new_tag"
+        },
+        {
+          "date": "2026-06-24",
+          "freq": 15,
+          "rec": "new_tag"
         }
       ],
-      "streak": 1,
-      "last_seen": "2026-06-16"
+      "streak": 0,
+      "last_seen": "2026-06-24"
     },
     "material_missing": {
       "theme": "교재·준비물 미지참",
       "category": "caution",
       "suggested_label": "📕 교재 미지참",
-      "suggested_phrase": "교재나 프린트를 가져오지 않아 임시 자료로 수업을 진행함, 준비물 지참을 안내함",
+      "suggested_phrase": "교재나 프린트를 가져오지 않아 복사본·노트로 수업을 진행함, 준비물 지참을 안내함",
       "first_seen": "2026-06-16",
       "history": [
         {
           "date": "2026-06-16",
           "freq": 6,
           "rec": "new_tag"
+        },
+        {
+          "date": "2026-06-24",
+          "freq": 6,
+          "rec": "new_tag"
         }
       ],
-      "streak": 1,
-      "last_seen": "2026-06-16"
+      "streak": 0,
+      "last_seen": "2026-06-24"
     },
     "equation_setup": {
-      "theme": "활용문제에서 식 세우기·미지수 정의 어려움",
+      "theme": "활용문제 식 세우기·미지수 정의·개념 적용 어려움",
       "category": "understand_sub",
       "suggested_label": "🧩 식세우기 약함",
-      "suggested_phrase": "개념은 알지만 활용 유형에서 미지수를 정의하고 식을 세우는 과정을 어려워해, 문제 해석·식 유도 연습이 필요함",
+      "suggested_phrase": "개념은 이해하나 활용 유형에서 미지수를 설정하고 식을 세워 적용하는 과정을 어려워해, 문제 해석·식 유도 연습이 필요함",
       "first_seen": "2026-06-16",
       "history": [
         {
           "date": "2026-06-16",
           "freq": 5,
           "rec": "new_tag"
+        },
+        {
+          "date": "2026-06-24",
+          "freq": 25,
+          "rec": "new_tag"
         }
       ],
-      "streak": 1,
-      "last_seen": "2026-06-16"
+      "streak": 0,
+      "last_seen": "2026-06-24"
     },
     "self_directed": {
       "theme": "자발적 일찍 등원·자율 보충(자기주도)",
@@ -191,10 +216,143 @@
           "date": "2026-06-16",
           "freq": 5,
           "rec": "new_tag"
+        },
+        {
+          "date": "2026-06-24",
+          "freq": 15,
+          "rec": "new_tag"
+        }
+      ],
+      "streak": 0,
+      "last_seen": "2026-06-24"
+    },
+    "read_miss": {
+      "theme": "문제 발문 미독·조건 놓침(문해력)",
+      "category": "caution",
+      "suggested_label": "👓 발문 놓침",
+      "suggested_phrase": "문제를 끝까지 읽지 않거나 조건을 놓쳐, 구하라는 것을 정확히 파악하는 독해 습관이 필요함",
+      "first_seen": "2026-06-24",
+      "history": [
+        {
+          "date": "2026-06-24",
+          "freq": 9,
+          "rec": "new_tag"
+        }
+      ],
+      "streak": 0,
+      "last_seen": "2026-06-24"
+    },
+    "answer_fitting": {
+      "theme": "답 먼저 가정·역산해 풀이 끼워맞춤",
+      "category": "understand_sub",
+      "suggested_label": "🔙 역산 끼워맞춤",
+      "suggested_phrase": "답을 먼저 가정한 뒤 역으로 풀이를 맞추는 습관이 있어, 풀이 과정을 순서대로 전개하는 연습이 필요함",
+      "first_seen": "2026-06-24",
+      "history": [
+        {
+          "date": "2026-06-24",
+          "freq": 3,
+          "rec": "new_tag"
+        }
+      ],
+      "streak": 0,
+      "last_seen": "2026-06-24"
+    },
+    "skip_steps": {
+      "theme": "암산 의존·풀이과정 생략",
+      "category": "caution",
+      "suggested_label": "✏️ 풀이 생략",
+      "suggested_phrase": "풀이 과정을 생략하고 암산에 의존하는 경향이 있어, 과정을 차분히 작성하면 계산 실수를 줄일 수 있음",
+      "first_seen": "2026-06-24",
+      "history": [
+        {
+          "date": "2026-06-24",
+          "freq": 4,
+          "rec": "new_tag"
+        }
+      ],
+      "streak": 0,
+      "last_seen": "2026-06-24"
+    },
+    "exam_hard_miss": {
+      "theme": "고난도·심화 문제 오답 (기본은 해결)",
+      "category": "caution",
+      "suggested_label": "🧩 심화오답",
+      "suggested_phrase": "고난도·심화 유형에서 오답이 있었으나 기본 개념 문제는 안정적으로 해결함",
+      "first_seen": "2026-06-24",
+      "history": [
+        {
+          "date": "2026-06-24",
+          "freq": 85,
+          "rec": "new_tag"
         }
       ],
       "streak": 1,
-      "last_seen": "2026-06-16"
+      "last_seen": "2026-06-24"
+    },
+    "error_note": {
+      "theme": "오답노트 작성·정리 습관",
+      "category": "extra",
+      "suggested_label": "🗒 오답노트",
+      "suggested_phrase": "오답노트를 작성·정리하며 틀린 문제를 복습함",
+      "first_seen": "2026-06-24",
+      "history": [
+        {
+          "date": "2026-06-24",
+          "freq": 79,
+          "rec": "new_tag"
+        }
+      ],
+      "streak": 1,
+      "last_seen": "2026-06-24"
+    },
+    "careless_miss": {
+      "theme": "단순 실수로 실점 (아는데 틀림)",
+      "category": "caution",
+      "suggested_label": "⚠️ 단순실수",
+      "suggested_phrase": "내용을 아는데도 조건 누락·단위 누락·검토 부족 등 단순 실수로 실점함",
+      "first_seen": "2026-06-24",
+      "history": [
+        {
+          "date": "2026-06-24",
+          "freq": 37,
+          "rec": "new_tag"
+        }
+      ],
+      "streak": 1,
+      "last_seen": "2026-06-24"
+    },
+    "basics_solid": {
+      "theme": "기본·필수 개념은 탄탄 (심화만 취약)",
+      "category": "highlight",
+      "suggested_label": "🧱 기본기탄탄",
+      "suggested_phrase": "기본·필수 개념은 정확히 해결하며 탄탄한 기본기를 보임",
+      "first_seen": "2026-06-24",
+      "history": [
+        {
+          "date": "2026-06-24",
+          "freq": 3,
+          "rec": "new_tag"
+        }
+      ],
+      "streak": 1,
+      "last_seen": "2026-06-24"
+    },
+    "test_skill": {
+      "theme": "시험 운영 스킬 (검토·시간분배·답안표기)",
+      "category": "caution",
+      "suggested_label": "⏱️ 시험운영",
+      "suggested_phrase": "검토·시간 분배·답안 표기 등 실전 시험 운영 습관에 보완이 필요함",
+      "first_seen": "2026-06-24",
+      "history": [
+        {
+          "date": "2026-06-24",
+          "freq": 12,
+          "rec": "new_tag"
+        }
+      ],
+      "streak": 1,
+      "last_seen": "2026-06-24"
     }
   }
 }
