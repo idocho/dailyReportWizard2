@@ -223,8 +223,20 @@ def decode_image(data_url):
     return path
 
 
+def _persist_smartwait(value, path=CFG_PATH):
+    """학습된 전송 대기값을 agent_config.json에 영속(평문·비민감). 암호화 키 필드는 미열람·미변경.
+    재시작 후 warm-start용. 실패해도 무해(다음 잡은 시드 0.5에서 재학습)."""
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+        raw["smartWait"] = round(float(value), 3)
+        path.write_text(json.dumps(raw, ensure_ascii=False, indent=2), encoding="utf-8")
+    except Exception:
+        pass
+
+
 def _send_real(cfg, msgs, item_cb, should_cancel=None):
-    """본인 카톡 실발송 — SmartWait 적응. 완료까지 동기 대기. should_cancel(): 건별 취소 폴링."""
+    """본인 카톡 실발송 — SmartWait 적응. 완료까지 동기 대기. should_cancel(): 건별 취소 폴링.
+    학습값(sw.wait)은 잡 종료 시 cfg(인메모리·세션 내 잡 간)+디스크(재시작)에 영속 → 진짜 적응형."""
     import kakao_send
     if not getattr(kakao_send, "AUTOMATION", False):
         raise RuntimeError("pyautogui/pyperclip 미설치 또는 비-Windows — 실 발송 불가")
@@ -233,7 +245,12 @@ def _send_real(cfg, msgs, item_cb, should_cancel=None):
     kakao_send.send_messages(msgs, wait_ctrl=sw, status_cb=lambda t: print("  " + t),
                              item_cb=lambda i, ok, room, err: item_cb(i, ok, err),
                              done_cb=lambda n: done.set(), should_cancel=should_cancel)
-    if not done.wait(timeout=25 * len(msgs) + 30):
+    ok = done.wait(timeout=25 * len(msgs) + 30)
+    # 적응 학습값 영속(완료·타임아웃 무관하게 그 시점까지 학습된 운영점 보존)
+    learned = round(sw.wait, 3)
+    cfg["smartWait"] = learned          # 세션 내 다음 잡 warm-start
+    _persist_smartwait(learned)         # 에이전트 재시작 후 warm-start
+    if not ok:
         raise RuntimeError("발송 타임아웃 — 카톡 응답 없음")
 
 
