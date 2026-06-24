@@ -206,7 +206,8 @@ function renderSettings(mc){
       <div class="sa-body${openSaIds.has('sa-aistyle')?' open':''}">
         <div style="padding:10px 12px">
           <div class="sl">문체(말투)</div>
-          <select class="inp sm" id="aiStyleMode">${_AISTYLES.map(([k,l])=>`<option value="${esc(k)}"${k===aiMode?' selected':''}>${esc(l)}</option>`).join('')}</select>
+          <select class="inp sm" id="aiStyleMode" onchange="renderAiStyleInfo()">${_AISTYLES.map(([k,l])=>`<option value="${esc(k)}"${k===aiMode?' selected':''}>${esc(l)}</option>`).join('')}</select>
+          <div id="aiStyleInfo" class="ai-style-info">${_aiStyleInfoHtml(aiMode)}</div>
           <div class="sl" style="margin-top:10px">개별 지침 (선택)</div>
           <textarea class="inp sm" id="aiCustom" style="min-height:62px;resize:vertical" placeholder="예: 마지막에 다음 수업 준비물을 안내해 주세요">${esc(aiCustom)}</textarea>
           <div style="font-size:10px;color:var(--gray);margin:6px 0 8px">AI 엔진·API 키는 본인 PC 에이전트에서 설정합니다.</div>
@@ -581,6 +582,19 @@ function saveFb(){
   saveLocal();toast('Firebase 설정 저장됨 ✅');
 }
 
+// 문체 설명·예시 안내 (RP_STYLE_INFO = ai_style.py STYLE_PRESETS 미러)
+function _aiStyleInfoHtml(mode){
+  const info=(typeof RP_STYLE_INFO!=='undefined')?RP_STYLE_INFO[mode]:null;
+  if(!info) return '';
+  const ex=(info.ex||[]).map(e=>`<div class="asi-ex">“${esc(e)}”</div>`).join('');
+  return `<div class="asi-desc">${esc(info.desc)}</div>`
+    + (ex ? `<div class="asi-exh">예시 문구</div>${ex}`
+          : `<div class="asi-exh">전송한 노트가 쌓이면 본인 문장이 예시로 학습됩니다.</div>`);
+}
+function renderAiStyleInfo(){
+  const el=document.getElementById('aiStyleInfo'); if(!el) return;
+  el.innerHTML=_aiStyleInfoHtml(document.getElementById('aiStyleMode')?.value||'auto');
+}
 async function saveAiStyle(){
   if(!instructor){toast('강사 미선택');return;}
   const mode=document.getElementById('aiStyleMode')?.value||'auto';
