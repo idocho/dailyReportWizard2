@@ -142,95 +142,11 @@ function renderSettings(mc){
   //   연결정보는 로그인 게이트가 자동 주입(index.html), 신원은 acl(instructorId)에서 옴.
   //   내 이름은 사이드바 아바타에 표시됨(app-core).
 
-  const SA_PRESET=`
-    <div class="sa" id="sa-preset">
-      <div class="sa-hdr${openSaIds.has('sa-preset')?' open':''}" onclick="_saToggle('sa-preset')">
-        <span class="sa-ico">🎯</span>
-        <span class="sa-lbl">자주 쓰는 문구</span>
-        <span class="sa-sub">${myPresets.length}개</span>
-        <span class="sa-chv">›</span>
-      </div>
-      <div class="sa-body${openSaIds.has('sa-preset')?' open':''}">
-        ${presetChips||'<div style="padding:10px 12px;font-size:12px;color:var(--gray)">등록된 문구가 없습니다.</div>'}
-        <div style="padding:8px 10px;border-top:1px solid var(--border);display:flex;gap:6px">
-          <input class="inp sm" id="pInput" placeholder="새 문구 입력" style="flex:1" onkeydown="if(event.key==='Enter')addPreset()">
-          <button class="btn bsm" onclick="addPreset()">+ 추가</button>
-        </div>
-      </div>
-    </div>`;
-
-  const SA_ASGN=`
-    <div class="sa" id="sa-asgn">
-      <div class="sa-hdr${openSaIds.has('sa-asgn')?' open':''}" onclick="_saToggle('sa-asgn')">
-        <span class="sa-ico">📚</span>
-        <span class="sa-lbl">내 담당 수업</span>
-        <span class="sa-sub">${asgns.length}개</span>
-        <span class="sa-chv">›</span>
-      </div>
-      <div class="sa-body${openSaIds.has('sa-asgn')?' open':''}">${asgRows}${addAsgn}</div>
-    </div>`;
-
-  const SA_CLS=`
-    <div class="sa" id="sa-cls">
-      <div class="sa-hdr${openSaIds.has('sa-cls')?' open':''}" onclick="_saToggle('sa-cls')">
-        <span class="sa-ico">🏫</span>
-        <span class="sa-lbl">학급 &amp; 학생 관리</span>
-        <span class="sa-sub">${config?Object.keys(config.classes||{}).length+'개 학급':'–'}</span>
-        <span class="sa-chv">›</span>
-      </div>
-      <div class="sa-body${openSaIds.has('sa-cls')?' open':''}">${renderClsMgmt()}</div>
-    </div>`;
-
-  const SA_RESET=`
-    <div class="sa" id="sa-reset">
-      <div class="sa-hdr${openSaIds.has('sa-reset')?' open':''}" onclick="_saToggle('sa-reset')">
-        <span class="sa-ico">🗑</span>
-        <span class="sa-lbl" style="color:var(--red)">초기화</span>
-        <span class="sa-sub"></span>
-        <span class="sa-chv">›</span>
-      </div>
-      <div class="sa-body${openSaIds.has('sa-reset')?' open':''}">${resetHtml}</div>
-    </div>`;
-
-  // ── AI 문체·지침 (리포트 생성) ──
-  const _AISTYLES=(typeof RP_STYLES!=='undefined')?RP_STYLES:[['auto','✍️ 내 말투 자동']];
-  const aiMode=instr.ai_style_mode||'auto', aiCustom=instr.ai_custom_prompt||'';
-  const SA_AISTYLE=`
-    <div class="sa" id="sa-aistyle">
-      <div class="sa-hdr${openSaIds.has('sa-aistyle')?' open':''}" onclick="_saToggle('sa-aistyle')">
-        <span class="sa-ico">✍️</span>
-        <span class="sa-lbl">AI 문체 · 지침</span>
-        <span class="sa-sub">리포트 생성</span>
-        <span class="sa-chv">›</span>
-      </div>
-      <div class="sa-body${openSaIds.has('sa-aistyle')?' open':''}">
-        <div style="padding:10px 12px">
-          <div class="sl">문체(말투)</div>
-          <select class="inp sm" id="aiStyleMode" onchange="renderAiStyleInfo()">${_AISTYLES.map(([k,l])=>`<option value="${esc(k)}"${k===aiMode?' selected':''}>${esc(l)}</option>`).join('')}</select>
-          <div id="aiStyleInfo" class="ai-style-info">${_aiStyleInfoHtml(aiMode)}</div>
-          <div class="sl" style="margin-top:10px">개별 지침 (선택)</div>
-          <textarea class="inp sm" id="aiCustom" style="min-height:62px;resize:vertical" placeholder="예: 마지막에 다음 수업 준비물을 안내해 주세요">${esc(aiCustom)}</textarea>
-          <div style="font-size:10px;color:var(--gray);margin:6px 0 8px">AI 엔진·API 키는 본인 PC 에이전트에서 설정합니다.</div>
-          <button class="btn bsm" onclick="saveAiStyle()">💾 저장</button>
-        </div>
-      </div>
-    </div>`;
-
-  const SA_FOOT=`
-    <div class="stg-foot">
-      <button class="btn bsm" style="width:100%;justify-content:center;display:flex;gap:6px" onclick="doLogout()">🚪 로그아웃</button>
-      <button class="adm-btn${adminOn?' on':''}" onclick="toggleAdmin()" id="admBtn">
-        <span>${adminOn?'🔓':'🔒'}</span>
-        <span id="admBtnLbl">${adminOn?'관리자 모드 해제':'관리자 모드'}</span>
-      </button>
-      ${adminOn?`<button class="btn bsm" style="width:100%;justify-content:center" onclick="changeAdminPw()">🔑 관리자 암호 변경</button>`:''}
-      <div style="font-size:10px;color:var(--gray);text-align:center">`+`DailyReportWizard ${APP_VERSION} · Crafted by IDO(idocho@kakao.com) · Powered by Claude AI`+`</div>
-    </div>`;
 
   // 활성 탭 (관리자 탭은 adminOn일 때만) — 잡다한 단일 스크롤 → 4탭 좌측 레일
   // ── 평탄화: 탭 = 기능 1개, 아코디언(이중구조) 제거 → 카드 직접 표시 ──
   const _card=(ic,title,sub,body)=>`<div class="stg-card"><div class="stg-card-h"><span>${ic}</span><b>${esc(title)}</b>${sub?`<span class="stg-csub">${esc(sub)}</span>`:''}</div><div class="stg-card-b">${body}</div></div>`;
-  const _aiBody=`<div style="padding:12px"><div class="sl">문체(말투)</div><select class="inp sm" id="aiStyleMode">${_AISTYLES.map(([k,l])=>`<option value="${esc(k)}"${k===aiMode?' selected':''}>${esc(l)}</option>`).join('')}</select><div class="sl" style="margin-top:10px">개별 지침 (선택)</div><textarea class="inp sm" id="aiCustom" style="min-height:64px;resize:vertical" placeholder="예: 마지막에 다음 수업 준비물을 안내해 주세요">${esc(aiCustom)}</textarea><div style="font-size:10px;color:var(--gray);margin:6px 0 10px">AI 엔진·API 키는 본인 PC 에이전트에서 설정합니다.</div><button class="btn bsm" onclick="saveAiStyle()">💾 저장</button></div>`;
+  const _aiBody=`<div style="padding:12px"><div class="sl">문체(말투)</div><select class="inp sm" id="aiStyleMode" onchange="renderAiStyleInfo()">${_AISTYLES.map(([k,l])=>`<option value="${esc(k)}"${k===aiMode?' selected':''}>${esc(l)}</option>`).join('')}</select><div id="aiStyleInfo" class="ai-style-info">${_aiStyleInfoHtml(aiMode)}</div><div class="sl" style="margin-top:10px">개별 지침 (선택)</div><textarea class="inp sm" id="aiCustom" style="min-height:64px;resize:vertical" placeholder="예: 마지막에 다음 수업 준비물을 안내해 주세요">${esc(aiCustom)}</textarea><div style="font-size:10px;color:var(--gray);margin:6px 0 10px">AI 엔진·API 키는 본인 PC 에이전트에서 설정합니다.</div><button class="btn bsm" onclick="saveAiStyle()">💾 저장</button></div>`;
   const _presetBody=`${presetChips||'<div style="padding:10px 12px;font-size:12px;color:var(--gray)">등록된 문구가 없습니다.</div>'}<div style="padding:8px 12px;border-top:1px solid var(--border);display:flex;gap:6px"><input class="inp sm" id="pInput" placeholder="새 문구 입력" style="flex:1" onkeydown="if(event.key==='Enter')addPreset()"><button class="btn bsm" onclick="addPreset()">+ 추가</button></div>`;
   const _sysBody=`<div style="padding:12px;display:flex;flex-direction:column;gap:8px"><button class="btn bsm" style="width:100%;justify-content:center;display:flex;gap:6px" onclick="doLogout()">🚪 로그아웃</button><button class="adm-btn${adminOn?' on':''}" onclick="toggleAdmin()" id="admBtn"><span>${adminOn?'🔓':'🔒'}</span> <span id="admBtnLbl">${adminOn?'관리자 모드 해제':'관리자 모드'}</span></button>${adminOn?`<button class="btn bsm" style="width:100%;justify-content:center" onclick="changeAdminPw()">🔑 관리자 암호 변경</button>`:''}<div style="font-size:10px;color:var(--gray);text-align:center">DailyReportWizard ${APP_VERSION} · Crafted by IDO · Powered by Claude AI</div></div>`;
   let _subjBody='',_bookBody='';
