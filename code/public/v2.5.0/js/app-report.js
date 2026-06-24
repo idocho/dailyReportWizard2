@@ -370,39 +370,51 @@ async function genReportAll(force){
 }
 
 // ── 전송 (실제 메시지 = build_message 전체) ──────────────────────────
+// 여러 반의 '검토중'(발송문 작성) 학생을 한 번에 선택 → 반별 잡으로 큐 적재
 async function openReportSend(force){
   if(!force && !await _agentAlive()){ _agentGuide(() => openReportSend(true)); return; }
-  const cid = _rpActiveCls; if(!cid) return;
-  const students = _clsStudents(cid);
-  const ready = students.filter(s => _curDraft(s.nameKey).trim());
-  const skipped = students.filter(s => !_curDraft(s.nameKey).trim()).map(s => s.name);
-  const cnt = {}; ready.forEach(s => cnt[s.name] = (cnt[s.name] || 0) + 1);
-  const dups = [...new Set(ready.map(s => s.name).filter(n => cnt[n] > 1))];
-  _rpModal(`<h3>카카오톡 전송 — ${esc(cid)}</h3>
-    <div class="rp-hint">전송 대상 ${ready.length}명 — 제외할 학생 체크 해제. 실제 발송 형식으로 전송됩니다.</div>
-    <div class="rp-cks">${ready.map(s => `<label class="rp-ck"><input type="checkbox" checked data-snk="${esc(s.nameKey)}"> ${esc(s.name)}${dups.includes(s.name) ? ` <span class="rp-warn-i">⚠동명이인</span>` : ``}</label>`).join('') || `<div class="rp-hint">생성·검토된 학생이 없습니다.</div>`}</div>
-    ${dups.length ? `<div class="rp-warn">⚠ 동명이인 ${esc(dups.join(', '))} — 자동 제외(수동 전송 권장)</div>` : ``}
-    ${skipped.length ? `<div class="rp-warn">미생성 제외 ${skipped.length}명: ${esc(skipped.join(', '))}</div>` : ``}
+  // 검토완료(발송문 있음) 학생이 있는 반들 — 활성반 우선
+  const groups = _myClassList().map(c => ({ cls: c.classId, ready: _clsStudents(c.classId).filter(s => _curDraft(s.nameKey).trim()) }))
+    .filter(g => g.ready.length)
+    .sort((a, b) => (a.cls === _rpActiveCls ? -1 : b.cls === _rpActiveCls ? 1 : 0));
+  if(!groups.length) return toast('발송문이 작성된(검토중) 학생이 없습니다');
+  const totalReady = groups.reduce((n, g) => n + g.ready.length, 0);
+  const body = groups.map(g => {
+    const cnt = {}; g.ready.forEach(s => cnt[s.name] = (cnt[s.name] || 0) + 1);
+    const dups = [...new Set(g.ready.map(s => s.name).filter(n => cnt[n] > 1))];
+    const rows = g.ready.map(s => `<label class="rp-ck"><input type="checkbox" checked data-snk="${esc(s.nameKey)}" data-cls="${esc(g.cls)}"> ${esc(s.name)}${dups.includes(s.name) ? ` <span class="rp-warn-i">⚠동명이인</span>` : ''}</label>`).join('');
+    return `<div class="rp-send-cls"><label class="rp-ck rp-send-clshd"><input type="checkbox" checked onchange="_sendClsToggle('${esc(g.cls)}',this.checked)"> <b>${esc(g.cls)}</b> <span class="rp-cls-cnt">${g.ready.length}</span></label>${rows}</div>`;
+  }).join('');
+  _rpModal(`<h3>카카오톡 전송 — ${groups.length}반 · ${totalReady}명</h3>
+    <div class="rp-hint">검토중(발송문 작성)인 학생만 표시 — 제외할 반/학생 체크 해제. 반별로 큐에 쌓여 순차 발송됩니다.</div>
+    <div class="rp-cks" style="max-height:320px">${body}</div>
     <div class="rp-mrow"><button class="rp-btn ghost" onclick="closeRpModal()">취소</button>
-      <button class="rp-btn" ${ready.length ? '' : 'disabled'} onclick="doReportSend()">전송 시작</button></div>`);
+      <button class="rp-btn" onclick="doReportSend()">전송 시작</button></div>`);
 }
+function _sendClsToggle(cls, on){ document.querySelectorAll(`#rp-ov [data-snk][data-cls="${cls.replace(/"/g,'\\"')}"]`).forEach(c => { c.checked = on; }); }
 async function doReportSend(){
-  const classId = _rpActiveCls; if(!classId) return;
-  const picked = [...document.querySelectorAll('#rp-ov [data-snk]')].filter(c => c.checked).map(c => c.dataset.snk);
-  const students = _clsStudents(classId);
-  const recipients = picked.map(nk => {
-    const s = students.find(x => x.nameKey === nk) || {};
-    const note = _curDraft(nk);   // 발송 특이사항 — history 누적 원료(전송 성공 시 에이전트가 기록)
-    return { nameKey: nk, name: s.name || nk, note, msg: _buildMessage(classId, nk, s.name || nk, note), status: '대기' };
-  });
+  const picked = [...document.querySelectorAll('#rp-ov [data-snk]')].filter(c => c.checked).map(c => ({ nk: c.dataset.snk, cls: c.dataset.cls }));
   closeRpModal();
-  if(!recipients.length) return;
-  const jid = Date.now() + '_' + Math.floor(Math.random() * 1000);
-  try{
-    // date·instructor = history/{nameKey}/{date}={note,instructor} 기록용(PC _push_history 계승). bulk 잡엔 date 없음 → 기록 안 함.
-    await fbPut(`sendJobs/${instructor.id}/${jid}`, { cls: classId, recipients, status: 'queued', ts: Date.now(), date: todayKey(), instructor: instructor.id });
-    toast(`전송 작업 생성 (${recipients.length}명) — 에이전트가 발송`); loadReportJobs();
-  }catch(e){ toast('전송 요청 실패 — ' + (e.message || e)); }
+  if(!picked.length) return toast('선택된 학생이 없습니다');
+  // 반별로 묶어 잡 생성(반별 history·취소·모니터 단위 유지)
+  const byCls = {}; picked.forEach(p => { (byCls[p.cls] = byCls[p.cls] || []).push(p.nk); });
+  let jobN = 0, stuN = 0;
+  for(const [classId, nks] of Object.entries(byCls)){
+    const students = _clsStudents(classId);
+    const recipients = nks.map(nk => {
+      const s = students.find(x => x.nameKey === nk) || {};
+      const note = _curDraft(nk);
+      return { nameKey: nk, name: s.name || nk, note, msg: _buildMessage(classId, nk, s.name || nk, note), status: '대기' };
+    });
+    if(!recipients.length) continue;
+    const jid = Date.now() + '_' + Math.floor(Math.random() * 100000);
+    try{
+      await fbPut(`sendJobs/${instructor.id}/${jid}`, { cls: classId, recipients, status: 'queued', ts: Date.now(), date: todayKey(), instructor: instructor.id });
+      jobN++; stuN += recipients.length;
+    }catch(e){ toast(`${classId} 전송 요청 실패 — ${e.message || e}`); }
+  }
+  if(jobN) toast(`전송 큐 적재: ${jobN}반 · ${stuN}명 — 에이전트가 순차 발송`);
+  loadReportJobs();
 }
 
 // ── 전송 상태 ─────────────────────────────────────────────────────────
