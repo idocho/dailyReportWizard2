@@ -1,7 +1,7 @@
 # DailyReportWizard — 요구사항 명세서
 
 **Crafted by IDO(idocho@kakao.com) · Powered by Claude AI**  
-**문서 버전**: 8.51 · **앱 버전**: v2.5.0(로그인 전환·개발 라인)/v2.4.0(이전) · **최종 수정**: 2026-06-24
+**문서 버전**: 8.52 · **앱 버전**: v2.5.0(로그인 전환·개발 라인)/v2.4.0(이전) · **최종 수정**: 2026-06-24
 
 > Firebase 스키마 전체 명세: [ClassManager/documents/DB_SCHEMA.md](../../ClassManager/documents/DB_SCHEMA.md)
 
@@ -11,6 +11,7 @@
 
 | 문서 버전 | 날짜 | 주요 변경 |
 |-----------|------|-----------|
+| 8.52 | 2026-06-24 | **PC 네이티브 앱 제거 — 빌드 단순화 (브랜치 endgame)**. 카톡 전송용으로 존재하던 PC 풀 클라이언트가 웹(v2.5.0)+강사 에이전트(생성·전송)로 완전 대체되어 기능 잉여화 → 코드 제거. **삭제(7파일)**: `app.py`(2630줄 fat client)·`main.py`(진입점)·`pc_auth.py`(PC 로그인)·`message.py`(PC 메시지 빌더)·`kakao_image.py`(에이전트는 자체 `decode_image` 보유)·`firebase.py`·`storage.py`·`errors.py`(셋은 PC앱/`AiEngine` 클래스 전용이라 동반 잉여화). **`ai_engine.py` 슬림화**: PC 전용 `AiEngine` 클래스(~360줄, tkinter 결합)·`_merge_student_tags`·firebase/storage/errors import 제거. **잔존 = 에이전트·마이닝 공용**: 프롬프트 조립(`build_single_prompt`/`build_batch_prompt`)·`_call_ai_hub`·`_base_conditions`·`_build_tags_context`·`_*_TEXT` 테이블. **빌드**: PC `DailyReportWizard.spec`(gitignore·로컬) 폐기 → `scripts/build-agent.ps1` 신설(추적, `agent_gui.py` 단일 exe = `DRW-Agent.exe`). 검증: 에이전트 스택(agent_worker·agent_gui·ai_engine·kakao_send·secret_codec) + 마이닝(`ai_engine._*_TEXT`) import 무결. ⚠️ 미해결: `history/` 누적(_push_history)은 PC앱 동작이었음 — 웹+에이전트 경로의 history 기록 구현 여부 별도 점검 필요(Analyzer 조인 원료). |
 | 8.51 | 2026-06-24 | **AI 생성 메시지 퀄리티 개선 — 컨디션 프롬프트 재작성 (`ai_engine.py`)**. 실 Claude(sonnet-4-6) 키로 컨디션 5단계 × 복합태그 6종 × 문체 3종 다회 시뮬레이션 후 도출. **문제**: ① `_CONDITION_TEXT["normal"]="무난하게 수업에 참여함"` → AI가 그대로 앵무새, 학부모에 밋밋·부정 인상("오늘은 무난하게…"). ② 모든 메시지가 `- 수업 컨디션:` 문구로 **시작·도배**(컨디션이 헤드라인 독점, 단조). **수정**: ① `_CONDITION_TEXT` 전면 재작성 — '무난' 제거(정상=「평소와 같이 안정적으로 집중」), good·normal엔 "굳이 언급 말 것" 메타지시 동봉, low·bad는 완곡·격려 어조. ② `_base_conditions()`에 지침 11~13 추가 — **컨디션은 보조맥락(메시지는 학습 내용·성취로 시작), good·normal은 미언급 허용, '무난·그냥·특별한 것 없이' 등 금지어, 건설적·앞을 향한 마무리**. 적용 범위: `build_single_prompt`/`build_batch_prompt`가 `_build_tags_context`+system(`_base_conditions`) 사용 → **에이전트 단건·일괄 생성 전 경로 자동 전파**(웹 생성 라인). A/B 검증: 정상 컨디션 "무난" 100% 제거·학습 리드 전환, caution(졸음·잡담) 완곡화·메모 보존·하이라이트 우선 모두 유지 확인. (PC `gen_all`은 system="" 라 미적용이나 PC 라인 폐기 예정) |
 | 8.50 | 2026-06-24 | **다기기 진도/과제 동기화 수정 (v2.5.0 캐시 v269)** — 진도/과제(반 공통, `session/class_data`)의 로드 병합이 `if(!progressData[k])`(**로컬 우선**, 빈 키만 채움)이라, 한 기기에 캐시된 뒤 다른 기기서 변경하면 갱신 안 되던 staleness. **태블릿 입력 → PC 발송** 주 워크플로가 정확히 이 경로에 물림. `Object.assign(progressData, sessD.class_data)`로 **Firebase 정본 우선** 전환(`app-scores.js` init·`app-settings.js` 명단 새로고침 2곳). 메모(`__note__`)·발송문(`__draft__`)·과제수행도·관찰태그는 **기존부터 Firebase 우선**이라 일관성 확보. 트레이드오프: 오프라인서 쓴(미반영) 로컬 진도값은 재로드 시 손실 가능하나 진도는 반 공통·재입력 용이, 쓰기는 즉시 `fbPatch`라 온라인 시 무손실 |
 | 8.49 | 2026-06-24 | **웹 통합 — PC 기능 마이그레이션 누락분 3종 이식 (v2.5.0 캐시 v268, 브랜치 endgame)**. PC→웹 기능 감사로 확인된 미이식 기능 보완. ① **진도/과제 발송 제외 토글**(PC `_toggle_exclude_prog` 이식) — 리포트 탭 발송 제외 바: 담당 과목별 `✓/✕` 토글로 이번 발송에서 진도/과제 제외(세션 메모리 `_excludeProg` set, key=`classId\|subject`). `_rpData`서 제외 과목의 progress/homework를 빈값 처리 → **메시지·AI 생성 동시 제외**(수행도·관찰태그·메모는 유지). 진도/과제가 입력된 과목만 토글 노출. ② **일괄 공지 저장 템플릿 CRUD**(PC `_bulk_add/del/load_tmpl` 이식) — 기존 단일 textarea(세션 휘발)에 저장 템플릿 추가: `config/instructors/{id}/bulkTemplates[]`(`{name,body}`)에 영속, 드롭다운 불러오기 + 💾저장(이름 중복 시 덮어쓰기) + 🗑삭제. 로그인 init서 `config.instructors[id].bulkTemplates` 하이드레이트. ③ **전송 취소**(PC `_cancel_send`/`_bulk_cancel` 이식) — 웹→에이전트 비동기 큐의 중단 경로: 작업 패널 `취소` 버튼 — 대기(queued) 건은 `sendJobs/{id}` 삭제(에이전트 미실행), 진행(sending) 건은 `cancel:true` 패치 → 에이전트 `process_sendjobs`가 건별 폴링(`should_cancel`)으로 **진행 중 학생까지 발송 후 나머지 중단**, 상태 `canceled`(미발송분 `대기` 유지). `kakao_send.send_messages`에 `should_cancel` 훅(매 건 직전 검사). + 완료·취소·오류 건 **수동 일괄 정리** 링크. 에이전트 격리 테스트: 정상=done(전건 발송), 취소=canceled(0발송·미발송 보호) 확인 |
@@ -207,6 +208,8 @@ DRW 2.0이 저장하는 수업 관찰 데이터(`obs/`)와 성적 데이터(`sco
 ---
 
 ## 2. PC 앱 — app.py (App 클래스)
+
+> ⚠️ **[폐기됨 · 문서 8.52, 2026-06-24]** PC 풀 클라이언트(`app.py`/`main.py`/`firebase.py`/`storage.py`/`errors.py`/`message.py`/`kakao_image.py`)는 웹(v2.5.0)+강사 에이전트 통합으로 **코드 제거**되었다. 아래 §2~§3 서술은 역사적 기록(필요 시 git 이력 복원). 현행 생성·전송은 §(에이전트)·`agent_worker.py`/`ai_engine.py`(프롬프트·`_call_ai_hub` 모듈 함수만 잔존)·`kakao_send.py` 참조. AI 생성 품질 지침은 §3의 `_base_conditions`/`_*_TEXT`(잔존)와 8.51 변경 이력 참조.
 
 ### 2.1 레이아웃
 
