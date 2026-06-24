@@ -322,7 +322,21 @@ body{font-family:'Pretendard','Malgun Gothic','맑은 고딕',-apple-system,sans
 .rp-pill.q{background:rgba(245,158,11,.15);color:#fbbf24}
 .rp-pill.send{background:rgba(99,102,241,.15);color:#a5b4fc}
 .rp-pill.done{background:rgba(34,197,94,.15);color:#4ade80}
+.rp-pill.cancel{background:rgba(148,163,184,.18);color:#cbd5e1}
 .rp-warn-i{font-size:10px;color:#f87171;font-weight:700}
+.rp-jx{margin-left:8px;font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px;border:1px solid rgba(248,113,113,.4);background:transparent;color:#f87171;cursor:pointer}
+.rp-jx:hover{background:rgba(248,113,113,.12)}
+.rp-jx-w{margin-left:8px;font-size:10px;color:#fbbf24;font-weight:700}
+.rp-jobs-ft{margin-top:6px;text-align:right}
+.rp-jobs-ft a{font-size:11px;color:var(--sub);cursor:pointer;text-decoration:underline}
+.rp-jobs-ft a:hover{color:var(--txt)}
+/* 발송 진도/과제 제외 토글 (PC _toggle_exclude_prog) */
+.rp-exbar{display:flex;align-items:center;flex-wrap:wrap;gap:6px;font-size:11px;color:var(--sub);margin:8px 0 4px}
+.rp-extag{font-size:11px;font-weight:700;padding:3px 9px;border-radius:10px;border:1px solid rgba(34,197,94,.4);background:rgba(34,197,94,.12);color:#4ade80;cursor:pointer}
+.rp-extag.off{border-color:rgba(148,163,184,.4);background:rgba(148,163,184,.12);color:#94a3b8;text-decoration:line-through}
+/* 일괄 공지 저장 템플릿 */
+.bulk-tmpls{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:11px;color:var(--sub);margin-bottom:8px}
+.bulk-tmpls select{flex:1;min-width:120px;padding:5px 8px;border-radius:8px;background:var(--panel);border:1px solid var(--border);color:var(--txt);font-size:12px}
 .rp-ov{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;padding:20px;z-index:1000}
 .rp-ov.on{display:flex}
 .rp-modal{background:var(--panel);border:1px solid var(--border);border-radius:14px;width:100%;max-width:360px;padding:18px}

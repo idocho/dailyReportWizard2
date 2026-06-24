@@ -564,6 +564,7 @@ function init(){
       if(_rec){
         if((!instructor.assignments||!instructor.assignments.length)&&Array.isArray(_rec.assignments))instructor.assignments=_rec.assignments;
         if((!instructor.presets||!instructor.presets.length)&&Array.isArray(_rec.presets))instructor.presets=_rec.presets;
+        if((!instructor.bulkTemplates||!instructor.bulkTemplates.length)&&Array.isArray(_rec.bulkTemplates))instructor.bulkTemplates=_rec.bulkTemplates;
         if(_rec.ai_style_mode&&!instructor.ai_style_mode)instructor.ai_style_mode=_rec.ai_style_mode;
         if(_rec.ai_custom_prompt!=null&&instructor.ai_custom_prompt==null)instructor.ai_custom_prompt=_rec.ai_custom_prompt;
         saveLocal();

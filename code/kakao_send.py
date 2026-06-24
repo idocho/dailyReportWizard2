@@ -352,7 +352,7 @@ class SmartWait:
             self._fast_streak = 0
 
 
-def send_messages(msgs, wait_time=0.5, status_cb=None, done_cb=None, wait_ctrl=None, item_cb=None):
+def send_messages(msgs, wait_time=0.5, status_cb=None, done_cb=None, wait_ctrl=None, item_cb=None, should_cancel=None):
     """
     카카오톡 채팅방 순차 전송.
 
@@ -366,6 +366,7 @@ def send_messages(msgs, wait_time=0.5, status_cb=None, done_cb=None, wait_ctrl=N
     wait_ctrl: SmartWait 인스턴스(선택) — 주어지면 건마다 wait_ctrl.wait 사용,
                게이트 실측(t_open·재시도)으로 adjust() 호출해 자동 가감속
     item_cb(index, ok, room, err): 건별 완료 콜백(선택) — 에이전트 per-recipient 회신용
+    should_cancel(): 취소 폴링 콜백(선택) — 각 건 직전 호출, True 면 진행 중 건까지만 발송 후 중단
     """
     # 이미지는 붙여넣기 후 미리보기 팝업 → Enter 확정까지 여유가 필요
     img_wait = max(wait_time, 1.0)
@@ -420,6 +421,11 @@ def send_messages(msgs, wait_time=0.5, status_cb=None, done_cb=None, wait_ctrl=N
         sent = 0
         lingering = []   # 정리 대상 잔류 방 — 이미지 방(의도적 미닫음) + 오류로 esc 정리 못 한 방
         for i, m in enumerate(msgs):
+            # 취소 폴링 — 다음 건 시작 전 확인(진행 중 건은 보호, 나머지 중단)
+            if should_cancel and should_cancel():
+                if status_cb:
+                    status_cb(f"⏹ 취소 요청 — {sent}/{total}건에서 중단")
+                break
             if status_cb:
                 status_cb(f"전송 중... ({i+1}/{total})  {m['room']}")
             # 매 건 전 메인 창 재포커스 — 전송 중 사용자가 다른 창을 만져도 복구

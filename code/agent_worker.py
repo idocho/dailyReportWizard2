@@ -223,8 +223,8 @@ def decode_image(data_url):
     return path
 
 
-def _send_real(cfg, msgs, item_cb):
-    """본인 카톡 실발송 — SmartWait 적응. 완료까지 동기 대기."""
+def _send_real(cfg, msgs, item_cb, should_cancel=None):
+    """본인 카톡 실발송 — SmartWait 적응. 완료까지 동기 대기. should_cancel(): 건별 취소 폴링."""
     import kakao_send
     if not getattr(kakao_send, "AUTOMATION", False):
         raise RuntimeError("pyautogui/pyperclip 미설치 또는 비-Windows — 실 발송 불가")
@@ -232,7 +232,7 @@ def _send_real(cfg, msgs, item_cb):
     done = threading.Event()
     kakao_send.send_messages(msgs, wait_ctrl=sw, status_cb=lambda t: print("  " + t),
                              item_cb=lambda i, ok, room, err: item_cb(i, ok, err),
-                             done_cb=lambda n: done.set())
+                             done_cb=lambda n: done.set(), should_cancel=should_cancel)
     if not done.wait(timeout=25 * len(msgs) + 30):
         raise RuntimeError("발송 타임아웃 — 카톡 응답 없음")
 
@@ -280,17 +280,27 @@ def process_sendjobs(cfg, db, instructor_id, token=None, real=False, progress_cb
                 progress_cb({"active": True, "cls": cls, "done": len(results),
                              "total": total, "fail": results.count(False)})
 
+        # 웹이 sending 중 set 하는 cancel 플래그를 건별 폴링(현재 건 보호, 나머지 중단)
+        def _canceled(_jid=jid):
+            try:
+                return bool(_get(db, f"{base}/{_jid}/cancel", token))
+            except Exception:
+                return False
+
         try:
             if real:
-                _send_real(cfg, msgs, on_item)
+                _send_real(cfg, msgs, on_item, should_cancel=_canceled)
             else:
                 for k, m in enumerate(msgs):
+                    if _canceled():
+                        break
                     time.sleep(0.02)
                     on_item(k, True)
             if progress_cb:
                 progress_cb({"active": False})
+            final = "canceled" if _canceled() else "done"
             _patch(db, f"{base}/{jid}",
-                   {"status": "done", "fail": results.count(False), "excluded": len(dups)}, token)
+                   {"status": final, "fail": results.count(False), "excluded": len(dups)}, token)
             done += 1
         except Exception as e:
             if progress_cb:

@@ -6,6 +6,7 @@
 let reportDrafts = {};      // {nameKey: 검토중 특이사항}
 let _rpJobTimer = null;
 let _rpActive = null;       // 우측 미리보기 대상 학생(nameKey)
+let _excludeProg = new Set(); // {classId|subject} — 이번 발송 메시지서 진도/과제 제외 (세션 메모리, PC _toggle_exclude_prog 이식)
 
 // 문체 옵션 (ai_style.py STYLE_ORDER/LABELS 미러)
 const RP_STYLES = [
@@ -56,7 +57,8 @@ function _rpData(classId, nk){
   const classInfo = {}, assignMap = {}, tbGrade = {};
   subjects.forEach(sub => {
     const pd = progressData[`${classId}|${sub}`] || {};
-    classInfo[sub] = { progress: pd.progress || '', homework: pd.homework || '' };
+    const ex = _excludeProg.has(`${classId}|${sub}`);   // 발송 제외 → 진도/과제 빈값(메시지·생성 동시 제외, PC와 동일)
+    classInfo[sub] = { progress: ex ? '' : (pd.progress || ''), homework: ex ? '' : (pd.homework || '') };
     assignMap[sub] = _assignText((getTags(classId, nk, sub) || {}).assign_grade);
     tbGrade[sub] = courses[sub].curriculum || '';
   });
@@ -142,6 +144,14 @@ function renderReport(mc){
     </div>`;
   }).join('') || `<div class="empty">이 반에 학생이 없습니다.</div>`;
 
+  // 발송 제외 토글 — 진도/과제가 입력된 담당 과목만 노출(제외할 게 있을 때만)
+  const exSubs = [...new Set((activeAsgns() || []).filter(x => x.classId === classId).map(x => x.subject))]
+    .filter(sub => { const pd = progressData[`${classId}|${sub}`] || {}; return pd.progress || pd.homework; }).sort();
+  const exBar = exSubs.length ? `<div class="rp-exbar">발송 진도/과제: ${exSubs.map(sub => {
+    const off = _excludeProg.has(`${classId}|${sub}`);
+    return `<button class="rp-extag${off ? ' off' : ''}" onclick="toggleExProg('${esc(classId)}','${esc(sub)}')" title="${off ? '발송 제외됨 — 누르면 포함' : '발송에 포함 — 누르면 제외'}">${off ? '✕' : '✓'} ${esc(sub)}</button>`;
+  }).join('')}</div>` : '';
+
   mc.innerHTML = makeTb('리포트', `${classId} · ${subject}`) + _stageBar('report') + `
     <div class="rp-2col">
       <div class="rp-left">
@@ -150,6 +160,7 @@ function renderReport(mc){
           <button class="rp-btn ghost" onclick="genReportAll()">✨ 일괄 생성</button>
           <button class="rp-btn" onclick="openReportSend()">전송 →</button>
         </div>
+        ${exBar}
         <div class="rp-list">${rows}</div>
         <div class="rp-jobs"><div class="rp-jobs-hd">전송 상태</div><div id="rp-jobs"><div class="rp-job">작업 없음</div></div></div>
       </div>
@@ -158,6 +169,13 @@ function renderReport(mc){
   _renderRpPreview();
   loadReportJobs();
   clearInterval(_rpJobTimer); _rpJobTimer = setInterval(loadReportJobs, 2500);
+}
+
+// 진도/과제 발송 제외 토글 (PC _toggle_exclude_prog) — 메시지·AI 생성서 동시 제외
+function toggleExProg(cls, sub){
+  const k = `${cls}|${sub}`;
+  _excludeProg.has(k) ? _excludeProg.delete(k) : _excludeProg.add(k);
+  renderReport(document.getElementById('mc'));
 }
 
 // 좌측 학생 편집 → 우측 미리보기 (전체 재렌더 없이 우측만 갱신 = 타이핑 무지연)
@@ -291,19 +309,50 @@ async function doReportSend(){
 
 // ── 전송 상태 ─────────────────────────────────────────────────────────
 async function loadReportJobs(){
-  if(activeTab !== 'report'){ clearInterval(_rpJobTimer); return; }
+  if(activeTab !== 'report' && activeTab !== 'bulk'){ clearInterval(_rpJobTimer); return; }
   let jobs = {};
   try{ jobs = await fbGet(`sendJobs/${instructor.id}`) || {}; }catch(e){ return; }
   const arr = Object.entries(jobs).sort((x, y) => (y[1].ts || 0) - (x[1].ts || 0)).slice(0, 6);
+  const hasDone = Object.values(jobs).some(j => j && (j.status === 'done' || j.status === 'canceled' || j.status === 'error'));
   const el = document.getElementById('rp-jobs'); if(!el) return;
-  el.innerHTML = arr.length ? arr.map(([id, j]) => {
+  el.innerHTML = (arr.length ? arr.map(([id, j]) => {
     const recs = j.recipients || [], tot = recs.length;
     const done = recs.filter(r => r.status === '완료').length, err = recs.filter(r => r.status === '실패').length;
     const exc = recs.filter(r => (r.status || '').indexOf('제외') === 0).length;
-    let st = j.status === 'done' ? ['done', err ? `완료(실패 ${err})` : '완료']
+    let st = j.status === 'canceled' ? ['cancel', `취소됨 ${done ? `(${done} 발송)` : ''}`]
+      : j.status === 'error' ? ['cancel', '오류']
+      : j.status === 'done' ? ['done', err ? `완료(실패 ${err})` : '완료']
       : (j.status === 'sending' || done + err > 0) ? ['send', `전송 중 ${done + err}/${tot}`] : ['q', '대기'];
-    return `<div class="rp-job">${esc(j.cls || '')} (${tot}명)${exc ? ` <span class="rp-warn-i">제외 ${exc}</span>` : ''}<span class="rp-pill ${st[0]}">${st[1]}</span></div>`;
-  }).join('') : `<div class="rp-job">작업 없음</div>`;
+    const live = j.status === 'queued' || j.status === 'sending';
+    const cancelBtn = live && !j.cancel ? `<button class="rp-jx" onclick="cancelSendJob('${esc(id)}')">취소</button>`
+      : (j.cancel && j.status === 'sending') ? `<span class="rp-jx-w">중단 중…</span>` : '';
+    return `<div class="rp-job">${esc(j.cls || '')} (${tot}명)${exc ? ` <span class="rp-warn-i">제외 ${exc}</span>` : ''}<span class="rp-pill ${st[0]}">${st[1]}</span>${cancelBtn}</div>`;
+  }).join('') : `<div class="rp-job">작업 없음</div>`)
+    + (hasDone ? `<div class="rp-jobs-ft"><a onclick="clearDoneJobs()">완료·취소 건 정리</a></div>` : '');
+}
+
+// 전송 취소 (PC _cancel_send/_bulk_cancel) — 대기 건은 삭제(에이전트 미실행), 진행 건은 cancel 플래그(현재 학생까지만 발송 후 중단)
+async function cancelSendJob(id){
+  let j; try{ j = await fbGet(`sendJobs/${instructor.id}/${id}`); }catch(e){ return toast('취소 조회 실패'); }
+  if(!j){ loadReportJobs(); return; }
+  if(j.status === 'queued'){
+    if(!confirm('대기 중인 전송 작업을 취소(삭제)할까요?')) return;
+    try{ await fbPut(`sendJobs/${instructor.id}/${id}`, null); toast('대기 작업 취소됨'); }catch(e){ toast('취소 실패: ' + (e.message || e)); }
+  }else if(j.status === 'sending'){
+    if(!confirm('전송 진행 중입니다. 중단할까요?\n(진행 중인 학생까지는 발송 후 나머지를 멈춥니다)')) return;
+    try{ await fbPatch(`sendJobs/${instructor.id}/${id}`, { cancel: true }); toast('중단 요청 — 진행 중 학생까지 발송 후 멈춤'); }catch(e){ toast('취소 실패: ' + (e.message || e)); }
+  }else toast('이미 종료된 작업입니다');
+  loadReportJobs();
+}
+// 완료·취소·오류 건 일괄 정리(수동)
+async function clearDoneJobs(){
+  if(!confirm('완료·취소·오류 건을 모두 삭제할까요?')) return;
+  let jobs = {}; try{ jobs = await fbGet(`sendJobs/${instructor.id}`) || {}; }catch(e){ return toast('정리 조회 실패'); }
+  const del = Object.entries(jobs).filter(([, j]) => j && ['done', 'canceled', 'error'].includes(j.status));
+  if(!del.length) return toast('정리할 건 없음');
+  try{ await Promise.all(del.map(([id]) => fbPut(`sendJobs/${instructor.id}/${id}`, null))); toast(`${del.length}건 정리됨`); }
+  catch(e){ toast('정리 실패: ' + (e.message || e)); }
+  loadReportJobs();
 }
 
 // ══════════════════════════════════════════════════════════════════════
@@ -333,9 +382,16 @@ function renderBulk(mc){
   const imgPv = _bulkImg ? `<div class="rp-imgpv"><img src="${_bulkImg}"><span>${esc(_bulkImgName)}</span><button class="rp-btn ghost" onclick="bulkClearImg()">제거</button><label class="rp-imgopt"><input type="checkbox" id="bulk-imgfirst">이미지 먼저</label></div>` : '';
   const chips = students.map(s => `<label class="rp-ck"><input type="checkbox" ${_bulkSel.has(s.nameKey) ? 'checked' : ''} onchange="bulkToggle('${esc(s.nameKey)}',this.checked)"> ${esc(s.name)}</label>`).join('') || '<div class="rp-hint">학생 없음</div>';
 
+  const tmplOpts = _bulkTemplates().map(t => `<option value="${esc(t.name)}">${esc(t.name)}</option>`).join('');
+
   mc.innerHTML = makeTb('일괄 공지', `${classId} · 담당 학생에게 같은 메시지 일괄 발송`) + `
     <div class="rp-2col">
       <div class="rp-left">
+        <div class="bulk-tmpls">저장 템플릿:
+          <select id="bulk-tsel" onchange="bulkLoadTmpl(this.value)"><option value="">— 불러오기 —</option>${tmplOpts}</select>
+          <button class="rp-btn ghost" onclick="bulkSaveTmpl()" title="현재 메시지를 이름 붙여 저장">💾 저장</button>
+          <button class="rp-btn ghost" onclick="bulkDelTmpl()" title="선택한 템플릿 삭제">🗑</button>
+        </div>
         <div class="bulk-vars">변수:
           <button class="rp-tag k-neutral" onclick="bulkInsertVar('{이름}')">{이름}</button>
           <button class="rp-tag k-neutral" onclick="bulkInsertVar('{반}')">{반}</button>
@@ -363,6 +419,31 @@ function renderBulk(mc){
 }
 let _bulkTmplCache = '';
 function bulkOnInput(el){ _bulkTmplCache = el.value; bulkPreview(); }
+// 저장 템플릿 CRUD (PC _bulk_add/del/load_tmpl) — config/instructors/{id}/bulkTemplates 에 영속
+function _bulkTemplates(){ return (instructor && Array.isArray(instructor.bulkTemplates)) ? instructor.bulkTemplates : []; }
+function _saveBulkTemplates(arr){
+  instructor.bulkTemplates = arr;
+  try{ if(typeof saveLocal === 'function') saveLocal(); }catch(_){}
+  try{ fbPatch(`config/instructors/${encodeURIComponent(instructor.id)}`, { bulkTemplates: arr }); }catch(_){}
+}
+function bulkLoadTmpl(name){
+  if(!name) return;
+  const t = _bulkTemplates().find(x => x.name === name); if(!t) return;
+  _bulkTmplCache = t.body || ''; const ta = document.getElementById('bulk-tmpl'); if(ta) ta.value = _bulkTmplCache; bulkPreview();
+}
+function bulkSaveTmpl(){
+  const body = (document.getElementById('bulk-tmpl')?.value || '').trim();
+  if(!body) return toast('저장할 메시지를 먼저 입력하세요');
+  const name = (prompt('템플릿 이름 (같은 이름이면 덮어쓰기)', '') || '').trim(); if(!name) return;
+  const arr = _bulkTemplates().slice(); const i = arr.findIndex(x => x.name === name);
+  if(i >= 0) arr[i] = { name, body }; else arr.push({ name, body });
+  _saveBulkTemplates(arr); toast('템플릿 저장: ' + name); renderBulk(document.getElementById('mc'));
+}
+function bulkDelTmpl(){
+  const name = document.getElementById('bulk-tsel')?.value; if(!name) return toast('삭제할 템플릿을 목록에서 고르세요');
+  if(!confirm(`템플릿 "${name}" 삭제할까요?`)) return;
+  _saveBulkTemplates(_bulkTemplates().filter(x => x.name !== name)); toast('삭제됨: ' + name); renderBulk(document.getElementById('mc'));
+}
 function bulkToggle(nk, on){ on ? _bulkSel.add(nk) : _bulkSel.delete(nk); const c = document.getElementById('bulk-cnt'); if(c) c.textContent = [..._bulkSel].length; bulkPreview(); }
 function bulkAll(on){ const st = _bulkStudents(); _bulkSel = new Set(on ? st.map(s => s.nameKey) : []); renderBulk(document.getElementById('mc')); }
 function bulkInsertVar(v){ const ta = document.getElementById('bulk-tmpl'); if(!ta) return; const s = ta.selectionStart, e = ta.selectionEnd; ta.value = ta.value.slice(0, s) + v + ta.value.slice(e); ta.selectionStart = ta.selectionEnd = s + v.length; ta.focus(); _bulkTmplCache = ta.value; bulkPreview(); }
