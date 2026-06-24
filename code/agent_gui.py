@@ -27,7 +27,7 @@ except Exception:
     _HAS_TRAY = False   # pystray 미설치/실패 → 트레이 비활성(일반 창으로 동작)
 
 INDIGO, INK, GREEN, RED, SUB = "#4F46E5", "#15171F", "#16A34A", "#DC2626", "#94A3B8"
-AGENT_VERSION = "0.9"
+AGENT_VERSION = "0.91"
 # 캠퍼스 표시명 → id (app.py / 웹 게이트와 동일 정본). 캠퍼스 추가 시 여기만 갱신.
 CAMPUS = {"동수원": "dongsuwon"}
 _Q = queue.Queue()
@@ -45,7 +45,7 @@ class AgentGUI:
         self.overlay = None
         self.last = "—"
         self.root = tk.Tk()
-        self.root.title(f"DRW Agent v{AGENT_VERSION}")
+        self.root.title(f"DRW AI Agent v{AGENT_VERSION}")
         self.root.configure(bg=INK)
         self.root.geometry("360x300")
         self.root.resizable(False, False)
@@ -82,7 +82,7 @@ class AgentGUI:
             pystray.MenuItem("종료", lambda i=None: self._quit()),
         )
         self.tray = pystray.Icon("drw_agent", self._tray_image(),
-                                 f"DRW Agent v{AGENT_VERSION}", menu)
+                                 f"DRW AI Agent v{AGENT_VERSION}", menu)
         threading.Thread(target=self.tray.run, daemon=True).start()
 
     def _hide_to_tray(self):
@@ -105,7 +105,7 @@ class AgentGUI:
         self.root.resizable(True, True)   # 배율(125/150%)로 잘릴 때 대비
         self.root.minsize(360, 420)
         e = existing or {}
-        tk.Label(self.root, text=f"DRW Agent Setup · v{AGENT_VERSION}", bg=INK, fg="#fff",
+        tk.Label(self.root, text=f"DRW AI Agent Setup · v{AGENT_VERSION}", bg=INK, fg="#fff",
                  font=("맑은 고딕", 13, "bold")).pack(pady=(16, 2))
         tk.Label(self.root, text="키·카톡은 이 PC를 떠나지 않습니다", bg=INK, fg=SUB,
                  font=("맑은 고딕", 9)).pack(pady=(0, 10))
@@ -184,7 +184,7 @@ class AgentGUI:
         for w in self.root.winfo_children():
             w.destroy()
         self.root.geometry("360x300"); self.root.resizable(False, False)
-        tk.Label(self.root, text=f"DRW Agent · v{AGENT_VERSION}", bg=INK, fg="#cbd5e1",
+        tk.Label(self.root, text=f"DRW AI Agent · v{AGENT_VERSION}", bg=INK, fg="#cbd5e1",
                  font=("맑은 고딕", 10)).pack(pady=(16, 2))
         row = tk.Frame(self.root, bg=INK); row.pack(pady=4)
         self.dot = tk.Label(row, text="●", bg=INK, fg=SUB, font=("맑은 고딕", 14)); self.dot.pack(side="left")
