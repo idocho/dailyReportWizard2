@@ -1,127 +1,148 @@
 <!DOCTYPE html>
-<!-- 목업(미승인·실코드 아님): 리포트·전송 3열 레이아웃 검토용. FHD 풀폭으로 열어 확인. -->
+<!-- 목업(미승인·실코드 아님): 리포트·전송 4열 과감한 리디자인 검토용. FHD 풀폭으로 확인. -->
 <html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>리포트·전송 3열 목업</title>
+<title>리포트·전송 리디자인 목업</title>
 <style>
-:root{--bg:#FAFAFB;--panel:#fff;--panel2:#F7F7F9;--border:#ECECEF;--line:#F3F3F5;
- --indigo:#4F46E5;--indigo-ink:#4338CA;--indigo-l:#EEF0FF;--gray:#9CA3AF;--text:#18181B;--sub:#5C6370;}
+:root{--bg:#F6F7FB;--panel:#fff;--panel2:#F7F8FB;--border:#ECEDF2;--line:#F2F3F7;
+ --ind:#4F46E5;--ind-ink:#4338CA;--ind-l:#EEF0FF;--gray:#9AA1AE;--txt:#1A1C23;--sub:#646B7A;
+ --pos-b:#ECFDF5;--pos-t:#047857;--pos-l:#A7F3D0; --warn-b:#FFFBEB;--warn-t:#B45309;--warn-l:#FDE68A;
+ --neu-b:#EEF0FF;--neu-t:#4338CA; --ash-b:#F1F4F8;--ash-t:#5A6473;}
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'Pretendard','Malgun Gothic',sans-serif;background:var(--bg);color:var(--text);font-size:14px;letter-spacing:-.01em}
-.top{height:54px;background:var(--panel);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:14px;padding:0 18px}
-.top .ttl{font-weight:800;font-size:15px}.top .ttl small{color:var(--sub);font-weight:600;margin-left:6px;font-size:12px}
-.top select{padding:7px 10px;border:1px solid var(--border);border-radius:8px;font-size:12.5px;background:var(--panel)}
-.top .prog{margin-left:auto;font-size:12px;color:var(--sub)}.top .prog b{color:var(--indigo-ink)}
-.btn{padding:8px 14px;border-radius:9px;border:1px solid var(--border);background:var(--panel);font-size:12.5px;font-weight:700;cursor:pointer}
-.btn.p{background:var(--indigo);color:#fff;border-color:var(--indigo)}
-.exbar{display:flex;gap:7px;align-items:center;padding:8px 18px;background:var(--panel);border-bottom:1px solid var(--border);font-size:11px;color:var(--sub)}
-.extag{font-size:11px;font-weight:700;padding:3px 9px;border-radius:10px;border:1px solid #34d39966;background:#34d3991f;color:#16a34a;cursor:pointer}
-.extag.off{border-color:#94a3b866;background:#94a3b81f;color:#94a3b8;text-decoration:line-through}
-.wrap{display:flex;height:calc(100vh - 54px - 37px)}
-/* ① 학생 레일 */
-.rail{width:220px;flex-shrink:0;border-right:1px solid var(--border);background:var(--panel);overflow-y:auto}
-.rail-h{padding:10px 14px;font-size:11px;color:var(--sub);border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--panel)}
-.rail-h b{color:var(--indigo-ink)}
-.si{display:flex;align-items:center;gap:8px;padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--line);border-left:3px solid transparent}
+body{font-family:'Pretendard','Malgun Gothic',sans-serif;background:var(--bg);color:var(--txt);font-size:14px;letter-spacing:-.011em;-webkit-font-smoothing:antialiased}
+/* 상단 */
+.top{height:58px;background:var(--panel);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:14px;padding:0 20px}
+.top .ttl{font-weight:800;font-size:15.5px}.top .ttl small{color:var(--sub);font-weight:600;margin-left:7px;font-size:12px}
+.chip-ro{font-size:12px;color:var(--sub);background:var(--panel2);border:1px solid var(--border);border-radius:999px;padding:5px 11px}
+.chip-ro b{color:var(--ind-ink);font-weight:700}.chip-ro a{color:var(--ind);font-size:11px;margin-left:6px;text-decoration:none;cursor:pointer}
+.btn{padding:9px 15px;border-radius:10px;border:1px solid var(--border);background:var(--panel);font-size:12.5px;font-weight:700;cursor:pointer;transition:.12s}
+.btn:hover{background:var(--panel2)}
+.btn.p{background:var(--ind);color:#fff;border-color:var(--ind);box-shadow:0 1px 2px rgba(79,70,229,.28)}
+.btn.p:hover{background:var(--ind-ink)}
+/* 발송제외 바 */
+.exbar{display:flex;gap:8px;align-items:center;padding:9px 20px;background:var(--panel);border-bottom:1px solid var(--border);font-size:11.5px;color:var(--sub)}
+.extag{font-size:11.5px;font-weight:700;padding:4px 11px;border-radius:999px;border:1px solid var(--pos-l);background:var(--pos-b);color:var(--pos-t);cursor:pointer;transition:.12s}
+.extag.off{border-color:var(--border);background:var(--panel2);color:var(--gray);text-decoration:line-through}
+/* 4열 */
+.grid{display:grid;grid-template-columns:212px minmax(0,1fr) 360px 208px;gap:12px;padding:14px;height:calc(100vh - 58px - 39px)}
+.col{background:var(--panel);border:1px solid var(--border);border-radius:14px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 1px 2px rgba(20,20,40,.03)}
+.col-h{padding:11px 14px;font-size:11px;font-weight:700;color:var(--sub);border-bottom:1px solid var(--line);flex-shrink:0;display:flex;align-items:center;justify-content:space-between}
+.col-h b{color:var(--ind-ink)}
+.col-scroll{overflow-y:auto;flex:1}
+/* ① 레일 */
+.si{display:flex;align-items:center;gap:9px;padding:10px 13px;cursor:pointer;border-left:3px solid transparent;transition:.1s}
 .si:hover{background:var(--panel2)}
-.si.on{background:var(--indigo-l);border-left-color:var(--indigo)}
-.si .dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
-.dot.ok{background:#22c55e}.dot.no{background:#d1d5db}
-.si .nm{flex:1;font-size:13px;font-weight:600}
-.si .bd{font-size:9px;font-weight:700;padding:1px 6px;border-radius:7px}
-.bd.ok{background:#dcfce7;color:#16a34a}.bd.no{background:#f1f5f9;color:#94a3b8}
+.si.on{background:var(--ind-l);border-left-color:var(--ind)}
+.av{width:28px;height:28px;border-radius:9px;background:var(--ind-l);color:var(--ind-ink);font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.si.on .av{background:var(--ind);color:#fff}
+.si-nm{flex:1;font-size:13px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bd{font-size:9px;font-weight:800;padding:2px 7px;border-radius:999px}
+.bd.ok{background:var(--pos-b);color:var(--pos-t)}.bd.no{background:var(--ash-b);color:var(--gray)}
 /* ② 편집 */
-.edit{flex:1;overflow-y:auto;padding:18px 22px;min-width:0}
-.edit h2{font-size:18px;font-weight:800;margin-bottom:2px}
-.edit .sub{font-size:12px;color:var(--sub);margin-bottom:14px}
-.sumcard{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:12px 14px;margin-bottom:12px}
-.sumrow{font-size:13px;margin-bottom:8px}.sumrow b{color:var(--sub);font-weight:600;margin-right:4px}
-.tags{display:flex;flex-wrap:wrap;gap:5px}
-.tag{font-size:11px;font-weight:600;padding:3px 9px;border-radius:9px}
-.tag.pos{background:#dcfce7;color:#15803d}.tag.warn{background:#fef3c7;color:#b45309}.tag.neu{background:#eef2ff;color:#4338ca}
-.memo{background:#FFFBEB;border:1px solid #FDE68A;border-radius:10px;padding:9px 12px;font-size:12.5px;color:#92400e;margin-bottom:14px}
-.memo b{font-weight:700}
-.lbl{font-size:12px;color:var(--sub);font-weight:700;margin-bottom:6px}
-textarea{width:100%;min-height:180px;border:1px solid var(--border);border-radius:11px;padding:13px;font-size:14px;font-family:inherit;line-height:1.6;resize:vertical}
-textarea:focus{outline:none;border-color:var(--indigo);box-shadow:0 0 0 3px var(--indigo-l)}
-.acts{display:flex;gap:8px;margin-top:12px}
-.gen{background:var(--indigo);color:#fff;border:none;padding:10px 18px;border-radius:9px;font-weight:700;font-size:13px;cursor:pointer}
-.tone{background:var(--panel);border:1px solid var(--border);padding:10px 14px;border-radius:9px;font-size:12.5px;font-weight:600;cursor:pointer;color:var(--sub)}
-/* ③ 미리보기 */
-.pv{width:380px;flex-shrink:0;border-left:1px solid var(--border);background:var(--panel2);overflow-y:auto;padding:16px}
-.pv-h{font-size:12px;font-weight:700;color:var(--sub);margin-bottom:10px;display:flex;justify-content:space-between}
-.pv-h .len{color:var(--gray);font-weight:600}
-.pv-body{background:var(--panel);border:1px solid var(--border);border-radius:11px;padding:14px;font-size:13px;line-height:1.7;white-space:pre-wrap}
+.edit{padding:18px 20px;overflow-y:auto}
+.ed-h{display:flex;align-items:center;gap:11px;margin-bottom:14px}
+.ed-av{width:40px;height:40px;border-radius:12px;background:var(--ind);color:#fff;font-size:15px;font-weight:800;display:flex;align-items:center;justify-content:center}
+.ed-h h2{font-size:18px;font-weight:800}.ed-h .meta{font-size:12px;color:var(--sub);margin-top:1px}
+.metrics{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+.metric{background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:7px 11px;min-width:84px}
+.metric .k{font-size:10px;color:var(--sub);font-weight:600}.metric .v{font-size:13px;font-weight:700;margin-top:2px}
+.tags{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
+.tag{font-size:11px;font-weight:700;padding:4px 10px;border-radius:999px;border:1px solid transparent}
+.tag.pos{background:var(--pos-b);color:var(--pos-t);border-color:var(--pos-l)}
+.tag.warn{background:var(--warn-b);color:var(--warn-t);border-color:var(--warn-l)}
+.tag.neu{background:var(--neu-b);color:var(--neu-t)}
+.memo{display:flex;gap:8px;background:var(--warn-b);border:1px solid var(--warn-l);border-radius:11px;padding:10px 13px;font-size:12.5px;color:var(--warn-t);margin-bottom:16px}
+.lbl{font-size:12px;color:var(--sub);font-weight:700;margin-bottom:7px;display:flex;align-items:center;gap:6px}
+.lbl .hint{font-weight:400;color:var(--gray);font-size:11px}
+textarea{width:100%;min-height:200px;border:1px solid var(--border);border-radius:12px;padding:14px;font-size:14px;font-family:inherit;line-height:1.65;resize:vertical;background:var(--panel)}
+textarea:focus{outline:none;border-color:var(--ind);box-shadow:0 0 0 3px var(--ind-l)}
+.gen{margin-top:12px;background:var(--ind);color:#fff;border:none;padding:11px 20px;border-radius:11px;font-weight:800;font-size:13.5px;cursor:pointer;box-shadow:0 1px 2px rgba(79,70,229,.28)}
+.gen:hover{background:var(--ind-ink)}
+/* ③ 미리보기 — 카톡풍 */
+.pv{background:var(--panel2)}
+.pv-scroll{padding:16px;overflow-y:auto;flex:1}
+.kk{background:#fff;border:1px solid var(--border);border-radius:4px 16px 16px 16px;padding:14px 16px;font-size:13px;line-height:1.7;white-space:pre-wrap;box-shadow:0 1px 3px rgba(20,20,40,.05);max-width:100%}
+.kk-h{font-size:11px;color:var(--sub);margin-bottom:8px;display:flex;justify-content:space-between}
+.kk-h .len{color:var(--gray)}
+/* ④ 전송상태 */
+.job{padding:10px 12px;border:1px solid var(--border);border-radius:10px;margin:8px 10px;font-size:12px}
+.job-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.job-cls{font-weight:700}
+.pill{font-size:9.5px;font-weight:800;padding:2px 8px;border-radius:999px}
+.pill.send{background:var(--neu-b);color:var(--neu-t)}.pill.done{background:var(--pos-b);color:var(--pos-t)}
+.pill.q{background:var(--warn-b);color:var(--warn-t)}.pill.cancel{background:var(--ash-b);color:var(--gray)}
+.bar{height:5px;background:var(--line);border-radius:999px;overflow:hidden}.bar i{display:block;height:100%;background:var(--ind);border-radius:999px}
+.job-sub{font-size:10.5px;color:var(--sub);margin-top:5px;display:flex;justify-content:space-between}
+.job-x{font-size:10px;color:#C2410C;cursor:pointer;font-weight:700}
+.col-ft{padding:9px 12px;border-top:1px solid var(--line);text-align:right}
+.col-ft a{font-size:11px;color:var(--sub);cursor:pointer;text-decoration:underline}
+/* ④ 전송 모니터 — 작업 열과 명확히 구분되는 다크 상태보드 */
+.monitor{background:#1E2129;border-color:#2A2F3A;box-shadow:inset 0 0 0 1px rgba(255,255,255,.02)}
+.monitor .col-h{color:#9CA6B8;border-bottom-color:#2A2F3A}
+.live{display:inline-flex;align-items:center;gap:5px;font-size:10px;color:#34D399;font-weight:800}
+.live i{width:6px;height:6px;border-radius:50%;background:#34D399;animation:pulse 1.8s infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(52,211,153,.5)}70%{box-shadow:0 0 0 6px rgba(52,211,153,0)}100%{box-shadow:0 0 0 0 rgba(52,211,153,0)}}
+.monitor .job{background:#262A34;border-color:#333A48;color:#D7DCE6}
+.monitor .job-cls{color:#fff}
+.monitor .bar{background:#333A48}
+.monitor .job-sub{color:#8A93A6}
+.monitor .col-ft{border-top-color:#2A2F3A}.monitor .col-ft a{color:#8A93A6}
+.monitor .pill.send{background:rgba(99,102,241,.24);color:#A5B4FC}
+.monitor .pill.done{background:rgba(34,197,94,.2);color:#6EE7B7}
+.monitor .pill.q{background:rgba(245,158,11,.2);color:#FCD34D}
+.monitor .pill.cancel{background:rgba(148,163,184,.18);color:#CBD5E1}
 </style></head>
 <body>
 <div class="top">
-  <div class="ttl">수업 · 리포트 <small>중2A · 쎈</small></div>
-  <span style="font-size:12px;color:var(--sub)">문체 <b style="color:var(--indigo-ink)">정돈·균형형</b> <a href="#" style="color:var(--indigo);font-size:11px">AI설정에서 변경</a></span>
-  <button class="btn">✨ 일괄 생성</button>
+  <div class="ttl">리포트·전송 <small>중2A · 쎈</small></div>
+  <span class="chip-ro">문체 <b>정돈·균형형</b><a>AI설정에서 변경 ›</a></span>
+  <button class="btn" style="margin-left:auto">✨ 일괄 생성</button>
   <button class="btn p">전송 →</button>
-  <span class="prog">입력 <b>12/12</b> · 발송문 <b>9/12</b></span>
 </div>
-<div class="exbar">발송 진도/과제:
-  <button class="extag">✓ 쎈 중2-1</button>
-  <button class="extag off">✕ 개념원리</button>
+<div class="exbar">발송 진도/과제
+  <button class="extag">쎈 중2-1</button>
+  <button class="extag off">개념원리</button>
 </div>
-<div class="wrap">
-  <div class="rail" id="rail"></div>
-  <div class="edit" id="edit"></div>
-  <div class="pv" id="pv"></div>
+<div class="grid">
+  <div class="col"><div class="col-h">학생 <span><b id="cN">4</b>명 · 발송문 <b id="dN">3</b></span></div><div class="col-scroll" id="rail"></div></div>
+  <div class="col edit" id="edit"></div>
+  <div class="col pv"><div class="col-h" id="pvh"></div><div class="pv-scroll" id="pv"></div></div>
+  <div class="col monitor"><div class="col-h">전송 모니터 <span class="live"><i></i>실시간</span></div><div class="col-scroll" id="jobs"></div><div class="col-ft"><a>완료·취소 정리</a></div></div>
 </div>
 <script>
 const STU=[
- {nk:'1',name:'김서연',ok:true,
-  prog:'이차방정식 근의 공식',hw:'쎈 p.84~89',grade:'대부분',
-  tags:[['컨디션 좋음','neu'],['심화도전','pos'],['개념완전습득','pos']],
-  memo:'근의 공식 유도 과정 스스로 설명함',
+ {nk:'1',name:'김서연',prog:'이차방정식 근의 공식',hw:'쎈 p.84~89',grade:'대부분',
+  tags:[['이해 완벽','neu'],['심화도전','pos'],['개념완전습득','pos']],memo:'근의 공식 유도 스스로 설명',
   draft:'이차방정식 근의 공식을 완전히 습득하였습니다. 설명을 듣는 즉시 이해하고 응용 문제까지 막힘 없이 풀어냈으며, 심화 유형에도 적극적으로 도전하는 모습이 인상적이었습니다.'},
- {nk:'2',name:'이준호',ok:true,
-  prog:'이차방정식 근의 공식',hw:'쎈 p.84~89',grade:'절반',
-  tags:[['컨디션 보통','neu'],['계산실수','warn'],['풀이 느림','warn']],
-  memo:'계산 단계 검토 습관 강조함',
+ {nk:'2',name:'이준호',prog:'이차방정식 근의 공식',hw:'쎈 p.84~89',grade:'절반',
+  tags:[['이해 보통','neu'],['계산실수','warn'],['풀이 느림','warn']],memo:'계산 검토 습관 강조',
   draft:'근의 공식을 다루며 대부분의 내용을 잘 따라왔습니다. 계산 과정에서 실수가 반복되는 부분이 있어, 풀이 단계를 꼼꼼히 확인하는 습관을 함께 강조하였습니다.'},
- {nk:'3',name:'박지민',ok:false,
-  prog:'이차방정식 근의 공식',hw:'쎈 p.84~89',grade:'일부',
-  tags:[['컨디션 낮음','neu'],['헷갈림','warn']],
-  memo:'',
-  draft:''},
- {nk:'4',name:'최유나',ok:true,
-  prog:'이차방정식 근의 공식',hw:'쎈 p.84~89',grade:'완료',
-  tags:[['컨디션 최상','neu'],['혼자해결','pos'],['만점·완벽','pos']],
-  memo:'오답노트 꼼꼼히 작성',
+ {nk:'3',name:'박지민',prog:'이차방정식 근의 공식',hw:'쎈 p.84~89',grade:'일부',
+  tags:[['이해 헷갈림','warn']],memo:'',draft:''},
+ {nk:'4',name:'최유나',prog:'이차방정식 근의 공식',hw:'쎈 p.84~89',grade:'완료',
+  tags:[['이해 완벽','neu'],['혼자해결','pos'],['만점·완벽','pos']],memo:'오답노트 꼼꼼',
   draft:'오늘 진행한 범위를 정확히 소화하며 안정적으로 수업을 마쳤습니다. 틀린 문제는 스스로 다시 풀어 오답노트에 꼼꼼히 정리하는 좋은 습관을 보여주었습니다.'},
 ];
-let cur='1';
-function renderRail(){
- document.getElementById('rail').innerHTML=
-  `<div class="rail-h">학생 <b>${STU.length}</b>명 · 발송문 <b>${STU.filter(s=>s.draft).length}</b></div>`+
-  STU.map(s=>`<div class="si${s.nk===cur?' on':''}" onclick="sel('${s.nk}')">
-    <span class="dot ${s.draft?'ok':'no'}"></span><span class="nm">${s.name}</span>
-    <span class="bd ${s.draft?'ok':'no'}">${s.draft?'검토중':'미생성'}</span></div>`).join('');
-}
-function renderEdit(){
- const s=STU.find(x=>x.nk===cur);
- document.getElementById('edit').innerHTML=`
-  <h2>${s.name} <span class="bd ${s.draft?'ok':'no'}" style="font-size:10px;vertical-align:middle">${s.draft?'검토중':'미생성'}</span></h2>
-  <div class="sub">중2A · 쎈 중2-1</div>
-  <div class="sumcard">
-   <div class="sumrow"><b>진도</b>${s.prog} <b style="margin-left:10px">과제</b>${s.hw} <b style="margin-left:10px">수행도</b>${s.grade}</div>
-   <div class="tags">${s.tags.map(t=>`<span class="tag ${t[1]}">${t[0]}</span>`).join('')}</div>
-  </div>
-  ${s.memo?`<div class="memo">📝 강사 메모: <b>${s.memo}</b></div>`:''}
-  <div class="lbl">발송 특이사항 <span style="font-weight:400;color:var(--gray)">· AI 생성·검토 · 자동 저장</span></div>
-  <textarea placeholder="✨ 생성을 누르면 강사 메모·데이터로 발송문을 만듭니다">${s.draft}</textarea>
-  <div class="acts">
-   <button class="gen">✨ ${s.draft?'다시 생성':'생성'}</button>
-  </div>`;
-}
-function renderPv(){
- const s=STU.find(x=>x.nk===cur);
- const msg=`[데일리 리포트] 6/24 (화)\n-------------------------\n▶ 오늘의 진도\n${s.prog}\n\n▶ 오늘의 과제\n${s.hw}\n\n▶ 과제 수행도\n${s.grade}\n\n▶ 오늘의 ${s.name.slice(1)}는?\n${s.draft||'(미생성)'}`;
- document.getElementById('pv').innerHTML=`<div class="pv-h"><span>📨 ${s.name} · 발송 미리보기</span><span class="len">${msg.length}자</span></div><div class="pv-body">${msg}</div>`;
-}
-function sel(nk){cur=nk;renderRail();renderEdit();renderPv();}
-renderRail();renderEdit();renderPv();
+const JOBS=[
+ {cls:'중2A',st:'send',lbl:'전송 중',done:7,tot:12},
+ {cls:'중1B',st:'done',lbl:'완료',done:10,tot:10},
+ {cls:'중3A',st:'cancel',lbl:'취소됨',done:2,tot:9},
+];
+let cur='1';const ini=n=>n.slice(-2);
+function rail(){document.getElementById('rail').innerHTML=STU.map(s=>`<div class="si${s.nk===cur?' on':''}" onclick="sel('${s.nk}')"><span class="av">${ini(s.name)}</span><span class="si-nm">${s.name}</span><span class="bd ${s.draft?'ok':'no'}">${s.draft?'검토중':'미생성'}</span></div>`).join('');
+ document.getElementById('dN').textContent=STU.filter(s=>s.draft).length;}
+function edit(){const s=STU.find(x=>x.nk===cur);document.getElementById('edit').innerHTML=`<div class="edit" style="padding:0;overflow:visible">
+ <div class="ed-h"><div class="ed-av">${ini(s.name)}</div><div><h2>${s.name}</h2><div class="meta">중2A · 쎈 중2-1 · <span style="color:${s.draft?'var(--pos-t)':'var(--gray)'}">${s.draft?'검토중':'미생성'}</span></div></div></div>
+ <div class="metrics"><div class="metric"><div class="k">진도</div><div class="v">${s.prog}</div></div><div class="metric"><div class="k">과제</div><div class="v">${s.hw}</div></div><div class="metric"><div class="k">수행도</div><div class="v">${s.grade}</div></div></div>
+ <div class="tags">${s.tags.map(t=>`<span class="tag ${t[1]}">${t[0]}</span>`).join('')}</div>
+ ${s.memo?`<div class="memo">📝 <div><b>강사 메모</b> · ${s.memo}</div></div>`:''}
+ <div class="lbl">발송 특이사항 <span class="hint">AI 생성·검토 · 자동 저장</span></div>
+ <textarea placeholder="✨ 생성을 누르면 강사 메모·데이터로 발송문을 만듭니다">${s.draft}</textarea>
+ <button class="gen">✨ ${s.draft?'다시 생성':'생성'}</button></div>`;}
+function pv(){const s=STU.find(x=>x.nk===cur);const msg=`[데일리 리포트] 6/24 (화)\n-------------------------\n▶ 오늘의 진도\n${s.prog}\n\n▶ 오늘의 과제\n${s.hw}\n\n▶ 과제 수행도\n${s.grade}\n\n▶ 오늘의 ${s.name.slice(1)}는?\n${s.draft||'(미생성)'}`;
+ document.getElementById('pvh').innerHTML=`<span>📨 ${s.name} 미리보기</span><span class="len">${msg.length}자</span>`;
+ document.getElementById('pv').innerHTML=`<div class="kk">${msg}</div>`;}
+function jobs(){document.getElementById('jobs').innerHTML=JOBS.map(j=>`<div class="job"><div class="job-top"><span class="job-cls">${j.cls} (${j.tot}명)</span><span class="pill ${j.st}">${j.lbl}</span></div>${j.st==='send'?`<div class="bar"><i style="width:${Math.round(j.done/j.tot*100)}%"></i></div>`:''}<div class="job-sub"><span>${j.done}/${j.tot}</span>${j.st!=='done'&&j.st!=='cancel'?`<span class="job-x">취소</span>`:''}</div></div>`).join('');}
+function sel(nk){cur=nk;rail();edit();pv();}
+rail();edit();pv();jobs();
 </script>
 </body></html>

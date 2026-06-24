@@ -64,6 +64,7 @@ function _nickSuffix(full){
   return (c >= 0xAC00 && c <= 0xD7A3 && (c - 0xAC00) % 28 !== 0) ? nick + '이는' : nick + '는';
 }
 function _todayStr(){ const d = new Date(); return `${d.getMonth() + 1}/${d.getDate()} (${'일월화수목금토'[d.getDay()]})`; }
+function _ini(name){ const n = String(name || ''); return n.length > 2 ? n.slice(-2) : n; }   // 아바타 이니셜(이름 끝 2자)
 
 // 학생 1명의 메시지 데이터 집계 — 내가 담당하는 과목만(옛/타 교재 노출 방지)
 function _rpData(classId, nk){
@@ -135,9 +136,8 @@ function renderReport(mc){
   const rail = students.map(s => {
     const nk = s.nameKey;
     const has = !!_curDraft(nk).trim();
-    const dot = dotClass(classId, nk, subject);
     return `<div class="rp-si${nk === _rpActive ? ' on' : ''}" data-nk="${esc(nk)}" onclick="setRpActive('${esc(nk)}')">
-      <span class="dot ${dot}"></span><span class="rp-si-nm">${esc(s.name)}</span>
+      <span class="rp-av">${esc(_ini(s.name))}</span><span class="rp-si-nm">${esc(s.name)}</span>
       <span class="rp-badge ${has ? 'ok' : 'no'}">${has ? '검토중' : '미생성'}</span></div>`;
   }).join('') || `<div class="rp-hint" style="padding:12px">이 반에 학생이 없습니다.</div>`;
   const draftN = students.filter(s => _curDraft(s.nameKey).trim()).length;
@@ -165,7 +165,7 @@ function renderReport(mc){
       <div class="rp-edit" id="rp-edit"></div>
       <div class="rp-right" id="rp-right"></div>
       <div class="rp-statcol">
-        <div class="rp-rail-h">전송 상태</div>
+        <div class="rp-rail-h">전송 모니터 <span class="rp-live"><i></i>실시간</span></div>
         <div id="rp-jobs" class="rp-statcol-list"><div class="rp-job">작업 없음</div></div>
       </div>
     </div>`;
@@ -195,17 +195,21 @@ function _renderRpEditor(){
   const note = _curDraft(nk), memo = _readNote(nk) || '';
   const d = _rpData(classId, nk);
   const exCnt = d.subjects.filter(sub => _excludeProg.has(`${classId}|${sub}`)).length;
+  const multi = d.subjects.length > 1;
   const summary = d.subjects.map(sub => {
     if(_excludeProg.has(`${classId}|${sub}`)) return '';   // 발송 제외 교재 → 중앙 패널서도 숨김
     const ci = d.classInfo[sub], ag = d.assignMap[sub];
-    const bits = [ci.progress && `진도 ${esc(ci.progress)}`, ci.homework && `과제 ${esc(ci.homework)}`, ag && `수행도 ${esc(ag)}`].filter(Boolean).join(' · ');
+    const metrics = [ci.progress && ['진도', ci.progress], ci.homework && ['과제', ci.homework], ag && ['수행도', ag]]
+      .filter(Boolean).map(([k, v]) => `<div class="rp-metric"><div class="k">${k}</div><div class="v">${esc(v)}</div></div>`).join('');
     const obs = _obsTagLabels(getTags(classId, nk, sub));
     const obsHtml = obs.length ? `<div class="rp-obs">${obs.map(o => `<span class="rp-tag k-${o.kind}">${esc(o.label)}</span>`).join('')}</div>` : '';
-    return (bits || obs.length) ? `<div class="rp-sub"><b>${esc(d.subjects.length > 1 ? sub : '')}</b> ${bits}</div>${obsHtml}` : '';
+    if(!metrics && !obs.length) return '';
+    return `${multi ? `<div class="rp-sub" style="margin-bottom:5px"><b>${esc(sub)}</b></div>` : ''}${metrics ? `<div class="rp-metrics">${metrics}</div>` : ''}${obsHtml}`;
   }).join('')
     || `<div class="rp-sub" style="color:var(--gray)">${exCnt ? '발송 제외된 교재만 있습니다 (상단에서 포함 가능)' : '진도·과제·수행도·관찰 미입력'}</div>`;
   el.innerHTML = `
-    <div class="rp-ed-h"><b>${esc(s.name)}</b>${note.trim() ? `<span class="rp-badge ok">검토중</span>` : `<span class="rp-badge no">미생성</span>`}</div>
+    <div class="rp-ed-h"><div class="rp-ed-av">${esc(_ini(s.name))}</div>
+      <div><h2>${esc(s.name)}</h2><div class="rp-ed-meta">${esc(classId)}${d.subjects[0] ? ' · ' + esc(multi ? a.subject : d.subjects[0]) : ''} · ${note.trim() ? '검토중' : '미생성'}</div></div></div>
     <div class="rp-ed-sum">${summary}</div>
     ${memo ? `<div class="rp-memo">📝 강사 메모: <b>${esc(memo)}</b> <span>· 입력에서 수정</span></div>` : ''}
     <div class="rp-lbl">발송 특이사항 <span class="hint">AI 생성·검토 · 자동 저장</span></div>
@@ -356,14 +360,20 @@ async function loadReportJobs(){
     const recs = j.recipients || [], tot = recs.length;
     const done = recs.filter(r => r.status === '완료').length, err = recs.filter(r => r.status === '실패').length;
     const exc = recs.filter(r => (r.status || '').indexOf('제외') === 0).length;
-    let st = j.status === 'canceled' ? ['cancel', `취소됨 ${done ? `(${done} 발송)` : ''}`]
+    const inflight = j.status === 'sending' || (done + err > 0 && j.status !== 'done' && j.status !== 'canceled' && j.status !== 'error');
+    let st = j.status === 'canceled' ? ['cancel', '취소됨']
       : j.status === 'error' ? ['cancel', '오류']
-      : j.status === 'done' ? ['done', err ? `완료(실패 ${err})` : '완료']
-      : (j.status === 'sending' || done + err > 0) ? ['send', `전송 중 ${done + err}/${tot}`] : ['q', '대기'];
+      : j.status === 'done' ? ['done', err ? `완료·실패${err}` : '완료']
+      : inflight ? ['send', '전송 중'] : ['q', '대기'];
     const live = j.status === 'queued' || j.status === 'sending';
-    const cancelBtn = live && !j.cancel ? `<button class="rp-jx" onclick="cancelSendJob('${esc(id)}')">취소</button>`
+    const cancelBtn = live && !j.cancel ? `<a class="rp-jx" onclick="cancelSendJob('${esc(id)}')">취소</a>`
       : (j.cancel && j.status === 'sending') ? `<span class="rp-jx-w">중단 중…</span>` : '';
-    return `<div class="rp-job">${esc(j.cls || '')} (${tot}명)${exc ? ` <span class="rp-warn-i">제외 ${exc}</span>` : ''}<span class="rp-pill ${st[0]}">${st[1]}</span>${cancelBtn}</div>`;
+    const pct = tot ? Math.round((done + err) / tot * 100) : 0;
+    return `<div class="rp-job">
+      <div class="rp-job-top"><span class="rp-job-cls">${esc(j.cls || '')} <span style="font-weight:400;opacity:.65">${tot}명</span></span><span class="rp-pill ${st[0]}">${st[1]}</span></div>
+      ${inflight ? `<div class="rp-bar2"><i style="width:${pct}%"></i></div>` : ''}
+      <div class="rp-job-sub"><span>${done + err}/${tot}${exc ? ` · 제외 ${exc}` : ''}${err ? ` · 실패 ${err}` : ''}</span>${cancelBtn}</div>
+    </div>`;
   }).join('') : `<div class="rp-job">작업 없음</div>`)
     + (hasDone ? `<div class="rp-jobs-ft"><a onclick="clearDoneJobs()">완료·취소 건 정리</a></div>` : '');
 }
