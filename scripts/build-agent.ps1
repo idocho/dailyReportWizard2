@@ -2,7 +2,7 @@
 # 에이전트 = AI 생성(genJobs) + 카톡 전송(sendJobs) 로컬 워커. 진입점 agent_gui.py.
 # 키·카톡은 강사 PC 로컬(DPAPI). 웹(v2.5.0)이 입력·검토·전송요청 담당.
 #
-# 사전: pip install pyinstaller pyautogui pyperclip pillow
+# 사전: pip install pyinstaller pyautogui pyperclip pillow pystray
 # 산출물: code/dist/DRW-Agent-0.9.exe  (build/·dist/·*.spec 은 gitignore)
 param([switch]$Clean)
 
@@ -16,6 +16,7 @@ if ($Clean) { Remove-Item -Recurse -Force build, dist -ErrorAction SilentlyConti
 pyinstaller --noconfirm --onefile --windowed `
   --name DRW-Agent-0.9 `
   --hidden-import pyautogui --hidden-import pyperclip --hidden-import PIL `
+  --hidden-import pystray --hidden-import pystray._win32 `
   --hidden-import kakao_send --hidden-import secret_codec `
   --hidden-import ai_engine --hidden-import ai_style --hidden-import constants --hidden-import agent_worker `
   --exclude-module cv2 --exclude-module numpy --exclude-module pandas `

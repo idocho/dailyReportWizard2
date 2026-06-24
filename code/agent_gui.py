@@ -19,6 +19,13 @@ from tkinter import ttk, messagebox
 import agent_worker as W
 from constants import AI_ENGINE_ORDER, AI_ENGINE_LABELS
 
+try:
+    import pystray
+    from PIL import Image, ImageDraw
+    _HAS_TRAY = True
+except Exception:
+    _HAS_TRAY = False   # pystray 미설치 → 트레이 비활성(일반 창으로 동작)
+
 INDIGO, INK, GREEN, RED, SUB = "#4F46E5", "#15171F", "#16A34A", "#DC2626", "#94A3B8"
 AGENT_VERSION = "0.9"
 # 캠퍼스 표시명 → id (app.py / 웹 게이트와 동일 정본). 캠퍼스 추가 시 여기만 갱신.
@@ -51,6 +58,41 @@ class AgentGUI:
         else:
             self._build_setup()
         self.root.after(150, self._drain)
+        # 시스템 트레이 — 창 닫기/최소화 시 트레이로 숨김(워커는 백그라운드 계속)
+        self.tray = None
+        if _HAS_TRAY:
+            self._init_tray()
+            self.root.protocol("WM_DELETE_WINDOW", self._hide_to_tray)
+            self.root.bind("<Unmap>", self._on_unmap)
+
+    # ── 시스템 트레이 ─────────────────────────────────────────────────
+    def _tray_image(self):
+        img = Image.new("RGBA", (64, 64), (0, 0, 0, 0))
+        d = ImageDraw.Draw(img)
+        d.rounded_rectangle([6, 6, 58, 58], radius=14, fill=(79, 70, 229, 255))
+        d.ellipse([25, 25, 39, 39], fill=(255, 255, 255, 255))
+        return img
+
+    def _init_tray(self):
+        menu = pystray.Menu(
+            pystray.MenuItem("열기", lambda i=None: self._show_window(), default=True),
+            pystray.MenuItem("종료", lambda i=None: self._quit()),
+        )
+        self.tray = pystray.Icon("drw_agent", self._tray_image(),
+                                 f"DRW Agent v{AGENT_VERSION}", menu)
+        threading.Thread(target=self.tray.run, daemon=True).start()
+
+    def _hide_to_tray(self):
+        self.root.withdraw()   # 트레이 아이콘은 이미 떠 있음
+
+    def _on_unmap(self, e):
+        # 최소화(iconic) 시 트레이로 숨김. withdraw는 state=withdrawn이라 재귀 안 됨.
+        if _HAS_TRAY and self.root.state() == "iconic":
+            self.root.withdraw()
+
+    def _show_window(self):
+        self.root.after(0, lambda: (self.root.deiconify(), self.root.state("normal"),
+                                    self.root.lift(), self.root.focus_force()))
 
     # ── 설정 폼 ──────────────────────────────────────────────────────
     def _build_setup(self, existing=None):
@@ -242,8 +284,15 @@ class AgentGUI:
 
     def _quit(self):
         self.running = False
-        self.root.destroy()
-        sys.exit(0)
+        try:
+            if self.tray:
+                self.tray.stop()
+        except Exception:
+            pass
+        try:
+            self.root.after(0, self.root.destroy)   # 트레이 스레드서 호출돼도 안전
+        except Exception:
+            pass
 
     def run(self):
         self.root.mainloop()
@@ -258,6 +307,7 @@ if __name__ == "__main__":
             g.real = True
             if hasattr(g, "real_var"): g.real_var.set(True)
             g._toggle_run()
+            if _HAS_TRAY: g._hide_to_tray()   # 자동시작 = 트레이서 조용히 백그라운드 가동
         except Exception:
             pass
     g.run()
