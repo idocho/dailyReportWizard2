@@ -20,6 +20,8 @@ import agent_worker as W
 from constants import AI_ENGINE_ORDER, AI_ENGINE_LABELS
 
 INDIGO, INK, GREEN, RED, SUB = "#4F46E5", "#15171F", "#16A34A", "#DC2626", "#94A3B8"
+# 캠퍼스 표시명 → id (app.py / 웹 게이트와 동일 정본). 캠퍼스 추가 시 여기만 갱신.
+CAMPUS = {"동수원": "dongsuwon"}
 _Q = queue.Queue()
 
 
@@ -77,7 +79,14 @@ class AgentGUI:
             self.vars[key] = v
             return v
 
-        row("캠퍼스 id", "campus", "dongsuwon")
+        # 캠퍼스 드롭다운 — id 직접 입력 대신 선택(오타·불일치 방지)
+        tk.Label(frm, text="캠퍼스", bg=INK, fg="#cbd5e1", font=("맑은 고딕", 10),
+                 anchor="w").pack(fill="x", pady=(7, 1))
+        _id2name = {cid: nm for nm, cid in CAMPUS.items()}
+        cur_campus = e.get("campus", next(iter(CAMPUS.values())))
+        self.campus_var = tk.StringVar(value=_id2name.get(cur_campus, next(iter(CAMPUS))))
+        ttk.Combobox(frm, textvariable=self.campus_var, state="readonly",
+                     values=list(CAMPUS.keys()), font=("맑은 고딕", 11)).pack(fill="x")
         row("본인 이름 (웹 로그인명과 동일)", "instructorId")
         # 엔진 드롭다운
         tk.Label(frm, text="AI 엔진", bg=INK, fg="#cbd5e1", font=("맑은 고딕", 10),
@@ -107,12 +116,13 @@ class AgentGUI:
 
     def _save_setup(self):
         v = {k: var.get().strip() for k, var in self.vars.items()}
-        if not v["campus"] or not v["instructorId"] or not v["_api_key"]:
+        campus = CAMPUS.get(self.campus_var.get(), "")
+        if not campus or not v["instructorId"] or not v["_api_key"]:
             messagebox.showwarning("입력 필요", "캠퍼스·이름·API 키는 필수입니다.")
             return
         eng = self._eng_id()
         fields = {
-            "campus": v["campus"], "instructorId": v["instructorId"],
+            "campus": campus, "instructorId": v["instructorId"],
             "dbUrl": W.DEFAULT_DB, "roomPrefix": v.get("roomPrefix", ""),
             "ai_engine_type": eng, f"{eng}_api_key": v["_api_key"],
         }
