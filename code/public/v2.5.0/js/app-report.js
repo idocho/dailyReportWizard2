@@ -197,13 +197,16 @@ function _renderRpEditor(){
   const nk = s.nameKey, classId = a.classId;
   const note = _curDraft(nk), memo = _readNote(nk) || '';
   const d = _rpData(classId, nk);
+  const exCnt = d.subjects.filter(sub => _excludeProg.has(`${classId}|${sub}`)).length;
   const summary = d.subjects.map(sub => {
+    if(_excludeProg.has(`${classId}|${sub}`)) return '';   // 발송 제외 교재 → 중앙 패널서도 숨김
     const ci = d.classInfo[sub], ag = d.assignMap[sub];
     const bits = [ci.progress && `진도 ${esc(ci.progress)}`, ci.homework && `과제 ${esc(ci.homework)}`, ag && `수행도 ${esc(ag)}`].filter(Boolean).join(' · ');
     const obs = _obsTagLabels(getTags(classId, nk, sub));
     const obsHtml = obs.length ? `<div class="rp-obs">${obs.map(o => `<span class="rp-tag k-${o.kind}">${esc(o.label)}</span>`).join('')}</div>` : '';
     return (bits || obs.length) ? `<div class="rp-sub"><b>${esc(d.subjects.length > 1 ? sub : '')}</b> ${bits}</div>${obsHtml}` : '';
-  }).join('') || `<div class="rp-sub" style="color:var(--gray)">진도·과제·수행도·관찰 미입력</div>`;
+  }).join('')
+    || `<div class="rp-sub" style="color:var(--gray)">${exCnt ? '발송 제외된 교재만 있습니다 (상단에서 포함 가능)' : '진도·과제·수행도·관찰 미입력'}</div>`;
   el.innerHTML = `
     <div class="rp-ed-h"><b>${esc(s.name)}</b>${note.trim() ? `<span class="rp-badge ok">검토중</span>` : `<span class="rp-badge no">미생성</span>`}</div>
     <div class="rp-ed-sum">${summary}</div>
@@ -248,9 +251,9 @@ function _genCtx(classId, nk, name){
     progress: d.classInfo[sub].progress, homework: d.classInfo[sub].homework,
     gradeLabel: d.tbGrade[sub],
   }));
-  // obs 태그 병합(과제수행도 제외 — value로 전달)
+  // obs 태그 병합(과제수행도 제외 — value로 전달). 발송 제외 교재는 관찰 태그도 제외(교재 단위 일관)
   const tags = {};
-  d.subjects.forEach(sub => { const t = { ...(getTags(classId, nk, sub) || {}) }; delete t.assign_grade; Object.assign(tags, t); });
+  d.subjects.forEach(sub => { if(_excludeProg.has(`${classId}|${sub}`)) return; const t = { ...(getTags(classId, nk, sub) || {}) }; delete t.assign_grade; Object.assign(tags, t); });
   const job = {
     nameKey: nk, cls: classId, displayName: name, sheet: '',
     items, tags, note: _readNote(nk) || '',
