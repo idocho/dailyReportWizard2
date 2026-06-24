@@ -495,9 +495,13 @@ function renderSb(){
       aHtml+=`<div style="padding:8px 13px;font-size:11px;color:rgba(255,255,255,.3)">설정에서 추가하세요</div>`;
     } else {
       const groups=[...new Set(asgns.map(a=>a.group||''))];
+      // 오늘 요일의 그룹(M=월수금 / T=화목토)만 펼치고 나머지는 기본 fold (수동 토글이 우선)
+      const _dd=_devDate?new Date(_devDate):new Date(); const _dow=_dd.getDay();
+      const todayGroup=[1,3,5].includes(_dow)?'M':([2,4,6].includes(_dow)?'T':'');
       groups.forEach(gr=>{
         const grAsgns=_sortedAsgns(asgns).map(p=>p.a).filter(a=>(a.group||'')===gr); // 학급→과정→교재명 표시 정렬
-        const folded=sbFolded[gr]===true;
+        const autoFold=!!gr&&!!todayGroup&&gr.toUpperCase()!==todayGroup;
+        const folded=(sbFolded[gr]===undefined)?autoFold:(sbFolded[gr]===true);
         const arrow=folded?'▸':'▾';
         aHtml+=`<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 13px 2px;font-size:9px;font-weight:700;color:rgba(255,255,255,.4);letter-spacing:.08em;cursor:pointer;user-select:none" onclick="sbToggle('${esc(gr)}')">${esc(gr||'기타')} <span style="font-size:11px;opacity:.7">${arrow}</span></div>`;
         if(!folded){
@@ -523,12 +527,12 @@ function renderSb(){
     </div>
     <div class="sb-nav">
       <div class="sni${activeTab==='input'?' on':''}" onclick="goNav('input')">✏️ 수업 입력</div>
+      ${aHtml}
       <div class="sni${activeTab==='report'?' on':''}" onclick="goNav('report')">📤 리포트·전송</div>
       <div class="sni${activeTab==='scores'?' on':''}" onclick="goNav('scores')">📊 성적 입력</div>
       <div class="sni${activeTab==='bulk'?' on':''}" onclick="goNav('bulk')">📢 일괄 공지</div>
       <div class="sni${activeTab==='setting'?' on':''}" onclick="goNav('setting')">⚙️ 설정</div>
     </div>
-    ${aHtml}
     <div style="flex:1"></div>
     <a href="./guide.html" target="_blank" style="display:flex;align-items:center;gap:8px;padding:10px 13px;font-size:11px;color:rgba(255,255,255,.4);text-decoration:none;border-top:1px solid rgba(255,255,255,.08);transition:background .12s,color .12s" onmouseover="this.style.background='rgba(255,255,255,.07)';this.style.color='rgba(255,255,255,.8)'" onmouseout="this.style.background='';this.style.color='rgba(255,255,255,.4)'">📖 <span>설치 · 운용 가이드</span></a>
     <div style="padding:5px 8px 8px;font-size:9px;color:rgba(255,255,255,.18);text-align:center">`+`DRW ${APP_VERSION} · IDO`+`</div>`;

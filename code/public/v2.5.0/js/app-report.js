@@ -137,7 +137,7 @@ function renderReport(mc){
     const nk = s.nameKey;
     const has = !!_curDraft(nk).trim();
     return `<div class="rp-si${nk === _rpActive ? ' on' : ''}" data-nk="${esc(nk)}" onclick="setRpActive('${esc(nk)}')">
-      <span class="rp-av">${esc(_ini(s.name))}</span><span class="rp-si-nm">${esc(s.name)}</span>
+      <span class="rp-si-nm">${esc(s.name)}</span>
       <span class="rp-badge ${has ? 'ok' : 'no'}">${has ? '검토중' : '미생성'}</span></div>`;
   }).join('') || `<div class="rp-hint" style="padding:12px">이 반에 학생이 없습니다.</div>`;
   const draftN = students.filter(s => _curDraft(s.nameKey).trim()).length;
@@ -208,7 +208,7 @@ function _renderRpEditor(){
   }).join('')
     || `<div class="rp-sub" style="color:var(--gray)">${exCnt ? '발송 제외된 교재만 있습니다 (상단에서 포함 가능)' : '진도·과제·수행도·관찰 미입력'}</div>`;
   el.innerHTML = `
-    <div class="rp-ed-h"><div class="rp-ed-av">${esc(_ini(s.name))}</div>
+    <div class="rp-ed-h">
       <div><h2>${esc(s.name)}</h2><div class="rp-ed-meta">${esc(classId)}${d.subjects[0] ? ' · ' + esc(multi ? a.subject : d.subjects[0]) : ''} · ${note.trim() ? '검토중' : '미생성'}</div></div></div>
     <div class="rp-ed-sum">${summary}</div>
     ${memo ? `<div class="rp-memo">📝 강사 메모: <b>${esc(memo)}</b> <span>· 입력에서 수정</span></div>` : ''}
