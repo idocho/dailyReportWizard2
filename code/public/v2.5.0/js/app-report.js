@@ -155,22 +155,19 @@ function renderReport(mc){
       <span class="rp-ctx">문체 <b>${esc(styleLbl)}</b> <a class="rp-ctx-link" onclick="goAiSettings()">AI설정에서 변경</a></span>
       <button class="rp-btn ghost" onclick="genReportAll()" style="margin-left:auto">✨ 일괄 생성</button>
       <button class="rp-btn" onclick="openReportSend()">전송 →</button>
-      <div class="rp-stat-wrap">
-        <button class="rp-stat-btn" onclick="toggleRpStatus()">전송상태<span class="rp-stat-pill" id="rp-status-pill"></span></button>
-        <div class="rp-stat-pop" id="rp-status-pop">
-          <div class="rp-jobs-hd">전송 상태 <a class="rp-stat-x" onclick="toggleRpStatus(false)">✕</a></div>
-          <div id="rp-jobs"><div class="rp-job">작업 없음</div></div>
-        </div>
-      </div>
     </div>
     ${exBar}
-    <div class="rp-3col">
+    <div class="rp-grid">
       <div class="rp-rail">
         <div class="rp-rail-h">학생 <b>${students.length}</b>명 · 발송문 <b>${draftN}</b></div>
         <div class="rp-rail-list">${rail}</div>
       </div>
       <div class="rp-edit" id="rp-edit"></div>
       <div class="rp-right" id="rp-right"></div>
+      <div class="rp-statcol">
+        <div class="rp-rail-h">전송 상태</div>
+        <div id="rp-jobs" class="rp-statcol-list"><div class="rp-job">작업 없음</div></div>
+      </div>
     </div>`;
   _renderRpEditor();
   _renderRpPreview();
@@ -369,17 +366,6 @@ async function loadReportJobs(){
     return `<div class="rp-job">${esc(j.cls || '')} (${tot}명)${exc ? ` <span class="rp-warn-i">제외 ${exc}</span>` : ''}<span class="rp-pill ${st[0]}">${st[1]}</span>${cancelBtn}</div>`;
   }).join('') : `<div class="rp-job">작업 없음</div>`)
     + (hasDone ? `<div class="rp-jobs-ft"><a onclick="clearDoneJobs()">완료·취소 건 정리</a></div>` : '');
-  // 전송상태 버튼 pill — 진행/대기 중 작업 수 요약(팝오버 닫혀도 보임)
-  const liveN = Object.values(jobs).filter(j => j && (j.status === 'queued' || j.status === 'sending')).length;
-  const pill = document.getElementById('rp-status-pill');
-  if(pill){ pill.textContent = liveN ? String(liveN) : ''; pill.classList.toggle('on', !!liveN); }
-}
-// 전송상태 팝오버 토글 (전송 버튼 옆)
-function toggleRpStatus(show){
-  const p = document.getElementById('rp-status-pop'); if(!p) return;
-  const open = show === undefined ? !p.classList.contains('on') : show;
-  p.classList.toggle('on', open);
-  if(open) loadReportJobs();
 }
 
 // 전송 취소 (PC _cancel_send/_bulk_cancel) — 대기 건은 삭제(에이전트 미실행), 진행 건은 cancel 플래그(현재 학생까지만 발송 후 중단)

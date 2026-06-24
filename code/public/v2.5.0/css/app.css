@@ -381,8 +381,8 @@ body{font-family:'Pretendard','Malgun Gothic','맑은 고딕',-apple-system,sans
 .rp-right .rp-pv-body{border:none;border-radius:0}
 .rp-pv-empty{padding:34px 18px;text-align:center;color:var(--gray);font-size:12px;line-height:1.9}
 @media(max-width:880px){.rp-2col{grid-template-columns:1fr}.rp-right{position:static;max-height:none}}
-/* ── 리포트·전송 3열 (학생 레일 · 편집 · 미리보기) ── */
-.rp-3col{display:grid;grid-template-columns:220px minmax(0,1fr) 380px;gap:14px;align-items:start;padding:12px}
+/* ── 리포트·전송 4열 (학생 레일 · 편집 · 미리보기 · 전송상태) ── */
+.rp-grid{display:grid;grid-template-columns:200px minmax(0,1fr) 360px 200px;gap:12px;align-items:start;padding:12px}
 .rp-rail{border:1px solid var(--border);border-radius:12px;background:var(--panel);overflow:hidden;position:sticky;top:12px;max-height:calc(100vh - 96px);display:flex;flex-direction:column}
 .rp-rail-h{padding:9px 12px;font-size:11px;color:var(--sub);border-bottom:1px solid var(--line-soft);flex-shrink:0}
 .rp-rail-h b{color:var(--indigo-ink)}
@@ -391,23 +391,17 @@ body{font-family:'Pretendard','Malgun Gothic','맑은 고딕',-apple-system,sans
 .rp-si:hover{background:var(--panel-2)}
 .rp-si.on{background:var(--indigo-l);border-left-color:var(--indigo)}
 .rp-si-nm{flex:1;font-size:13px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.rp-rail .rp-jobs{flex-shrink:0;border-top:1px solid var(--border);padding:10px 12px;margin:0}
 .rp-edit{min-width:0}
 .rp-ed-h{display:flex;align-items:center;gap:8px;font-size:17px;font-weight:800;margin-bottom:10px}
 .rp-ed-sum{margin-bottom:10px}
 .rp-edit .rp-ta{min-height:210px}
 .rp-ctx-link{font-size:11px;color:var(--indigo);cursor:pointer;margin-left:6px;text-decoration:underline}
-@media(max-width:1100px){.rp-3col{grid-template-columns:200px minmax(0,1fr)}.rp-3col .rp-right{display:none}}
-@media(max-width:760px){.rp-3col{grid-template-columns:1fr}.rp-rail{position:static;max-height:none}}
-/* 전송상태 팝오버(전송 버튼 옆) */
-.rp-stat-wrap{position:relative}
-.rp-stat-btn{padding:9px 12px;border-radius:9px;border:1px solid var(--border);background:var(--panel);font-size:12.5px;font-weight:600;cursor:pointer;color:var(--sub);display:inline-flex;align-items:center;gap:5px}
-.rp-stat-btn:hover{background:var(--panel-2)}
-.rp-stat-pill{min-width:16px;height:16px;padding:0 4px;border-radius:8px;font-size:10px;font-weight:800;display:none;align-items:center;justify-content:center;background:var(--indigo);color:#fff}
-.rp-stat-pill.on{display:inline-flex}
-.rp-stat-pop{position:absolute;top:calc(100% + 6px);right:0;width:300px;max-height:340px;overflow-y:auto;background:var(--panel);border:1px solid var(--border);border-radius:12px;box-shadow:0 8px 28px rgba(0,0,0,.12);padding:10px 12px;z-index:50;display:none}
-.rp-stat-pop.on{display:block}
-.rp-stat-x{float:right;color:var(--gray);cursor:pointer;text-decoration:none;font-weight:400}
+/* 전송상태 — 최우측 얇은 모니터 열 */
+.rp-statcol{border:1px solid var(--border);border-radius:12px;background:var(--panel);overflow:hidden;position:sticky;top:12px;max-height:calc(100vh - 96px);display:flex;flex-direction:column}
+.rp-statcol-list{overflow-y:auto;flex:1;padding:6px 10px}
+@media(max-width:1500px){.rp-grid{grid-template-columns:200px minmax(0,1fr) 200px}.rp-grid .rp-right{display:none}}
+@media(max-width:1040px){.rp-grid{grid-template-columns:200px minmax(0,1fr)}.rp-grid .rp-statcol{display:none}}
+@media(max-width:760px){.rp-grid{grid-template-columns:1fr}.rp-rail,.rp-statcol{position:static;max-height:none}}
 .bulk-vars{font-size:11px;color:var(--sub);display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:6px}
 .bulk-vars button{cursor:pointer}
 .rp-imgpv{display:flex;align-items:center;gap:8px;margin-top:8px;font-size:11px;color:var(--sub);background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:6px 8px}
