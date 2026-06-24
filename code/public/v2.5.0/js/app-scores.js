@@ -554,7 +554,9 @@ function init(){
         }
         saveLocal();setSync(true);
       if(inpD)Object.assign(inputData,inpD);
-      if(sessD?.class_data)for(const[k,v]of Object.entries(sessD.class_data))if(!progressData[k])progressData[k]=v;
+      // 진도/과제(반 공통)는 Firebase 정본 우선 — 다기기(태블릿 입력→PC 발송) staleness 방지.
+      // 메모·발송문·태그도 이미 Firebase 우선이라 일관. 오프라인 미반영 로컬값은 재입력 쉬움(반 공통).
+      if(sessD?.class_data)Object.assign(progressData,sessD.class_data);
       if(obsD)Object.assign(tagData,obsD);
       if(scD&&typeof scD==='object')scoreData=scD;
       if(inpD||sessD||obsD)saveLocal();

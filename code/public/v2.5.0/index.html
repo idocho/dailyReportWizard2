@@ -73,7 +73,7 @@
     try{ localStorage.setItem('drw_db_url',cfg.databaseURL); localStorage.setItem('drw_db_path',CAMPUS_PATH);
          localStorage.removeItem('drw_db_secret'); }catch(_){}
     $('drw-gate').remove(); $('wr').style.display='';
-    const order=['data/curriculum.js?v=202606112000','js/app-core.js?v=v268','js/app-input.js?v=v268','js/app-settings.js?v=v268','js/app-scores.js?v=v268','js/app-report.js?v=v268'];
+    const order=['data/curriculum.js?v=202606112000','js/app-core.js?v=v269','js/app-input.js?v=v269','js/app-settings.js?v=v269','js/app-scores.js?v=v269','js/app-report.js?v=v269'];
     window.APP_VERSION='v2.5.0'; document.title='DailyReportWizard v2.5.0';
     (function next(i){ if(i>=order.length)return; const s=document.createElement('script'); s.src=order[i]; s.onload=()=>next(i+1); document.body.appendChild(s); })(0);
   }

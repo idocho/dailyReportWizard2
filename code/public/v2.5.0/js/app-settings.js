@@ -827,7 +827,7 @@ async function loadCfg(){
       config._classStudents=classStudents;
     }
     saveLocal();setSync(true);
-    try{let s=await fbGet('session').catch(()=>null);if(s?.class_data)for(const[k,v]of Object.entries(s.class_data))if(!progressData[k])progressData[k]=v;saveLocal();}catch(e){}
+    try{let s=await fbGet('session').catch(()=>null);if(s?.class_data)Object.assign(progressData,s.class_data);saveLocal();}catch(e){}
     try{const d=await fbGet('input');if(d)Object.assign(inputData,d);saveLocal();}catch(e){}
     try{const d=await fbGet('obs');if(d)Object.assign(tagData,d);saveLocal();}catch(e){}
     if(instructor?.id){const id=await fbGet(`config/instructors/${encodeURIComponent(instructor.id)}`).catch(()=>null);if(id){Object.assign(instructor,id);saveLocal();}}
