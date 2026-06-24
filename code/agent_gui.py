@@ -41,7 +41,7 @@ class AgentGUI:
     def __init__(self):
         self.cfg = None
         self.running = False
-        self.real = False
+        self.real = "--dry" not in sys.argv   # 운영=실 발송 기본. 테스트만 --dry로 dry
         self.overlay = None
         self.last = "—"
         self.root = tk.Tk()
@@ -61,9 +61,12 @@ class AgentGUI:
         # 시스템 트레이 — 창 닫기/최소화 시 트레이로 숨김(워커는 백그라운드 계속)
         self.tray = None
         if _HAS_TRAY:
-            self._init_tray()
-            self.root.protocol("WM_DELETE_WINDOW", self._hide_to_tray)
-            self.root.bind("<Unmap>", self._on_unmap)
+            try:   # 트레이 실패해도 앱은 일반 창으로 구동(가드)
+                self._init_tray()
+                self.root.protocol("WM_DELETE_WINDOW", self._hide_to_tray)
+                self.root.bind("<Unmap>", self._on_unmap)
+            except Exception:
+                self.tray = None
 
     # ── 시스템 트레이 ─────────────────────────────────────────────────
     def _tray_image(self):
@@ -193,10 +196,10 @@ class AgentGUI:
         self.last_lbl = tk.Label(self.root, text="마지막 활동: —", bg=INK, fg=SUB,
                                  font=("맑은 고딕", 9)); self.last_lbl.pack(pady=(4, 10))
 
-        self.real_var = tk.BooleanVar(value=False)
-        tk.Checkbutton(self.root, text="실 발송 (체크 해제 = dry, 카톡 미발송)", variable=self.real_var,
-                       bg=INK, fg="#FCA5A5", selectcolor=INK, activebackground=INK,
-                       font=("맑은 고딕", 9), command=self._toggle_real).pack()
+        # 운영=항상 실 발송. dry(테스트)는 --dry CLI 플래그로만 — UI 토글 제거(미발송 footgun 차단)
+        if not self.real:
+            tk.Label(self.root, text="🧪 DRY 모드 (테스트 · 카톡 미발송)", bg=INK, fg="#FCA5A5",
+                     font=("맑은 고딕", 9, "bold")).pack()
         btns = tk.Frame(self.root, bg=INK); btns.pack(pady=12)
         self.start_btn = tk.Button(btns, text="시작", command=self._toggle_run, bg=INDIGO, fg="#fff",
                                    relief="flat", font=("맑은 고딕", 11, "bold"), cursor="hand2", width=8)
@@ -205,9 +208,6 @@ class AgentGUI:
                   relief="flat", font=("맑은 고딕", 10), cursor="hand2", width=6).pack(side="left", padx=4, ipady=3)
         tk.Button(self.root, text="종료", command=self._quit, bg="#2A2D3A", fg=SUB,
                   relief="flat", font=("맑은 고딕", 9), cursor="hand2").pack(pady=(6, 0))
-
-    def _toggle_real(self):
-        self.real = self.real_var.get()
 
     def _toggle_run(self):
         if self.running:
@@ -304,9 +304,7 @@ if __name__ == "__main__":
     # 자동시작(.bat --auto)으로 켜진 경우: 설정돼 있으면 실 발송 모드로 즉시 가동(턴키)
     if "--auto" in sys.argv and g.cfg:
         try:
-            g.real = True
-            if hasattr(g, "real_var"): g.real_var.set(True)
-            g._toggle_run()
+            g._toggle_run()                    # self.real은 위에서 결정(기본 실발송, --dry면 dry)
             if _HAS_TRAY: g._hide_to_tray()   # 자동시작 = 트레이서 조용히 백그라운드 가동
         except Exception:
             pass
