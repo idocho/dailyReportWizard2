@@ -272,10 +272,23 @@ def process_sendjobs(cfg, db, instructor_id, token=None, real=False, progress_cb
 
         def on_item(k, ok, err=None):
             results.append(ok)
+            idx = send_idx[k]
             patch = {"status": "완료" if ok else "실패"}
             if err:
                 patch["error"] = str(err)[:120]
-            _patch(db, f"{base}/{jid}/recipients/{send_idx[k]}", patch, token)
+            _patch(db, f"{base}/{jid}/recipients/{idx}", patch, token)
+            # 데일리 리포트 전송 성공 → history/{nameKey}/{date}={note,instructor} 누적
+            # (PC _push_history 계승. real 발송분만·job.date 있는 리포트 잡만. bulk·dry 제외. Analyzer 조인 원료)
+            if ok and real and job.get("date"):
+                r = recs[idx]
+                nk = str(r.get("nameKey") or "").strip()
+                note = (r.get("note") or "").strip()
+                if nk and note:
+                    try:
+                        _patch(db, f"campus/{cfg['campus']}/history/{urllib.parse.quote(nk)}/{job['date']}",
+                               {"note": note, "instructor": job.get("instructor", instructor_id)}, token)
+                    except Exception:
+                        pass
             if progress_cb:
                 progress_cb({"active": True, "cls": cls, "done": len(results),
                              "total": total, "fail": results.count(False)})

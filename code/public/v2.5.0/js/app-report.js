@@ -296,13 +296,15 @@ async function doReportSend(){
   const students = _rpStudents();
   const recipients = picked.map(nk => {
     const s = students.find(x => x.nameKey === nk) || {};
-    return { nameKey: nk, name: s.name || nk, msg: _buildMessage(classId, nk, s.name || nk, _curDraft(nk)), status: '대기' };
+    const note = _curDraft(nk);   // 발송 특이사항 — history 누적 원료(전송 성공 시 에이전트가 기록)
+    return { nameKey: nk, name: s.name || nk, note, msg: _buildMessage(classId, nk, s.name || nk, note), status: '대기' };
   });
   closeRpModal();
   if(!recipients.length) return;
   const jid = Date.now() + '_' + Math.floor(Math.random() * 1000);
   try{
-    await fbPut(`sendJobs/${instructor.id}/${jid}`, { cls: classId, recipients, status: 'queued', ts: Date.now() });
+    // date·instructor = history/{nameKey}/{date}={note,instructor} 기록용(PC _push_history 계승). bulk 잡엔 date 없음 → 기록 안 함.
+    await fbPut(`sendJobs/${instructor.id}/${jid}`, { cls: classId, recipients, status: 'queued', ts: Date.now(), date: todayKey(), instructor: instructor.id });
     toast(`전송 작업 생성 (${recipients.length}명) — 에이전트가 발송`); loadReportJobs();
   }catch(e){ toast('전송 요청 실패 — ' + (e.message || e)); }
 }

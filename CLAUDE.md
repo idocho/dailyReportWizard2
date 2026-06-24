@@ -39,9 +39,9 @@
 
 - `grade_sem` → 교재(`cfg.textbooks[tbName]`) 종속. 학급 종속 아님
 - `pkey` 형식: `{classId}|{subject}` (예: `중1A|수학`) — `session/class_data/{pkey}` 키. web write + PC read 모두 2-part
-- Firebase 쓰기: 웹 전용. PC 앱은 **PC 소유·웹 미사용 경로만** 허용 — `history/{nameKey}/`(전송 코멘트 누적) + 강사 등록(`config/instructors/{id}` 신규). `lastSent/`는 폐기됨(v2.1.2)
+- Firebase 쓰기: 웹 전용. **강사 에이전트**(구 PC 앱 대체)는 PC 소유·웹 미사용 경로만 허용 — `campus/{campus}/history/{nameKey}/`(전송 성공분 코멘트 누적, sendJob 처리 시) + 강사 등록(`config/instructors/{id}` 신규). `lastSent/`는 폐기됨(v2.1.2)
 - `history/{nameKey}/{YYYY-MM-DD}` = `{note, instructor}` — 전송된 최종 특이사항 누적(학생 grain, 날짜키=todayKey). Analyzer가 obs/·scores/와 nameKey+date로 조인
-- 전송 확정 시점(`_push_history`) PC 동작: ① `history/`에 최종 note 기록, ② **`input/{nameKey}/__note__` 소거**(원본 draft consume) — 특이사항을 "당일 소비"로 만들어 다음 가져오기 시 옛 메모 잔류 방지. PC의 input/ 쓰기는 이 소거(전송된 학생 한정)만 허용
+- 전송 확정 시 history 기록(웹+에이전트, PC `_push_history` 계승): 웹이 sendJob 수신자에 `note`·잡에 `date`/`instructor` 동봉 → 에이전트가 **카톡 전송 성공한 수신자만** `campus/{campus}/history/{nameKey}/{date}={note,instructor}` 기록(real 발송 한정, dry·bulk 제외). ※ PC의 `__note__` 소거(import 브리지 anti-staleness)는 모바일 가져오기 폐기로 불요 — 웹 `__draft__`는 todayKey date-gating으로 자연 만료
 - 특이사항(note)은 **학생 종속 단일**(과목 grain 아님). 입력 `input/{nameKey}/__note__`, 누적 `history/`. 과제수행도는 `obs/assign_grade`가 단일 소스(`input/.assign` 폐기)
 - 로컬 캐시(daily_cache.json)는 **진도/과제(class_data)만** 영속. student/note/force는 메모리만(v2.1.2)
 - 관리자 기능: `adminOn === true` 시만 렌더링
