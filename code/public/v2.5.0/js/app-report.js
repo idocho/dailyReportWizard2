@@ -131,31 +131,16 @@ function renderReport(mc){
   if(!_rpActive || !students.some(s => s.nameKey === _rpActive)) _rpActive = students[0]?.nameKey || null;
   const styleLbl = (RP_STYLES.find(s => s[0] === (instructor?.ai_style_mode || 'auto')) || RP_STYLES[0])[1];
 
-  const rows = students.map(s => {
-    const nk = s.nameKey, name = s.name;
-    const note = _curDraft(nk);
-    const memo = _readNote(nk) || '';
-    const d = _rpData(classId, nk);
+  // ① 학생 레일(전환용 thin list) — 점·이름·검토상태만. 편집은 가운데 열에서.
+  const rail = students.map(s => {
+    const nk = s.nameKey;
+    const has = !!_curDraft(nk).trim();
     const dot = dotClass(classId, nk, subject);
-    const summary = d.subjects.map(sub => {
-      const ci = d.classInfo[sub], ag = d.assignMap[sub];
-      const bits = [ci.progress && `진도 ${esc(ci.progress)}`, ci.homework && `과제 ${esc(ci.homework)}`, ag && `수행도 ${esc(ag)}`].filter(Boolean).join(' · ');
-      const obs = _obsTagLabels(getTags(classId, nk, sub));
-      const obsHtml = obs.length ? `<div class="rp-obs">${obs.map(o => `<span class="rp-tag k-${o.kind}">${esc(o.label)}</span>`).join('')}</div>` : '';
-      return (bits || obs.length) ? `<div class="rp-sub"><b>${esc(d.subjects.length > 1 ? sub : '')}</b> ${bits}</div>${obsHtml}` : '';
-    }).join('') || `<div class="rp-sub" style="color:var(--gray)">진도·과제·수행도·관찰 미입력</div>`;
-    return `<div class="rp-row${nk === _rpActive ? ' active' : ''}" data-nk="${esc(nk)}" onclick="setRpActive('${esc(nk)}')">
-      <div class="rp-head"><span class="dot ${dot}"></span><b>${esc(name)}</b>
-        ${note.trim() ? `<span class="rp-badge ok">검토중</span>` : `<span class="rp-badge no">미생성</span>`}</div>
-      ${summary}
-      ${memo ? `<div class="rp-memo">📝 강사 메모: <b>${esc(memo)}</b> <span>· 입력에서 수정</span></div>` : ''}
-      <div class="rp-lbl">발송 특이사항 <span class="hint">AI 생성·검토 · 자동 저장</span></div>
-      <textarea class="rp-ta" id="rp-${esc(nk)}" onfocus="setRpActive('${esc(nk)}')" oninput="onRpEdit('${esc(nk)}',this)" onchange="_saveDraft('${esc(nk)}',this.value)" placeholder="✨ 생성을 누르면 강사 메모·데이터로 발송문을 만듭니다 — 검토·수정 후 전송">${esc(note)}</textarea>
-      <div class="rp-act">
-        <button class="rp-gen" onclick="event.stopPropagation();genReportOne('${esc(nk)}')">✨ ${note.trim() ? '다시생성' : '생성'}</button>
-      </div>
-    </div>`;
-  }).join('') || `<div class="empty">이 반에 학생이 없습니다.</div>`;
+    return `<div class="rp-si${nk === _rpActive ? ' on' : ''}" data-nk="${esc(nk)}" onclick="setRpActive('${esc(nk)}')">
+      <span class="dot ${dot}"></span><span class="rp-si-nm">${esc(s.name)}</span>
+      <span class="rp-badge ${has ? 'ok' : 'no'}">${has ? '검토중' : '미생성'}</span></div>`;
+  }).join('') || `<div class="rp-hint" style="padding:12px">이 반에 학생이 없습니다.</div>`;
+  const draftN = students.filter(s => _curDraft(s.nameKey).trim()).length;
 
   // 발송 제외 토글 — 진도/과제가 입력된 담당 과목만 노출(제외할 게 있을 때만)
   const exSubs = [...new Set((activeAsgns() || []).filter(x => x.classId === classId).map(x => x.subject))]
@@ -166,19 +151,22 @@ function renderReport(mc){
   }).join('')}</div>` : '';
 
   mc.innerHTML = makeTb('리포트', `${classId} · ${subject}`) + _stageBar('report') + `
-    <div class="rp-2col">
-      <div class="rp-left">
-        <div class="rp-bar">
-          <span class="rp-ctx">문체: ${esc(styleLbl)}</span>
-          <button class="rp-btn ghost" onclick="genReportAll()">✨ 일괄 생성</button>
-          <button class="rp-btn" onclick="openReportSend()">전송 →</button>
-        </div>
-        ${exBar}
-        <div class="rp-list">${rows}</div>
+    <div class="rp-bar">
+      <span class="rp-ctx">문체 <b>${esc(styleLbl)}</b> <a class="rp-ctx-link" onclick="goAiSettings()">AI설정에서 변경</a></span>
+      <button class="rp-btn ghost" onclick="genReportAll()" style="margin-left:auto">✨ 일괄 생성</button>
+      <button class="rp-btn" onclick="openReportSend()">전송 →</button>
+    </div>
+    ${exBar}
+    <div class="rp-3col">
+      <div class="rp-rail">
+        <div class="rp-rail-h">학생 <b>${students.length}</b>명 · 발송문 <b>${draftN}</b></div>
+        <div class="rp-rail-list">${rail}</div>
         <div class="rp-jobs"><div class="rp-jobs-hd">전송 상태</div><div id="rp-jobs"><div class="rp-job">작업 없음</div></div></div>
       </div>
+      <div class="rp-edit" id="rp-edit"></div>
       <div class="rp-right" id="rp-right"></div>
     </div>`;
+  _renderRpEditor();
   _renderRpPreview();
   loadReportJobs();
   clearInterval(_rpJobTimer); _rpJobTimer = setInterval(loadReportJobs, 2500);
@@ -191,12 +179,40 @@ function toggleExProg(cls, sub){
   renderReport(document.getElementById('mc'));
 }
 
-// 좌측 학생 편집 → 우측 미리보기 (전체 재렌더 없이 우측만 갱신 = 타이핑 무지연)
+// 문체는 AI설정 단일 출처 — 리포트 탭에선 표시만, 변경은 설정으로 이동
+function goAiSettings(){ goNav('setting'); if(typeof setStg === 'function') setStg('style'); }
+
+// 가운데 편집 열 = 선택 학생 1명 (요약·메모·발송문·생성)
+function _renderRpEditor(){
+  const el = document.getElementById('rp-edit'); if(!el) return;
+  const a = activeAsgns()[curAI];
+  const s = a && _rpActive ? _rpStudents().find(x => x.nameKey === _rpActive) : null;
+  if(!s){ el.innerHTML = `<div class="rp-pv-empty">왼쪽에서 학생을 선택하세요.</div>`; return; }
+  const nk = s.nameKey, classId = a.classId;
+  const note = _curDraft(nk), memo = _readNote(nk) || '';
+  const d = _rpData(classId, nk);
+  const summary = d.subjects.map(sub => {
+    const ci = d.classInfo[sub], ag = d.assignMap[sub];
+    const bits = [ci.progress && `진도 ${esc(ci.progress)}`, ci.homework && `과제 ${esc(ci.homework)}`, ag && `수행도 ${esc(ag)}`].filter(Boolean).join(' · ');
+    const obs = _obsTagLabels(getTags(classId, nk, sub));
+    const obsHtml = obs.length ? `<div class="rp-obs">${obs.map(o => `<span class="rp-tag k-${o.kind}">${esc(o.label)}</span>`).join('')}</div>` : '';
+    return (bits || obs.length) ? `<div class="rp-sub"><b>${esc(d.subjects.length > 1 ? sub : '')}</b> ${bits}</div>${obsHtml}` : '';
+  }).join('') || `<div class="rp-sub" style="color:var(--gray)">진도·과제·수행도·관찰 미입력</div>`;
+  el.innerHTML = `
+    <div class="rp-ed-h"><b>${esc(s.name)}</b>${note.trim() ? `<span class="rp-badge ok">검토중</span>` : `<span class="rp-badge no">미생성</span>`}</div>
+    <div class="rp-ed-sum">${summary}</div>
+    ${memo ? `<div class="rp-memo">📝 강사 메모: <b>${esc(memo)}</b> <span>· 입력에서 수정</span></div>` : ''}
+    <div class="rp-lbl">발송 특이사항 <span class="hint">AI 생성·검토 · 자동 저장</span></div>
+    <textarea class="rp-ta" id="rp-${esc(nk)}" oninput="onRpEdit('${esc(nk)}',this)" onchange="_saveDraft('${esc(nk)}',this.value)" placeholder="✨ 생성을 누르면 강사 메모·데이터로 발송문을 만듭니다 — 검토·수정 후 전송">${esc(note)}</textarea>
+    <div class="rp-act"><button class="rp-gen" onclick="genReportOne('${esc(nk)}')">✨ ${note.trim() ? '다시 생성' : '생성'}</button></div>`;
+}
+
+// 학생 편집 → 미리보기 즉시 갱신 (타이핑 무지연)
 function onRpEdit(nk, el){ reportDrafts[nk] = el.value; if(nk === _rpActive) _renderRpPreview(); }
 function setRpActive(nk){
   _rpActive = nk;
-  document.querySelectorAll('.rp-row').forEach(r => r.classList.toggle('active', r.dataset.nk === nk));
-  _renderRpPreview();
+  document.querySelectorAll('.rp-si').forEach(r => r.classList.toggle('on', r.dataset.nk === nk));
+  _renderRpEditor(); _renderRpPreview();
 }
 function _renderRpPreview(){
   const el = document.getElementById('rp-right'); if(!el) return;
