@@ -13,10 +13,12 @@ if ($Clean) { Remove-Item -Recurse -Force build, dist -ErrorAction SilentlyConti
 
 # 에이전트는 키 입력·클립보드만 사용(이미지 인식·스크린샷 미사용) → pyautogui가 끌어오는
 # cv2/numpy/pandas 등 무거운 의존성 제외(67MB→20MB). PIL/pyscreeze는 pyautogui import 안정성 위해 유지.
-pyinstaller --noconfirm --onefile --windowed `
+# python -m PyInstaller (bare 'pyinstaller' CLI가 의존성 없는 다른 파이썬을 쓸 수 있어 명시)
+python -m PyInstaller --noconfirm --onefile --windowed `
   --name DRW-Agent-0.9 `
   --hidden-import pyautogui --hidden-import pyperclip --hidden-import PIL `
-  --collect-all pystray `
+  --collect-submodules pystray `
+  --hidden-import pystray._win32 --hidden-import pystray._util --hidden-import pystray._util.win32 `
   --hidden-import kakao_send --hidden-import secret_codec `
   --hidden-import ai_engine --hidden-import ai_style --hidden-import constants --hidden-import agent_worker `
   --exclude-module cv2 --exclude-module numpy --exclude-module pandas `

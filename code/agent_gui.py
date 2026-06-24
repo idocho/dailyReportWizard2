@@ -24,7 +24,7 @@ try:
     from PIL import Image, ImageDraw
     _HAS_TRAY = True
 except Exception:
-    _HAS_TRAY = False   # pystray 미설치 → 트레이 비활성(일반 창으로 동작)
+    _HAS_TRAY = False   # pystray 미설치/실패 → 트레이 비활성(일반 창으로 동작)
 
 INDIGO, INK, GREEN, RED, SUB = "#4F46E5", "#15171F", "#16A34A", "#DC2626", "#94A3B8"
 AGENT_VERSION = "0.9"
