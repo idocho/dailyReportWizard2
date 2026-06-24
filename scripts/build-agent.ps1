@@ -13,9 +13,9 @@ if ($Clean) { Remove-Item -Recurse -Force build, dist -ErrorAction SilentlyConti
 
 pyinstaller --noconfirm --onefile --windowed `
   --name DRW-Agent `
-  --hidden-import pyautogui `
-  --hidden-import pyperclip `
-  --hidden-import PIL `
+  --hidden-import pyautogui --hidden-import pyperclip --hidden-import PIL `
+  --hidden-import kakao_send --hidden-import secret_codec `
+  --hidden-import ai_engine --hidden-import ai_style --hidden-import constants --hidden-import agent_worker `
   agent_gui.py
 
 Write-Host "`n[완료] code/dist/DRW-Agent.exe" -ForegroundColor Green

@@ -122,6 +122,7 @@ function _saveDraft(nk, val){
 
 // ── 에이전트 실행 감지 + 미실행 시 설치 안내 ──────────────────────────
 // 에이전트가 agents/{id}.ts(ms) 하트비트를 ~15s마다 기록 → 90s 이내면 살아있음
+const AGENT_DL = 'https://github.com/idocho/dailyReportWizard2/releases/download/agent/DRW-Agent.exe';
 let _rpPending = null;
 async function _agentAlive(){
   try{ const a = await fbGet(`agents/${instructor.id}`); return !!(a && a.ts && Date.now() - a.ts < 90000); }
@@ -133,11 +134,15 @@ function _agentGuide(proceed){
     <div class="rp-hint">AI 생성·카톡 전송은 본인 PC의 <b>강사 에이전트</b>가 처리합니다. 지금 실행 중인 에이전트가 감지되지 않았습니다.</div>
     <ul style="font-size:12.5px;color:var(--sub);line-height:1.9;margin:10px 0 4px;padding-left:18px">
       <li>이미 설치돼 있으면 <b>DRW-Agent</b>를 실행하세요(시작메뉴·트레이).</li>
-      <li>처음이라면 아래 가이드로 1회 설치·설정 후 다시 시도.</li></ul>
+      <li>처음이라면 아래에서 내려받아 1회 설치·설정 후 다시 시도.</li>
+      <li style="color:var(--gray)">실행 시 Windows SmartScreen 경고가 뜨면 <b>추가 정보 → 실행</b>.</li></ul>
     <div class="rp-mrow">
+      <a class="rp-btn" href="${AGENT_DL}" style="text-decoration:none;text-align:center">⬇ 에이전트 다운로드</a>
+      <button class="rp-btn ghost" onclick="window.open('./guide.html','_blank')">설치 가이드</button>
+    </div>
+    <div class="rp-mrow" style="margin-top:8px">
       <button class="rp-btn ghost" onclick="closeRpModal()">닫기</button>
-      <button class="rp-btn ghost" onclick="window.open('./guide.html','_blank')">📖 설치 가이드</button>
-      ${proceed ? `<button class="rp-btn" onclick="_rpProceed()">그래도 대기열 추가</button>` : ''}
+      ${proceed ? `<button class="rp-btn ghost" onclick="_rpProceed()">그래도 대기열 추가</button>` : ''}
     </div>`);
 }
 function _rpProceed(){ const f = _rpPending; _rpPending = null; closeRpModal(); if(f) f(); }
