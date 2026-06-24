@@ -101,8 +101,11 @@ def _build_tags_context(tags: dict) -> str:
         lines.append(f"- 이해 속도: {_UNDERSTAND_TEXT[und]}")
 
     ex = tags.get("exam")
-    if ex and ex in _EXAM_TEXT:
-        lines.append(f"- 시험 결과(직접적이되 공격적이지 않게, 이 결과를 메시지 핵심으로): {_EXAM_TEXT[ex]}")
+    if isinstance(ex, str):   # 레거시 단일값 호환
+        ex = [ex] if ex else []
+    ex_notes = [_EXAM_TEXT[k] for k in (ex or []) if k in _EXAM_TEXT]
+    if ex_notes:
+        lines.append("- 시험 결과(직접적이되 공격적이지 않게, 이 결과를 메시지 핵심으로): " + "; ".join(ex_notes))
 
     for key in tags.get("understand_sub") or []:
         if key in _UNDERSTAND_SUB_TEXT:

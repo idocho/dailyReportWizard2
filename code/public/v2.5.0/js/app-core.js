@@ -390,16 +390,6 @@ function onTagUnderstand(el,classId,nameKey,subject){
   });
   pushObs(classId,nameKey,subject,'understand');
 }
-function onTagExam(el,classId,nameKey,subject){
-  const k=el.dataset.k;
-  const tags=getTags(classId,nameKey,subject);
-  tags.exam = tags.exam===k ? null : k;
-  const cell=el.closest('.tg-cell');
-  if(cell)cell.querySelectorAll('.tg-radio[data-g="exam"]').forEach(b=>{
-    b.classList.toggle('sel-c', b.dataset.k===tags.exam);
-  });
-  pushObs(classId,nameKey,subject,'exam');
-}
 function onTagMulti(el,classId,nameKey,field,subject){
   const k=el.dataset.k;
   const tags=getTags(classId,nameKey,subject);

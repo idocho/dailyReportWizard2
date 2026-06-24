@@ -164,10 +164,10 @@ function renderInput(mc){
       const sel=tags.understand===t.key;
       return `<button class="tg-radio${sel?' sel-c':''}" data-k="${esc(t.key)}" data-g="understand" onclick="onTagUnderstand(this,'${esc(classId)}','${esc(nameKey)}','${esc(subject)}')">${esc(t.label)}</button>`;
     }).join('');
-    // 시험 결과 (단일 선택, 시험 본 날만 — 미선택이면 메시지 미반영)
+    // 시험 결과 (복수 선택, 시험 본 날만 — 미선택이면 메시지 미반영)
     const examBtns=(TAGS.exam||[]).map(t=>{
-      const sel=tags.exam===t.key;
-      return `<button class="tg-radio${sel?' sel-c':''}" data-k="${esc(t.key)}" data-g="exam" onclick="onTagExam(this,'${esc(classId)}','${esc(nameKey)}','${esc(subject)}')">${esc(t.label)}</button>`;
+      const sel=(tags.exam||[]).includes(t.key);
+      return `<button class="tg-check${sel?' sel-m':''}" data-k="${esc(t.key)}" onclick="onTagMulti(this,'${esc(classId)}','${esc(nameKey)}','exam','${esc(subject)}')">${esc(t.label)}</button>`;
     }).join('');
     const undSubBtns=TAGS.understand_sub.map(t=>{
       const sel=(tags.understand_sub||[]).includes(t.key);
