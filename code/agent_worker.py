@@ -269,18 +269,63 @@ def _send_real(cfg, msgs, item_cb, should_cancel=None):
         raise RuntimeError("발송 타임아웃 — 카톡 응답 없음")
 
 
-def process_sendjobs(cfg, db, instructor_id, token=None, real=False, progress_cb=None):
-    """본인 sendJobs 큐 처리 — 동명이인 가드 + per-recipient 라이브 상태 회신. 반환: 처리 건수.
+def render(tmpl, name, cls):
+    """일괄공지 템플릿 치환(CM 계승) — 수신자 msg 없을 때 job.body로 본문 생성.
+    {날짜}=발송일(ko-KR 'YYYY. M. D.'). CM 웹 미리보기와 동일 표기."""
+    import datetime
+    d = datetime.date.today()
+    return ((tmpl or "").replace("{이름}", name or "").replace("{반}", cls or "")
+            .replace("{날짜}", f"{d.year}. {d.month}. {d.day}."))
+
+
+_ROLE_CACHE = {}
+
+
+def _lookup_role(db, cfg, instructor_id, token=None):
+    """로그인 신원의 acl 역할 조회(campus+instructorId 매칭, active만). 프로세스당 1회 캐시.
+    manager/admin/super 면 캠퍼스 일괄공지 발송 권한(일반 강사 None → 미폴링)."""
+    key = (cfg.get("campus"), instructor_id)
+    if key in _ROLE_CACHE:
+        return _ROLE_CACHE[key]
+    role = None
+    try:
+        acl = _get(db, "acl", token) or {}
+        for _uid, a in acl.items():
+            if (isinstance(a, dict) and a.get("instructorId") == instructor_id
+                    and a.get("campus") == cfg.get("campus") and a.get("active") is True):
+                role = a.get("role")
+                break
+    except Exception:
+        role = None
+    _ROLE_CACHE[key] = role
+    return role
+
+
+def process_sendjobs(cfg, db, instructor_id, token=None, real=False, progress_cb=None,
+                     base=None, claim_id=None):
+    """sendJobs 큐 처리 — 동명이인 가드 + per-recipient 라이브 상태 회신. 반환: 처리 건수.
+    base=None → 본인 강사 큐(campus/{c}/sendJobs/{id}). claim_id 지정 시(캠퍼스 공지) sender 선점으로
+    다중 매니저 PC 경쟁 방지. 수신자에 msg 없으면 job.body 템플릿으로 생성(일괄공지).
     progress_cb(state): GUI 오버레이용 진행 콜백(state={active,cls,done,total,fail})."""
     from collections import Counter
-    base = f"campus/{cfg['campus']}/sendJobs/{urllib.parse.quote(instructor_id)}"
+    if base is None:
+        base = f"campus/{cfg['campus']}/sendJobs/{urllib.parse.quote(instructor_id)}"
     jobs = _get(db, base, token) or {}
     pending = {jid: j for jid, j in jobs.items()
                if isinstance(j, dict) and j.get("status") == "queued"}
     prefix = cfg.get("roomPrefix", "")
     done = 0
     for jid, job in pending.items():
-        _patch(db, f"{base}/{jid}", {"status": "sending"}, token)
+        # 캠퍼스 공지 다중 매니저 경쟁 방지(best-effort, REST 비트랜잭션):
+        # ① 사전 확인 — 이미 다른 매니저가 선점(sending+sender)했으면 patch 없이 skip
+        if claim_id:
+            cur = _get(db, f"{base}/{jid}", token) or {}
+            if cur.get("status") == "sending" and cur.get("sender") and cur.get("sender") != claim_id:
+                continue
+        _patch(db, f"{base}/{jid}", {"status": "sending", **({"sender": claim_id} if claim_id else {})}, token)
+        # ② 짧은 경합 창 재확인 — 선점자≠나면 양보(나머지 skip)
+        if claim_id and (_get(db, f"{base}/{jid}/sender", token) or "") != claim_id:
+            continue
         recs = job.get("recipients", [])
         # 동명이인 오발송 가드(계승) — 같은 표시이름은 카톡방 검색이 합쳐져 타 학부모에게 갈 위험.
         names = [r.get("name", "") for r in recs]
@@ -293,7 +338,7 @@ def process_sendjobs(cfg, db, instructor_id, token=None, real=False, progress_cb
                 send_idx.append(i)
         img_path = decode_image(job.get("image")) if job.get("image") else None   # 일괄 공지 이미지
         msgs = [{"room": (prefix + (recs[i].get("name") or "")).strip(),
-                 "msg": recs[i].get("msg", ""),
+                 "msg": recs[i].get("msg") or render(job.get("body", ""), recs[i].get("name"), job.get("cls", "")),
                  **({"image": img_path, "image_first": bool(job.get("imageFirst"))} if img_path else {})}
                 for i in send_idx]
         total = len(msgs)
@@ -362,11 +407,25 @@ def process_sendjobs(cfg, db, instructor_id, token=None, real=False, progress_cb
 
 
 # ── 오케스트레이션 ───────────────────────────────────────────────────
+def process_campus_sendjobs(cfg, db, sender_id, token=None, real=False, progress_cb=None):
+    """매니저/운영자 PC 전용 — 캠퍼스 일괄공지 큐(root sendJobs/{campus}) 처리.
+    CM 웹이 적재, 강사용 DRW와 동일 발송 엔진. sender 선점으로 캠퍼스당 1대만 발송."""
+    base = f"sendJobs/{urllib.parse.quote(cfg['campus'])}"
+    return process_sendjobs(cfg, db, sender_id, token=token, real=real,
+                            progress_cb=progress_cb, base=base, claim_id=sender_id)
+
+
+_CAMPUS_SEND_ROLES = ("manager", "admin", "super")
+
+
 def process_once(cfg, db, instructor_id, token=None, real=False, progress_cb=None):
-    """생성 → 전송 큐를 한 번씩 처리. dry(real=False)=AI·카톡 모킹."""
+    """생성 → 전송 큐를 한 번씩 처리. dry(real=False)=AI·카톡 모킹.
+    로그인 신원이 매니저/운영자면 캠퍼스 일괄공지 큐도 처리(일반 강사는 미폴링·비노출)."""
     ai = _call_ai_hub if real else (lambda e, k, p, **kw: f"[dry] {p[:0]}AI 생성 문구(테스트)")
     g = process_genjobs(cfg, db, instructor_id, token, ai_call=ai)
     s = process_sendjobs(cfg, db, instructor_id, token, real=real, progress_cb=progress_cb)
+    if _lookup_role(db, cfg, instructor_id, token) in _CAMPUS_SEND_ROLES:
+        s += process_campus_sendjobs(cfg, db, instructor_id, token=token, real=real, progress_cb=progress_cb)
     return g, s
 
 
