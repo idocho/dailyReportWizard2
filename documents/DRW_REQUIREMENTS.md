@@ -1,7 +1,7 @@
 # DailyReportWizard — 요구사항 명세서
 
 **Crafted by IDO(idocho@kakao.com) · Powered by Claude AI**  
-**문서 버전**: 8.59 · **앱 버전**: v2.5.0(로그인 전환·개발 라인)/v2.4.0(이전) · **최종 수정**: 2026-06-24
+**문서 버전**: 8.60 · **앱 버전**: v2.5.0(로그인 전환·개발 라인)/v2.4.0(이전) · **최종 수정**: 2026-06-24
 
 > Firebase 스키마 전체 명세: [ClassManager/documents/DB_SCHEMA.md](../../ClassManager/documents/DB_SCHEMA.md)
 
@@ -11,6 +11,7 @@
 
 | 문서 버전 | 날짜 | 주요 변경 |
 |-----------|------|-----------|
+| 8.60 | 2026-06-24 | **에이전트 frozen exe 치명 버그 수정(exe 재배포)**. 슬림화(67→20MB) 검증 중 발견: PyInstaller onefile에서 `__file__`이 임시추출폴더(`_MEI…`, 종료 시 삭제)라 ① **agent_config.json이 매 실행 휘발**(재설정 반복) ② 자동시작 .bat가 임시 .py 경로 참조(무효)·GUI exe와 불일치. 수정: `agent_worker._BASE_DIR`=frozen이면 `sys.executable` 부모(exe 옆)로 config 영속, `register_autostart`=frozen이면 `start "" exe --auto`, `agent_gui` `--auto` 인자 → 설정 존재 시 실 발송 모드 자동 가동(턴키 자동시작). **검증**: 제외 모듈(cv2/numpy/pandas) 차단 상태서 에이전트 전체 import + 핵심 함수(build_prompt·SmartWait·send_messages·decode_image 등) 정상(런타임 불사용 확정), 재빌드 exe 기동 무크래시. 릴리스 `agent` 에셋 교체(동일 URL). |
 | 8.59 | 2026-06-24 | **에이전트 exe 빌드·배포 + 다운로드 안내 (v2.5.0 캐시 v287)**. `scripts/build-agent.ps1`로 `agent_gui.py` 단일 exe(`DRW-Agent.exe`, **20MB**, 동적 import kakao_send·secret_codec·ai_engine·ai_style·constants·agent_worker hidden-import 보강) PyInstaller 빌드. **용량 최적화**: 에이전트는 키 입력·클립보드만 사용(이미지 인식·스크린샷 미사용)인데 pyautogui→pyscreeze가 cv2(opencv)·numpy·pandas를 끌어와 67MB로 비대 → `--exclude-module cv2 numpy pandas scipy matplotlib IPython pytest`로 **67MB→20MB**(PIL·pyscreeze는 pyautogui import 안정성 위해 유지). **배포**: GitHub Release 태그 `agent`(PUBLIC 레포 → 무인증 다운로드, HTTP 200 확인) 에셋으로 업로드(git 미커밋, dist/ gitignore). **다운로드 경로**: `https://github.com/idocho/dailyReportWizard2/releases/download/agent/DRW-Agent.exe` — 에이전트 미감지 안내 모달(`_agentGuide`)에 `⬇ 에이전트 다운로드` 버튼(`AGENT_DL`)+SmartScreen 안내 추가. 재빌드 시 `gh release upload agent DRW-Agent.exe --clobber`로 동일 URL 유지. |
 | 8.58 | 2026-06-24 | **에이전트 미실행 감지 + 설치 안내 (v2.5.0 캐시 v286)**. AI 생성·카톡 전송은 로컬 에이전트가 처리하는데 에이전트 미실행 시 작업이 큐에 무한 대기하던 문제. **하트비트**: 에이전트(`agent_gui._worker`)가 `write_heartbeat`로 `campus/{campus}/agents/{instructorId}={ts(ms),real}`를 ~15s마다 기록. **웹**(`app-report.js`): `_agentAlive()`(하트비트 90s 이내 확인) 게이트를 AI 생성(`genReportOne`/`genReportAll`)·전송(`openReportSend`)·일괄(`bulkSend`) 진입에 추가 — 미감지 시 `_agentGuide` 모달(에이전트 실행/설치 가이드 링크 `guide.html` + '그래도 대기열 추가' 우회). 신규 DB 경로 `campus/{campus}/agents/{id}`(에이전트 소유). |
 | 8.57 | 2026-06-24 | **리포트·전송 화면 리디자인 (v2.5.0 JS v284·CSS v20260627)**. 승인 목업 반영. ① **4열 카드 패널화**(레일·편집·미리보기·전송모니터 각 둥근 카드). ② **라이트 테마 색 전면 교정** — 다크 잔재(저대비 연두/앰버 텍스트, `rgba(255,255,255,.05)` 보더) → 의미별 정상 대비(긍정 `#047857`/주의 `#B45309`/중립 `#4338CA`). 뱃지·pill·태그·제외칩·경고 모두. ③ **학생 레일 아바타**(이니셜) + 선택 강조. ④ **편집**: 아바타 헤더 + 진도/과제/수행도 **메트릭 칩** + 관찰 태그 pill + 강사메모 앰버 콜아웃 + 넓은 textarea + primary 생성. ⑤ **미리보기 카톡 말풍선**(좌상단 꼬리). ⑥ **전송 모니터 다크 패널화** — 작업 열(밝음)과 명확히 구분되는 어두운 상태보드, `● 실시간` 펄스 + 작업 카드 + **진행 프로그레스 바**. `_ini`(아바타), 작업카드 마크업(rp-job-top/rp-bar2/rp-job-sub) 신설. |

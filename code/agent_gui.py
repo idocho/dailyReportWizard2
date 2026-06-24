@@ -249,4 +249,14 @@ class AgentGUI:
 
 
 if __name__ == "__main__":
-    AgentGUI().run()
+    import sys
+    g = AgentGUI()
+    # 자동시작(.bat --auto)으로 켜진 경우: 설정돼 있으면 실 발송 모드로 즉시 가동(턴키)
+    if "--auto" in sys.argv and g.cfg:
+        try:
+            g.real = True
+            if hasattr(g, "real_var"): g.real_var.set(True)
+            g._toggle_run()
+        except Exception:
+            pass
+    g.run()
