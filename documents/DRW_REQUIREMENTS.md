@@ -1,7 +1,7 @@
 # DailyReportWizard — 요구사항 명세서
 
 **Crafted by IDO(idocho@kakao.com) · Powered by Claude AI**  
-**문서 버전**: 8.68 · **앱 버전**: v2.5.0(개발·배포)/v2.4.0(안정) · **최종 수정**: 2026-06-24
+**문서 버전**: 8.69 · **앱 버전**: v2.5.0(개발·배포)/v2.4.0(안정) · **최종 수정**: 2026-06-24
 
 > Firebase 스키마 전체 명세: [ClassManager/documents/DB_SCHEMA.md](../../ClassManager/documents/DB_SCHEMA.md)
 
@@ -11,6 +11,7 @@
 
 | 문서 버전 | 날짜 | 주요 변경 |
 |-----------|------|-----------|
+| 8.69 | 2026-06-25 | **호스팅 배포(v2.5.0 v293) + CSP Auth 차단 버그 수정**. 배포 직전 발견: v2.5.0 로그인 게이트가 Firebase SDK를 `gstatic.com`에서 import + Auth가 `identitytoolkit`/`securetoken.googleapis.com` 호출하나 `firebase.json` CSP `script-src`에 gstatic 없고 `connect-src`에 auth 엔드포인트 없음 → **배포판 로그인 전면 차단**(localhost는 CSP 미적용이라 미검출). 수정: `script-src`에 `https://www.gstatic.com`, `connect-src`에 `https://*.googleapis.com` 추가. `firebase deploy --only hosting`(87파일). 라이브 검증: 포털·v2.5.0·guide·v2.4.0 전부 200, CSP 헤더에 gstatic·googleapis 반영, 배포 JS v293. 에이전트 릴리스(`DRW-AI-Agent-0.91.exe`) 동반 공개. |
 | 8.68 | 2026-06-25 | **에이전트 리네이밍·버전 갱신 — DRW AI Agent v0.91**. AI 생성을 담당하는 'AI 에이전트' 성격 반영해 명칭 변경(`DRW Agent`→`DRW AI Agent`), 버전 0.9→0.91. 동기화: `agent_gui` 창/헤더 제목·`AGENT_VERSION`, `build-agent.ps1` 산출물명(`DRW-AI-Agent-0.91.exe`), 웹 `AGENT_DL`·에이전트 안내 모달, `guide.html` 다운로드 버튼(웹 JS v293). 릴리스 `agent` 에셋 교체(구 `DRW-Agent-0.9.exe` 삭제 → `DRW-AI-Agent-0.91.exe`). 기능 변경 없음(명칭·버전만). |
 | 8.67 | 2026-06-24 | **과제 커스텀 프리셋(`assign_tags`) AI 프롬프트 반영**. 강사 등록 자유문구(교재 미지참·오답풀이 안 함·채점 미실시 등)가 `tags.assign_tags`로 저장되고 genJob 페이로드까지 전달되나 `ai_engine._build_tags_context`가 키를 소비하지 않아 **프롬프트에서 누락**되던 버그. condition 다음에 `- 과제 관련 특이사항: ...`(자유텍스트 그대로) 추가. 과제 고정등급(assign_grade)은 기존대로 items.value로 전달. 에이전트 재빌드·재업로드. |
 | 8.66 | 2026-06-24 | **① 데일리 리포트 다반 일괄 전송 (v2.5.0 JS v292·CSS v20260629)**. 전송이 활성반 단독 → `전송` 모달이 **검토중(발송문 작성) 학생을 여러 반에 걸쳐 한 번에** 표시(`openReportSend`가 `_myClassList` 순회, 활성반 우선). 반 헤더 체크(`_sendClsToggle`)로 반 단위 토글·학생별 제외. `doReportSend`가 선택분을 **반별로 묶어 sendJob 다건 적재**(반별 history·취소·모니터 단위 유지) — A안(다반 선택)+B안(기존 큐 순차처리) 결합. 에이전트 불변(반별 잡 그대로). **② 카톡 전송 인터벌 단축**(`kakao_send.send_messages`): 학생 간 고정지연 — 말미 sleep 0.3→0.1, 방닫기 esc 0.2→0.12, 매건 재포커스 0.3→0.2(학생당 ~0.4s↓, room_opened 게이트가 정확성 보호). 에이전트 재빌드·재업로드. **③ guide.html 전면 갱신** — v2.4 잔재(설정 위저드·PC 전송 클라이언트·drw2_cbt 수동입력·데이터 가져오기·groq·수동 명단갱신) 제거, 현 구조 반영(로그인 게이트·강사 에이전트 설치/트레이/자동시작·5탭 사이드바·리포트·전송 트리·일괄공지 다반·시험 결과 태그·AI설정 문체·로그인 시 자동 최신로드). |
