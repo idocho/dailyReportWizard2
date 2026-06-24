@@ -166,6 +166,16 @@ def _patch(db, node, data, token):
         return json.loads(r.read())
 
 
+def write_heartbeat(cfg, db, instructor_id, token=None, real=False):
+    """웹이 에이전트 실행 여부를 감지하도록 주기적 하트비트 기록.
+    campus/{campus}/agents/{instructorId} = {ts(ms), real}. 실패 무해."""
+    try:
+        base = f"campus/{cfg['campus']}/agents/{urllib.parse.quote(instructor_id)}"
+        _patch(db, base, {"ts": int(time.time() * 1000), "real": bool(real)}, token)
+    except Exception:
+        pass
+
+
 def _fetch_instructor_notes(db, cfg, instructor_id, token):
     """history/ 에서 해당 강사가 전송한 노트 본문(최신순 일부) — AUTO 말투 학습용."""
     try:

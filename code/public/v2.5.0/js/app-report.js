@@ -120,6 +120,28 @@ function _saveDraft(nk, val){
   try{ fbPatch(`input/${nk}/__draft__`, { value: val, date: todayKey() }); }catch(_){}
 }
 
+// ── 에이전트 실행 감지 + 미실행 시 설치 안내 ──────────────────────────
+// 에이전트가 agents/{id}.ts(ms) 하트비트를 ~15s마다 기록 → 90s 이내면 살아있음
+let _rpPending = null;
+async function _agentAlive(){
+  try{ const a = await fbGet(`agents/${instructor.id}`); return !!(a && a.ts && Date.now() - a.ts < 90000); }
+  catch(_){ return false; }
+}
+function _agentGuide(proceed){
+  _rpPending = proceed || null;
+  _rpModal(`<h3>강사 에이전트가 필요합니다</h3>
+    <div class="rp-hint">AI 생성·카톡 전송은 본인 PC의 <b>강사 에이전트</b>가 처리합니다. 지금 실행 중인 에이전트가 감지되지 않았습니다.</div>
+    <ul style="font-size:12.5px;color:var(--sub);line-height:1.9;margin:10px 0 4px;padding-left:18px">
+      <li>이미 설치돼 있으면 <b>DRW-Agent</b>를 실행하세요(시작메뉴·트레이).</li>
+      <li>처음이라면 아래 가이드로 1회 설치·설정 후 다시 시도.</li></ul>
+    <div class="rp-mrow">
+      <button class="rp-btn ghost" onclick="closeRpModal()">닫기</button>
+      <button class="rp-btn ghost" onclick="window.open('./guide.html','_blank')">📖 설치 가이드</button>
+      ${proceed ? `<button class="rp-btn" onclick="_rpProceed()">그래도 대기열 추가</button>` : ''}
+    </div>`);
+}
+function _rpProceed(){ const f = _rpPending; _rpPending = null; closeRpModal(); if(f) f(); }
+
 // ── 메인 렌더 ─────────────────────────────────────────────────────────
 function renderReport(mc){
   renderMhdr('리포트');
@@ -265,7 +287,8 @@ function _genCtx(classId, nk, name){
   };
   return job;
 }
-async function genReportOne(nk){
+async function genReportOne(nk, force){
+  if(!force && !await _agentAlive()){ _agentGuide(() => genReportOne(nk, true)); return; }
   const a = activeAsgns()[curAI]; if(!a) return;
   const name = (_rpStudents().find(s => s.nameKey === nk) || {}).name || nk;
   const ta = document.getElementById('rp-' + nk);
@@ -288,7 +311,8 @@ async function _pollDrafts(jid, ms = 180000){   // 배치 — 더 긴 여유
   }
   throw new Error('생성 지연 — 에이전트 상태를 확인하세요');
 }
-async function genReportAll(){
+async function genReportAll(force){
+  if(!force && !await _agentAlive()){ _agentGuide(() => genReportAll(true)); return; }
   const a = activeAsgns()[curAI]; if(!a) return;
   const classId = a.classId;
   const students = _rpStudents().filter(s => _rpData(classId, s.nameKey).subjects.length);
@@ -313,7 +337,8 @@ async function genReportAll(){
 }
 
 // ── 전송 (실제 메시지 = build_message 전체) ──────────────────────────
-function openReportSend(){
+async function openReportSend(force){
+  if(!force && !await _agentAlive()){ _agentGuide(() => openReportSend(true)); return; }
   const a = activeAsgns()[curAI]; if(!a) return;
   const students = _rpStudents();
   const ready = students.filter(s => _curDraft(s.nameKey).trim());
@@ -514,11 +539,12 @@ function bulkPickImg(e){
   rd.readAsDataURL(f);
 }
 function bulkClearImg(){ _bulkImg = null; _bulkImgName = ''; renderBulk(document.getElementById('mc')); }
-async function bulkSend(){
+async function bulkSend(force){
   const a = activeAsgns()[curAI]; if(!a) return;
   const classId = a.classId;
   const tmpl = (document.getElementById('bulk-tmpl')?.value || '').trim();
   if(!tmpl) return toast('메시지를 입력하세요');
+  if(!force && !await _agentAlive()){ _agentGuide(() => bulkSend(true)); return; }
   const students = _bulkStudents().filter(s => _bulkSel.has(s.nameKey));
   if(!students.length) return toast('수신자를 선택하세요');
   const recipients = students.map(s => ({ nameKey: s.nameKey, name: s.name, msg: _bulkRender(tmpl, s.name, classId), status: '대기' }));

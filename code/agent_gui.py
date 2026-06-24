@@ -180,7 +180,12 @@ class AgentGUI:
     def _worker(self):
         db = self.cfg["dbUrl"]; instr = self.cfg["instructorId"]
         idle = self.cfg.get("interval", 2)   # 큐 픽업 지연 단축(2s) — sonnet 호출 구조는 불변
+        last_hb = 0.0
         while self.running:
+            now = time.time()
+            if now - last_hb > 15:           # 하트비트 — 웹이 에이전트 실행 여부 감지(미실행 시 설치 안내)
+                W.write_heartbeat(self.cfg, db, instr, real=self.real)
+                last_hb = now
             try:
                 g, s = W.process_once(self.cfg, db, instr, real=self.real, progress_cb=_progress)
                 if g or s:
