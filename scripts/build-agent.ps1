@@ -11,11 +11,15 @@ Set-Location (Join-Path $PSScriptRoot '..\code')
 
 if ($Clean) { Remove-Item -Recurse -Force build, dist -ErrorAction SilentlyContinue }
 
+# 에이전트는 키 입력·클립보드만 사용(이미지 인식·스크린샷 미사용) → pyautogui가 끌어오는
+# cv2/numpy/pandas 등 무거운 의존성 제외(67MB→20MB). PIL/pyscreeze는 pyautogui import 안정성 위해 유지.
 pyinstaller --noconfirm --onefile --windowed `
   --name DRW-Agent `
   --hidden-import pyautogui --hidden-import pyperclip --hidden-import PIL `
   --hidden-import kakao_send --hidden-import secret_codec `
   --hidden-import ai_engine --hidden-import ai_style --hidden-import constants --hidden-import agent_worker `
+  --exclude-module cv2 --exclude-module numpy --exclude-module pandas `
+  --exclude-module scipy --exclude-module matplotlib --exclude-module IPython --exclude-module pytest `
   agent_gui.py
 
 Write-Host "`n[완료] code/dist/DRW-Agent.exe" -ForegroundColor Green
