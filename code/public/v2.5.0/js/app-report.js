@@ -246,7 +246,8 @@ async function _pollDraft(jid, ms = 120000){
 }
 function _genCtx(classId, nk, name){
   const d = _rpData(classId, nk);
-  const items = d.subjects.map(sub => ({
+  // 발송 제외 교재는 AI 프롬프트(items)에서 아예 배제 — 빈 item 미전송
+  const items = d.subjects.filter(sub => !_excludeProg.has(`${classId}|${sub}`)).map(sub => ({
     subject: sub, value: d.assignMap[sub],
     progress: d.classInfo[sub].progress, homework: d.classInfo[sub].homework,
     gradeLabel: d.tbGrade[sub],
