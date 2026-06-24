@@ -136,6 +136,10 @@ body{font-family:'Pretendard','Malgun Gothic','맑은 고딕',-apple-system,sans
 .sr{padding:12px 14px;border-bottom:1px solid var(--border)}
 .sr:last-child{border-bottom:none}
 .sl{font-size:11px;color:var(--sub);margin-bottom:5px}
+/* 개별 지침 = 추가 프롬프트 안내 */
+.fld-tag{display:inline-block;margin-left:4px;font-size:9px;font-weight:700;color:#6366F1;background:rgba(99,102,241,.12);border:1px solid rgba(99,102,241,.3);border-radius:8px;padding:1px 6px;vertical-align:middle}
+.fld-help{font-size:10.5px;line-height:1.55;color:var(--sub);margin:0 0 6px}
+.fld-help b{color:var(--txt);font-weight:700}
 /* 문체 설명·예시 안내 */
 .ai-style-info{margin-top:8px;padding:9px 11px;border:1px solid var(--border);border-radius:9px;background:rgba(99,102,241,.05)}
 .asi-desc{font-size:11.5px;line-height:1.5;color:var(--txt)}
