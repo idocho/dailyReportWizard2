@@ -114,6 +114,14 @@ const TAGS = {
     {key:'effort',       label:'💎 끝까지도전'},
     {key:'process_good', label:'📝 풀이과정 우수'},
   ],
+  // 시험 결과(단일 선택, 시험 본 날만) — 잘봤/실수多/못봤에 따라 AI가 칭찬·격려 톤 자동 조정
+  exam: [
+    {key:'top',       label:'🏆 우수'},
+    {key:'good',      label:'👍 양호'},
+    {key:'careless',  label:'⚠️ 실수 실점'},
+    {key:'hard_miss', label:'🧩 심화 아쉬움'},
+    {key:'low',       label:'📉 아쉬움'},
+  ],
 };
 
 // 과제 추가 프리셋 기본값 — 강사 미설정 시 노출.
@@ -381,6 +389,16 @@ function onTagUnderstand(el,classId,nameKey,subject){
     b.classList.toggle('sel-c', b.dataset.k===tags.understand);
   });
   pushObs(classId,nameKey,subject,'understand');
+}
+function onTagExam(el,classId,nameKey,subject){
+  const k=el.dataset.k;
+  const tags=getTags(classId,nameKey,subject);
+  tags.exam = tags.exam===k ? null : k;
+  const cell=el.closest('.tg-cell');
+  if(cell)cell.querySelectorAll('.tg-radio[data-g="exam"]').forEach(b=>{
+    b.classList.toggle('sel-c', b.dataset.k===tags.exam);
+  });
+  pushObs(classId,nameKey,subject,'exam');
 }
 function onTagMulti(el,classId,nameKey,field,subject){
   const k=el.dataset.k;

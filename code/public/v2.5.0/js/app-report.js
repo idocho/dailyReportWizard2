@@ -46,6 +46,7 @@ function _obsTagLabels(tags){
   const out = [];
   if(tags.condition){ const t = TAGS.condition.find(x => x.key === tags.condition); if(t) out.push({ label: '컨디션 ' + t.label, kind: 'neutral' }); }
   if(tags.understand){ const t = TAGS.understand.find(x => x.key === tags.understand); if(t) out.push({ label: '이해 ' + t.label, kind: 'neutral' }); }
+  if(tags.exam && TAGS.exam){ const t = TAGS.exam.find(x => x.key === tags.exam); if(t) out.push({ label: '시험 ' + t.label, kind: (tags.exam === 'top' || tags.exam === 'good') ? 'pos' : 'warn' }); }
   const KIND = { understand_sub: 'pos', engage: 'pos', highlight: 'pos', caution: 'warn', extra: 'neutral' };
   ['understand_sub', 'engage', 'caution', 'extra', 'highlight'].forEach(g => {
     (tags[g] || []).forEach(k => { const t = (TAGS[g] || []).find(x => x.key === k); if(t) out.push({ label: t.label, kind: KIND[g] || 'neutral' }); });

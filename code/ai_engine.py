@@ -69,6 +69,13 @@ _EXTRA_TEXT = {
     "weekly_test": "주간 테스트를 실시함",
     "retest":      "재시험을 실시함",
 }
+_EXAM_TEXT = {
+    "top":       "시험 결과 우수(잘 봄) — 구체적으로 칭찬하고 성취를 강조",
+    "good":      "시험 결과 양호 — 안정적인 성취를 격려",
+    "careless":  "아는 내용인데 단순 실수(계산·조건·검토)로 실점 — 실력은 인정하되 검토·점검 습관을 완곡히 코칭",
+    "hard_miss": "기본 개념은 정확하나 고난도·심화에서 실점 — 기본기를 칭찬하고 심화 보강 방향을 제시",
+    "low":       "시험 결과가 전반적으로 아쉬움 — 비난 없이 완곡하게, 보완 방향과 격려 중심으로",
+}
 _HIGHLIGHT_TEXT = {
     "mastered":     "오늘 다룬 개념을 완전히 습득함",
     "effort":       "어려운 문제에도 끝까지 포기하지 않는 집념을 보임",
@@ -92,6 +99,10 @@ def _build_tags_context(tags: dict) -> str:
     und = tags.get("understand")
     if und and und in _UNDERSTAND_TEXT:
         lines.append(f"- 이해 속도: {_UNDERSTAND_TEXT[und]}")
+
+    ex = tags.get("exam")
+    if ex and ex in _EXAM_TEXT:
+        lines.append(f"- 시험 결과(직접적이되 공격적이지 않게, 이 결과를 메시지 핵심으로): {_EXAM_TEXT[ex]}")
 
     for key in tags.get("understand_sub") or []:
         if key in _UNDERSTAND_SUB_TEXT:
