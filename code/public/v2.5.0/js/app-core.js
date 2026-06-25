@@ -501,7 +501,12 @@ function selGroup(gr){
   renderSb();renderMain();
 }
 function sbToggle(gr){
-  sbFolded[gr]=sbFolded[gr]!==true;
+  // 현재 '보이는' 상태(autoFold 반영)를 뒤집음 — 저장값만 토글하면 자동접힘 그룹서 첫 클릭이 헛돎
+  const _dd=_devDate?new Date(_devDate):new Date(); const _dow=_dd.getDay();
+  const todayGroup=[1,3,5].includes(_dow)?'M':([2,4,6].includes(_dow)?'T':'');
+  const autoFold=!!gr&&!!todayGroup&&gr.toUpperCase()!==todayGroup;
+  const cur=(sbFolded[gr]===undefined)?autoFold:(sbFolded[gr]===true);
+  sbFolded[gr]=!cur;
   renderSb();
 }
 
