@@ -69,6 +69,18 @@
 
   const cfg=(await import('./js/auth/firebase-config.js')).firebaseConfig;
 
+  // 캠퍼스 목록 동적 로드 — 공개 읽기 노드(campuses)에서. 하드코딩 제거(추가 시 코드변경 불요).
+  // 로그인 전이라 무인증 REST. 실패 시 기본 옵션(동수원) 유지 → 로그인 불능 방지.
+  try{
+    const _esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    const cs=await (await fetch(cfg.databaseURL.replace(/\/$/,'')+'/campuses.json')).json();
+    if(cs && typeof cs==='object'){
+      const ents=Object.entries(cs).filter(([k,v])=>v && v.active!==false)
+        .sort((a,b)=>(((a[1]&&a[1].order)??99)-((b[1]&&b[1].order)??99))||a[0].localeCompare(b[0]));
+      if(ents.length) $('gt-campus').innerHTML=ents.map(([slug,v])=>`<option value="${_esc(slug)}">${_esc((v&&v.name)||slug)}</option>`).join('');
+    }
+  }catch(_){ /* 기본 옵션 유지 */ }
+
   function bootApp(){
     // 설정 주입(로그인 세션 기반) — 사용자 수동 입력 제거
     try{ localStorage.setItem('drw_db_url',cfg.databaseURL); localStorage.setItem('drw_db_path',CAMPUS_PATH);

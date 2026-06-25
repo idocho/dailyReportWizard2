@@ -32,6 +32,16 @@
       ".write": "auth != null && root.child('acl').child(auth.uid).child('role').val() === 'admin'"
     },
 
+    "campuses": {
+      // 캠퍼스 목록(드롭다운 원천) — 로그인 전 표시되므로 공개 읽기. 비민감(이미 로그인 화면 노출).
+      // 쓰기는 운영자(admin/super)만. {slug}={name, order?, active?}
+      ".read": true,
+      "$slug": {
+        ".write": "auth != null && ( root.child('acl').child(auth.uid).child('role').val() === 'admin' || root.child('acl').child(auth.uid).child('role').val() === 'super' )",
+        ".validate": "newData.hasChild('name')"
+      }
+    },
+
     "sendJobs": {
       "$campus": {
         // 읽기: 운영자(admin·전역) 또는 같은 캠퍼스 관리자(manager)/agent
