@@ -1087,9 +1087,141 @@ async function _aclPut(uid,field,val){
     {method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(val)});
   if(!r.ok) throw new Error('변경 실패 '+r.status);
 }
-function renderStudents(mc){
+// ── 학생 명단 탭 (CampusManager 포팅: 2-pane M/T 그룹 토글 + 학생 테이블) ──────
+//   스키마: students/{nameKey}={name,class} · classes/{id}={group:'M'|'T',courses}
+let _rs={group:'M',sel:null,classes:{},students:{}};
+async function renderStudents(mc){
   if(!_isMgr()){ activeTab='input'; renderMain(); return; }
-  mc.innerHTML=makeTb('학생 명단','학급·학생 추가·편집 (관리자)')+`<div style="padding:16px 18px;max-width:860px">${renderClsMgmt()}</div>`;
+  mc.innerHTML=makeTb('학생 명단','반·학생 추가·편집 (관리자)')+`
+    <div class="rs-wrap">
+      <div class="rs-head"><span class="rs-cnt" id="rsCnt">불러오는 중…</span>
+        <span class="rs-sp"><button class="btn bsm" id="rsAddCls">+ 반 추가</button><button class="btn bsm bp" id="rsAddStu">+ 학생 추가</button></span></div>
+      <div class="rs-grid">
+        <div class="rs-panel"><div class="rs-gtog"><button id="rsGM">M반</button><button id="rsGT">T반</button></div><div class="rs-clist" id="rsClist"></div></div>
+        <div class="rs-panel" id="rsSpanel"></div>
+      </div>
+    </div>`;
+  try{ const [cls,stu]=await Promise.all([fbGet('classes').catch(()=>null),fbGet('students').catch(()=>null)]);
+       _rs.classes=cls||{}; _rs.students=stu||{}; }
+  catch(_){ _rs.classes=config?.classes||{}; _rs.students={}; }
+  document.getElementById('rsAddCls').onclick=rsAddCls;
+  document.getElementById('rsAddStu').onclick=()=>rsEditStu(null);
+  document.getElementById('rsGM').onclick=()=>{_rs.group='M';_rs.sel=null;_rsDraw();};
+  document.getElementById('rsGT').onclick=()=>{_rs.group='T';_rs.sel=null;_rsDraw();};
+  _rsDraw();
+}
+function _rsInClass(c){ return Object.values(_rs.students).filter(s=>s&&s.class===c).length; }
+function _rsUnassigned(){ return Object.entries(_rs.students).filter(([k,s])=>!s||!s.class||!_rs.classes[s.class]); }
+function _rsDraw(){
+  document.getElementById('rsCnt').textContent=`학생 ${Object.keys(_rs.students).length}명 · 반 ${Object.keys(_rs.classes).length}개`;
+  document.getElementById('rsGM').className=_rs.group==='M'?'on':'';
+  document.getElementById('rsGT').className=_rs.group==='T'?'on':'';
+  const cs=Object.entries(_rs.classes).filter(([id,c])=>((c&&c.group)||'M')===_rs.group);
+  if(!_rs.sel||(_rs.sel!=='__un__'&&!_rs.classes[_rs.sel]))_rs.sel=cs.length?cs[0][0]:'__un__';
+  const clist=document.getElementById('rsClist');
+  clist.innerHTML=cs.map(([id])=>`<div class="rs-ci${_rs.sel===id?' on':''}" data-c="${esc(id)}">${esc(id)}<span class="rs-n">${_rsInClass(id)}</span></div>`).join('')
+    +`<div class="rs-ci rs-un${_rs.sel==='__un__'?' on':''}" data-c="__un__">⚠ 무소속<span class="rs-n">${_rsUnassigned().length}</span></div>`;
+  clist.querySelectorAll('.rs-ci').forEach(el=>el.onclick=()=>{_rs.sel=el.dataset.c;_rsDraw();});
+  const list=(_rs.sel==='__un__'?_rsUnassigned():Object.entries(_rs.students).filter(([k,s])=>s&&s.class===_rs.sel))
+    .sort((a,b)=>String(a[1]?.name||'').localeCompare(String(b[1]?.name||''),'ko'));
+  const isCls=_rs.sel!=='__un__';
+  const sp=document.getElementById('rsSpanel');
+  sp.innerHTML=`<div class="rs-sphd"><span class="rs-spttl">${isCls?esc(_rs.sel):'무소속'} · ${list.length}명</span>${isCls?`<span class="rs-spact"><button class="rs-abtn" id="rsRen">반 이름 변경</button><button class="rs-abtn del" id="rsDelC">반 삭제</button></span>`:''}</div>`
+    +(list.length?`<table class="rs-tbl"><thead><tr><th>출결번호</th><th>이름</th><th>반</th><th>작업</th></tr></thead><tbody>`
+      +list.map(([k,s])=>{const assigned=s.class&&_rs.classes[s.class];return `<tr><td class="rs-num">${esc(k)}</td><td><b>${esc(s.name||'')}</b></td><td>${esc(s.class||'무소속')}</td><td class="rs-act"><button data-edit="${esc(k)}">편집</button>${assigned?`<button class="del x" data-del="${esc(k)}" title="반에서 빼기(무소속)">✕</button>`:`<button class="del" data-del="${esc(k)}">영구삭제</button>`}</td></tr>`;}).join('')
+      +`</tbody></table>`:`<div class="rs-empty">학생이 없습니다.</div>`);
+  sp.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>rsEditStu(b.dataset.edit));
+  sp.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>rsDelStu(b.dataset.del));
+  if(isCls){ document.getElementById('rsRen').onclick=()=>rsRenameCls(_rs.sel); document.getElementById('rsDelC').onclick=()=>rsDelCls(_rs.sel); }
+}
+function _rsClsOpts(cur){ return Object.keys(_rs.classes).map(id=>`<option value="${esc(id)}"${id===cur?' selected':''}>${esc(id)}</option>`).join('')+`<option value=""${!cur?' selected':''}>무소속</option>`; }
+function rsEditStu(key){
+  const s=key?_rs.students[key]:null;
+  _rpModal(`<h3>${key?'학생 편집':'학생 추가'}</h3>
+    <label class="rp-flbl">출결번호 (nameKey)</label><input class="rp-fin" id="rs-key" value="${key?esc(key):''}" ${key?'disabled':''} inputmode="numeric" placeholder="예: 1024">
+    <label class="rp-flbl">이름</label><input class="rp-fin" id="rs-name" value="${s?esc(s.name||''):''}">
+    <label class="rp-flbl">반</label><select class="rp-fin" id="rs-cls">${_rsClsOpts(s?s.class:(_rs.sel==='__un__'?'':_rs.sel))}</select>
+    <div class="rp-mrow"><button class="rp-btn ghost" onclick="closeRpModal()">취소</button><button class="rp-btn" id="rs-ok">저장</button></div>`);
+  setTimeout(()=>document.getElementById(key?'rs-name':'rs-key')?.focus(),0);
+  document.getElementById('rs-ok').onclick=async()=>{
+    const k=(document.getElementById('rs-key').value||'').trim(),nm=(document.getElementById('rs-name').value||'').trim(),cl=document.getElementById('rs-cls').value||null;
+    if(!k||!nm)return toast('출결번호·이름을 입력하세요');
+    if(!key&&_rs.students[k])return toast('이미 있는 출결번호입니다');
+    try{ await fbPut('students/'+encodeURIComponent(k),{name:nm,class:cl}); _rs.students[k]={name:nm,class:cl}; if(cl)_rs.sel=cl; closeRpModal(); toast('저장됨 ✅'); _rsSyncConfig(); _rsDraw(); }
+    catch(e){ toast('저장 실패: '+e,4000); }
+  };
+}
+async function rsDelStu(k){
+  const s=_rs.students[k]; if(!s)return;
+  const assigned=s.class&&_rs.classes[s.class];
+  if(assigned){
+    if(!confirm(`'${s.name}' 학생을 '${s.class}'에서 빼서 무소속으로 옮길까요?`))return;
+    try{ await fbPut('students/'+encodeURIComponent(k),{name:s.name,class:null}); _rs.students[k]={name:s.name,class:null}; toast('무소속으로 이동'); _rsSyncConfig(); _rsDraw(); }catch(e){ toast(e.message||String(e)); }
+  }else{
+    if(!confirm(`'${s.name}' 학생을 완전히 삭제할까요? (되돌릴 수 없음)`))return;
+    try{ await fbPut('students/'+encodeURIComponent(k),null); delete _rs.students[k]; toast('삭제됨'); _rsSyncConfig(); _rsDraw(); }catch(e){ toast(e.message||String(e)); }
+  }
+}
+function rsAddCls(){
+  _rpModal(`<h3>반 추가</h3>
+    <label class="rp-flbl">반 이름</label><input class="rp-fin" id="rs-cid" placeholder="예: 중1A">
+    <label class="rp-flbl">그룹</label><select class="rp-fin" id="rs-cgrp"><option value="M"${_rs.group==='M'?' selected':''}>M반 (월수금)</option><option value="T"${_rs.group==='T'?' selected':''}>T반 (화목토)</option></select>
+    <div class="rp-mrow"><button class="rp-btn ghost" onclick="closeRpModal()">취소</button><button class="rp-btn" id="rs-cok">추가</button></div>`);
+  setTimeout(()=>document.getElementById('rs-cid')?.focus(),0);
+  document.getElementById('rs-cok').onclick=async()=>{
+    const id=(document.getElementById('rs-cid').value||'').trim(); if(!id)return toast('반 이름을 입력하세요');
+    if(_rs.classes[id])return toast('이미 있는 반입니다');
+    const grp=document.getElementById('rs-cgrp').value;
+    try{ await fbPut('classes/'+encodeURIComponent(id),{group:grp,courses:{}}); _rs.classes[id]={group:grp,courses:{}}; _rs.group=grp;_rs.sel=id; closeRpModal(); toast(`${id} 추가됨 ✅`); _rsSyncConfig(); _rsDraw(); }
+    catch(e){ toast('추가 실패: '+e,4000); }
+  };
+}
+async function rsDelCls(id){
+  const n=_rsInClass(id);
+  if(!confirm(`'${id}' 반을 삭제할까요?${n?`\n소속 학생 ${n}명은 무소속으로 이동됩니다(데이터 보존).`:''}`))return;
+  try{
+    for(const [k,s] of Object.entries(_rs.students))if(s&&s.class===id){ await fbPut('students/'+encodeURIComponent(k),{name:s.name,class:null}); _rs.students[k]={name:s.name,class:null}; }
+    await fbPut('classes/'+encodeURIComponent(id),null); delete _rs.classes[id];
+    _rs.sel=null; toast(`${id} 반 삭제 (학생 ${n}명 무소속 이동)`); _rsSyncConfig(); _rsDraw();
+  }catch(e){ toast(e.message||String(e)); }
+}
+function rsRenameCls(oldId){
+  _rpModal(`<h3>반 이름 변경</h3>
+    <label class="rp-flbl">새 반 이름</label><input class="rp-fin" id="rs-rid" value="${esc(oldId)}">
+    <div class="rp-hint">소속 학생·진도/과제·성적·강사 담당배정이 함께 이동합니다. 주기적 개편용 — 실행 전 백업 권장.</div>
+    <div class="rp-mrow"><button class="rp-btn ghost" onclick="closeRpModal()">취소</button><button class="rp-btn" id="rs-rok">변경</button></div>`);
+  setTimeout(()=>{const i=document.getElementById('rs-rid');if(i){i.focus();i.select();}},0);
+  document.getElementById('rs-rok').onclick=async()=>{
+    const nv=(document.getElementById('rs-rid').value||'').trim();
+    if(!nv||nv===oldId)return closeRpModal();
+    if(_rs.classes[nv])return toast('이미 있는 반 이름입니다');
+    const btn=document.getElementById('rs-rok'); btn.disabled=true; btn.textContent='이동 중…';
+    try{ await _rsMigrate(oldId,nv); closeRpModal(); _rs.sel=nv; toast(`'${oldId}' → '${nv}' 변경 완료`); await renderStudents(document.getElementById('mc')); }
+    catch(e){ toast('변경 실패: '+(e.message||e)); btn.disabled=false; btn.textContent='변경'; }
+  };
+}
+// 반 키 마이그레이션 — classes·students·session/class_data·scores·강사 담당배정 일괄 이동
+async function _rsMigrate(oldId,newId){
+  const enc=encodeURIComponent;
+  await fbPut('classes/'+enc(newId), _rs.classes[oldId]||{group:_rs.group,courses:{}});
+  const stu=await fbGet('students').catch(()=>null)||{};
+  for(const [k,s] of Object.entries(stu))if(s&&s.class===oldId)await fbPatch('students/'+enc(k),{class:newId});
+  const sess=await fbGet('session/class_data').catch(()=>null)||{};
+  for(const [key,val] of Object.entries(sess)){ const parts=key.split('|'); if(parts[0]===oldId){ const nk=newId+'|'+parts.slice(1).join('|'); await fbPut('session/class_data/'+enc(nk),val); await fbPut('session/class_data/'+enc(key),null); } }
+  const sc=await fbGet('scores/weekly/'+enc(oldId)).catch(()=>null);
+  if(sc){ await fbPut('scores/weekly/'+enc(newId),sc); await fbPut('scores/weekly/'+enc(oldId),null); }
+  const instrs=await fbGet('config/instructors').catch(()=>null)||{};
+  for(const [nm,info] of Object.entries(instrs)){ const as=info&&info.assignments; if(Array.isArray(as)){ let ch=false; as.forEach(a=>{if(a&&a.classId===oldId){a.classId=newId;ch=true;}}); if(ch)await fbPatch('config/instructors/'+enc(nm),{assignments:as}); } }
+  await fbPut('classes/'+enc(oldId),null);
+}
+// _rs 변경분을 DRW 인메모리(config)로 반영 — 입력·성적·사이드바 일관성
+function _rsSyncConfig(){
+  config=config||{classes:{},instructors:{}};
+  config.classes=JSON.parse(JSON.stringify(_rs.classes));
+  const cs={}; for(const [k,v] of Object.entries(_rs.students)){ const cid=v&&v.class; if(cid){ (cs[cid]=cs[cid]||[]).push({nameKey:k,...v}); } }
+  config._classStudents=cs;
+  try{ saveLocal(); }catch(_){}
+  try{ if(typeof renderSb==='function')renderSb(); }catch(_){}
 }
 
 function renderAccounts(mc){
