@@ -301,7 +301,7 @@ function renderClsMgmtTop(){
     <div class="sh">🏫 학급 &amp; 학생 관리</div>
     <div class="sh2">내 담당 학급</div>
     ${myRows||'<div style="padding:8px 12px;font-size:11px;color:var(--gray)">담당 수업을 추가하면 여기에 표시됩니다.</div>'}
-    <div class="sh2" style="display:flex;align-items:center;justify-content:space-between">전체 학급 탐색${adminOn?`<button class="btn bsm" onclick="addClsModal()" style="font-size:11px;padding:3px 9px">+ 학급 추가</button>`:''}</div>
+    <div class="sh2" style="display:flex;align-items:center;justify-content:space-between">전체 학급 탐색${_rosterAdmin()?`<button class="btn bsm" onclick="addClsModal()" style="font-size:11px;padding:3px 9px">+ 학급 추가</button>`:''}</div>
     ${drillBtns||'<div style="padding:8px 12px;font-size:11px;color:var(--gray)">등록된 학급이 없습니다.</div>'}
   </div>`;
 }
@@ -315,7 +315,7 @@ function renderClsMgmtClass(classId){
     <div class="sh" style="display:flex;align-items:center;gap:8px;padding:7px 10px 7px 14px">
       <button class="btn bsm" onclick="clsDrillSh=null;renderMain()" style="flex-shrink:0;font-size:11px">← 뒤로</button>
       <span style="flex:1">🏫 ${esc(classId)} 학급 관리</span>
-      ${adminOn?`<button class="btn br bsm" onclick="rmCls('${esc(classId)}')" style="padding:2px 7px;font-size:11px;flex-shrink:0">학급 삭제</button>`:''}
+      ${_rosterAdmin()?`<button class="btn br bsm" onclick="rmCls('${esc(classId)}')" style="padding:2px 7px;font-size:11px;flex-shrink:0">학급 삭제</button>`:''}
     </div>
     <div style="padding:12px 14px">${_clsSectionsHtml(classId,clsD)}</div>
   </div>`;
@@ -369,11 +369,11 @@ function toggleArchRow(btn,classId){
 function _clsSectionsHtml(classId,clsD){
   const students=(config?._classStudents||{})[classId]||[];
   // 학급·학생 정보 변경은 관리자 전용 (강사는 조회만) — 명단 소유권 분리
-  const stuChips=students.map(s=>adminOn
+  const stuChips=students.map(s=>_rosterAdmin()
     ?`<span class="chip" style="cursor:pointer" onclick="editStu('${esc(classId)}','${esc(s.nameKey)}')" title="클릭=편집">${esc(s.name||s.nameKey)} <span style="color:var(--gray);font-size:9px">${esc(s.nameKey)}</span></span>`
     :`<span class="chip" style="cursor:default">${esc(s.name||s.nameKey)}</span>`).join('');
   return `<div class="sl">학생</div>
-      <div class="chips" data-classid="${esc(classId)}" data-chip-type="stu">${stuChips}${adminOn?`<span class="chip" style="background:var(--indigo-l);border-color:var(--indigo);color:var(--indigo);cursor:pointer" onclick="addStuModal('${esc(classId)}')">+ 학생 추가</span>`:''}</div>
+      <div class="chips" data-classid="${esc(classId)}" data-chip-type="stu">${stuChips}${_rosterAdmin()?`<span class="chip" style="background:var(--indigo-l);border-color:var(--indigo);color:var(--indigo);cursor:pointer" onclick="addStuModal('${esc(classId)}')">+ 학생 추가</span>`:''}</div>
       <div class="sl" style="margin-top:10px">과목</div>
       <div data-course-block="${esc(classId)}">${_courseChipsBlockHtml(classId,clsD)}</div>`;
 }
@@ -390,7 +390,7 @@ function buildClsAccordion(classId,clsD,myRole){
       <span style="font-size:13px;font-weight:700;flex:1">${esc(classId)}</span>
       ${subBadge}
       <span style="font-size:10px;color:var(--gray);margin:0 6px;white-space:nowrap">학생 ${students.length} · 과목 ${subjects.length}</span>
-      ${adminOn?`<button class="btn br bsm" onclick="rmCls('${esc(classId)}');event.stopPropagation()" style="padding:2px 7px;font-size:11px;flex-shrink:0">✕</button>`:''}
+      ${_rosterAdmin()?`<button class="btn br bsm" onclick="rmCls('${esc(classId)}');event.stopPropagation()" style="padding:2px 7px;font-size:11px;flex-shrink:0">✕</button>`:''}
     </div>
     <div class="acc-body${open?' open':''}">${_clsSectionsHtml(classId,clsD)}</div>
   </div>`;
@@ -400,7 +400,7 @@ function buildClsAccordion(classId,clsD,myRole){
 function _allStudentKeys(){ const s={}; for(const arr of Object.values(config?._classStudents||{}))for(const st of (arr||[]))s[st.nameKey]=1; return s; }
 function _clsOptions(cur){ return Object.keys(config?.classes||{}).map(id=>`<option value="${esc(id)}"${id===cur?' selected':''}>${esc(id)}</option>`).join(''); }
 function addStuModal(classId){
-  if(!adminOn)return toast('관리자 모드가 필요합니다.');
+  if(!_rosterAdmin())return toast('학급·학생 편집 권한이 없습니다.');
   _rpModal(`<h3>학생 추가</h3>
     <div class="rp-hint">출결번호(nameKey)는 학생 고유 식별자 — 정확히 입력하세요.</div>
     <label class="rp-flbl">출결번호</label><input class="rp-fin" id="st-key" inputmode="numeric" placeholder="예: 1024">
@@ -410,7 +410,7 @@ function addStuModal(classId){
   setTimeout(()=>document.getElementById('st-key')?.focus(),0);
 }
 function editStu(classId,nameKey){
-  if(!adminOn)return toast('관리자 모드가 필요합니다.');
+  if(!_rosterAdmin())return toast('학급·학생 편집 권한이 없습니다.');
   const s=((config?._classStudents||{})[classId]||[]).find(x=>x.nameKey===nameKey)||{};
   _rpModal(`<h3>학생 편집</h3>
     <label class="rp-flbl">출결번호</label><input class="rp-fin" value="${esc(nameKey)}" disabled>
@@ -435,7 +435,7 @@ async function saveStu(editKey){
   }catch(e){ toast('저장 실패: '+e,4000); }
 }
 function addClsModal(){
-  if(!adminOn)return toast('관리자 모드가 필요합니다.');
+  if(!_rosterAdmin())return toast('학급·학생 편집 권한이 없습니다.');
   _rpModal(`<h3>학급 추가</h3>
     <label class="rp-flbl">반 이름</label><input class="rp-fin" id="cl-id" placeholder="예: 중1A">
     <label class="rp-flbl">그룹</label><select class="rp-fin" id="cl-grp"><option value="M">M반 (월수금)</option><option value="T">T반 (화목토)</option></select>
@@ -733,7 +733,7 @@ function _syncAssignments(){
 }
 
 function rmCls(classId){
-  if(!adminOn){toast('학급 삭제는 관리자만 가능합니다.');return;}
+  if(!_rosterAdmin()){toast('학급 삭제 권한이 없습니다.');return;}
   if(!confirm(`${classId} 학급을 삭제합니까?`))return;
   delete config.classes[classId];
   if(config._classStudents)delete config._classStudents[classId];
@@ -752,14 +752,14 @@ function rmCls(classId){
 }
 
 async function rmStu(classId,nameKey){
-  if(!adminOn){toast('학생 삭제는 관리자만 가능합니다.');return;}
+  if(!_rosterAdmin()){toast('학생 삭제 권한이 없습니다.');return;}
   const stu=((config?._classStudents||{})[classId]||[]).find(s=>s.nameKey===nameKey);
   const displayName=stu?.name||nameKey;
   if(!confirm(`${displayName}을(를) 삭제합니까?`))return;
   if(config._classStudents?.[classId]){
     config._classStudents[classId]=config._classStudents[classId].filter(s=>s.nameKey!==nameKey);
   }
-  refreshStuChips(classId);
+  renderMain();
   // Firebase: students/{nameKey} 삭제
   if(dbUrl&&dbPath){
     try{await fbPut(`students/${nameKey}`,null);}catch(e){}
@@ -1087,6 +1087,11 @@ async function _aclPut(uid,field,val){
     {method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(val)});
   if(!r.ok) throw new Error('변경 실패 '+r.status);
 }
+function renderStudents(mc){
+  if(!_isMgr()){ activeTab='input'; renderMain(); return; }
+  mc.innerHTML=makeTb('학생 명단','학급·학생 추가·편집 (관리자)')+`<div style="padding:16px 18px;max-width:860px">${renderClsMgmt()}</div>`;
+}
+
 function renderAccounts(mc){
   if(!_isMgr()){ activeTab='input'; renderMain(); return; }
   mc.innerHTML=makeTb('강사 계정','발급·비활성·비번 리셋·삭제 (관리자 전용)')+`

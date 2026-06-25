@@ -136,6 +136,8 @@ let clsDrillSh=null; // 학급 관리 드릴다운 상태 (null=최상위, class
 let adminOn=false;   // 관리자 세션 상태 (새로고침 시 해제)
 // acl 역할 기반 — 매니저/운영자만 관리 메뉴(강사 계정 등) 노출. instructor.role는 로그인 시 주입(index.html)
 function _isMgr(){ const r=(typeof instructor!=='undefined'&&instructor&&instructor.role)||''; return r==='manager'||r==='admin'||r==='super'; }
+// 학급·학생 명단 편집 권한 — 관리자 모드(adminOn) 또는 acl 매니저/운영자(별도 모드 불요)
+function _rosterAdmin(){ return adminOn || _isMgr(); }
 // 모바일·태블릿(=강사 에이전트 없는 기기) 판정 — 리포트·전송/일괄공지 비노출.
 // 데스크톱모드 UA 위장 대비: 터치전용(마우스 없음) 기기는 pointer:coarse로 잡음(데스크톱모드서도 불변).
 function _isMobile(){
@@ -570,6 +572,7 @@ function renderSb(){
       <div class="sni${activeTab==='scores'?' on':''}" onclick="goNav('scores')">📊 성적 입력</div>
       ${_isMobile()?'':`<div class="sni${activeTab==='bulk'?' on':''}" onclick="goNav('bulk')">📢 일괄 공지</div>`}
       ${_isMgr()?`<div class="sb-lbl" style="margin-top:8px">관리</div>
+      <div class="sni${activeTab==='students'?' on':''}" onclick="goNav('students')">🏫 학생 명단</div>
       <div class="sni${activeTab==='accounts'?' on':''}" onclick="goNav('accounts')">👥 강사 계정</div>`:''}
       <div class="sni${activeTab==='setting'?' on':''}" onclick="goNav('setting')">⚙️ 설정</div>
     </div>
@@ -609,5 +612,6 @@ function renderMain(){
   else if(activeTab==='report')renderReport(mc);
   else if(activeTab==='bulk')renderBulk(mc);
   else if(activeTab==='accounts'){ if(_isMgr())renderAccounts(mc); else{activeTab='input';renderInput(mc);} }
+  else if(activeTab==='students'){ if(_isMgr())renderStudents(mc); else{activeTab='input';renderInput(mc);} }
   else renderSettings(mc);
 }
