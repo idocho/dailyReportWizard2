@@ -412,8 +412,8 @@ body{font-family:'Pretendard','Malgun Gothic','맑은 고딕',-apple-system,sans
 .rp-cls-cnt{margin-left:auto;font-size:10px;font-weight:700;color:var(--indigo-ink);background:var(--indigo-l);border-radius:8px;padding:1px 7px}
 .rp-today{font-size:9px;font-weight:800;color:#047857;background:#ECFDF5;border:1px solid #A7F3D0;border-radius:7px;padding:1px 6px}
 /* 학생(자식) — 작게·연하게 + 들여쓰기 + 세로 가이드선으로 종속 표시 */
-.rp-stu{display:flex;align-items:center;gap:8px;padding:4px 12px 4px 34px;cursor:pointer;border-left:3px solid transparent;font-size:12px;position:relative}
-.rp-stu::before{content:"";position:absolute;left:20px;top:0;bottom:0;width:1px;background:var(--border)}
+.rp-stu{display:flex;align-items:center;gap:8px;padding:4px 12px 4px 46px;cursor:pointer;border-left:3px solid transparent;font-size:12px;position:relative}
+.rp-stu::before{content:"";position:absolute;left:24px;top:0;bottom:0;width:2px;background:var(--indigo-l)}
 .rp-stu:hover{background:var(--panel-2)}
 .rp-stu.on{background:var(--indigo-l);border-left-color:var(--indigo)}
 .rp-stu-nm{flex:1;font-weight:500;color:var(--sub);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
