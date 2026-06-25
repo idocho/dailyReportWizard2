@@ -23,15 +23,25 @@ function synthEmail(name, campus) {
   return "n" + n + "@" + slug + ".drw.local";
 }
 
-// 호출자가 활성 관리자(admin/super)인지 + (admin이면) 대상과 같은 캠퍼스인지 검증.
-async function requireAdmin(request, targetCampus) {
+// 대상 계정 관리 권한 검증. 운영자(admin)=자기 캠퍼스 전체, super=전역,
+// 관리자(manager)=자기 캠퍼스의 '강사'만(매니저/운영자 대상 불가 — 권한상승 차단).
+async function requireManage(request, target) {
   if (!request.auth) throw new HttpsError("unauthenticated", "로그인이 필요합니다.");
-  const acl = (await db.ref("acl/" + request.auth.uid).get()).val();
-  if (!acl || acl.active !== true) throw new HttpsError("permission-denied", "권한이 없습니다.");
-  if (acl.role !== "admin" && acl.role !== "super") throw new HttpsError("permission-denied", "관리자 전용입니다.");
-  if (acl.role === "admin" && targetCampus && acl.campus !== targetCampus)
-    throw new HttpsError("permission-denied", "다른 캠퍼스 계정은 관리할 수 없습니다.");
-  return acl;
+  const me = (await db.ref("acl/" + request.auth.uid).get()).val();
+  if (!me || me.active !== true) throw new HttpsError("permission-denied", "권한이 없습니다.");
+  if (me.role === "super") return me;
+  if (me.role === "admin") {
+    if (target && target.campus && me.campus !== target.campus)
+      throw new HttpsError("permission-denied", "다른 캠퍼스 계정은 관리할 수 없습니다.");
+    return me;
+  }
+  if (me.role === "manager") {
+    if (!target) throw new HttpsError("permission-denied", "권한이 없습니다.");
+    if (me.campus !== target.campus) throw new HttpsError("permission-denied", "다른 캠퍼스 계정은 관리할 수 없습니다.");
+    if (target.role !== "instructor") throw new HttpsError("permission-denied", "강사 계정만 관리할 수 있습니다.");
+    return me;
+  }
+  throw new HttpsError("permission-denied", "관리자 전용입니다.");
 }
 
 // 강사 비번 리셋 → 새 임시비번 설정 + 첫 로그인 변경 강제(mustChangePw=true)
@@ -41,7 +51,7 @@ exports.resetInstructorPassword = onCall(async (request) => {
     throw new HttpsError("invalid-argument", "uid·임시비번(6자 이상)이 필요합니다.");
   const t = (await db.ref("acl/" + uid).get()).val();
   if (!t) throw new HttpsError("not-found", "대상 계정이 없습니다.");
-  await requireAdmin(request, t.campus);
+  await requireManage(request, t);
   await admin.auth().updateUser(uid, { password: String(newPassword) });
   await db.ref("acl/" + uid + "/mustChangePw").set(true);
   return { ok: true };
@@ -83,7 +93,7 @@ exports.deleteInstructor = onCall(async (request) => {
   if (!uid) throw new HttpsError("invalid-argument", "uid가 필요합니다.");
   const t = (await db.ref("acl/" + uid).get()).val();
   if (!t) throw new HttpsError("not-found", "대상 계정이 없습니다.");
-  await requireAdmin(request, t.campus);
+  await requireManage(request, t);
   await admin.auth().deleteUser(uid).catch(() => {}); // Auth 유저 없더라도 acl 정리 진행
   await db.ref("acl/" + uid).remove();
   return { ok: true };
