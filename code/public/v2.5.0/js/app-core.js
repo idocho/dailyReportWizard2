@@ -136,8 +136,8 @@ let clsDrillSh=null; // 학급 관리 드릴다운 상태 (null=최상위, class
 let adminOn=false;   // 관리자 세션 상태 (새로고침 시 해제)
 // acl 역할 기반 — 매니저/운영자만 관리 메뉴(강사 계정 등) 노출. instructor.role는 로그인 시 주입(index.html)
 function _isMgr(){ const r=(typeof instructor!=='undefined'&&instructor&&instructor.role)||''; return r==='manager'||r==='admin'||r==='super'; }
-// 학급·학생 명단 편집 권한 — 관리자 모드(adminOn) 또는 acl 매니저/운영자(별도 모드 불요)
-function _rosterAdmin(){ return adminOn || _isMgr(); }
+// 학급·학생 명단 편집 권한 — acl 매니저/운영자 신원 전용(공유 암호 adminOn으로는 불가, 명단 소유권 분리)
+function _rosterAdmin(){ return _isMgr(); }
 // 모바일·태블릿(=강사 에이전트 없는 기기) 판정 — 리포트·전송/일괄공지 비노출.
 // 데스크톱모드 UA 위장 대비: 터치전용(마우스 없음) 기기는 pointer:coarse로 잡음(데스크톱모드서도 불변).
 function _isMobile(){
