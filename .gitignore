@@ -41,3 +41,5 @@ migration/
 code/scripts/sa-key.json
 code/scripts/*sa-key*.json
 *serviceAccount*.json
+
+functions/node_modules/

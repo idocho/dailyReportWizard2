@@ -1,7 +1,7 @@
 {
   "name": "campusmanager-functions",
   "description": "CampusManager 관리자 백엔드 (비번 리셋·삭제·mustChangePw 해제)",
-  "engines": { "node": "20" },
+  "engines": { "node": "22" },
   "main": "index.js",
   "dependencies": {
     "firebase-admin": "^12.6.0",
