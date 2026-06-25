@@ -368,12 +368,10 @@ function toggleArchRow(btn,classId){
 // 학급의 학생/과목 칩 섹션 (아코디언 본문과 드릴인 상세에서 공용)
 function _clsSectionsHtml(classId,clsD){
   const students=(config?._classStudents||{})[classId]||[];
-  // 학급·학생 정보 변경은 관리자 전용 (강사는 조회만) — 명단 소유권 분리
-  const stuChips=students.map(s=>_rosterAdmin()
-    ?`<span class="chip" style="cursor:pointer" onclick="editStu('${esc(classId)}','${esc(s.nameKey)}')" title="클릭=편집">${esc(s.name||s.nameKey)} <span style="color:var(--gray);font-size:9px">${esc(s.nameKey)}</span></span>`
-    :`<span class="chip" style="cursor:default">${esc(s.name||s.nameKey)}</span>`).join('');
-  return `<div class="sl">학생</div>
-      <div class="chips" data-classid="${esc(classId)}" data-chip-type="stu">${stuChips}${_rosterAdmin()?`<span class="chip" style="background:var(--indigo-l);border-color:var(--indigo);color:var(--indigo);cursor:pointer" onclick="addStuModal('${esc(classId)}')">+ 학생 추가</span>`:''}</div>
+  // 설정 명단은 조회 전용 — 학생 추가·편집은 사이드바 '🏫 학생 명단' 탭으로 일원화
+  const stuChips=students.map(s=>`<span class="chip" style="cursor:default">${esc(s.name||s.nameKey)}</span>`).join('');
+  return `<div class="sl">학생${_isMgr()?` <span style="font-weight:500;font-size:10px;color:var(--gray)">· 추가/편집은 ‘학생 명단’ 탭</span>`:''}</div>
+      <div class="chips" data-classid="${esc(classId)}" data-chip-type="stu">${stuChips||`<span style="font-size:11px;color:var(--gray)">학생 없음</span>`}</div>
       <div class="sl" style="margin-top:10px">과목</div>
       <div data-course-block="${esc(classId)}">${_courseChipsBlockHtml(classId,clsD)}</div>`;
 }
@@ -396,44 +394,7 @@ function buildClsAccordion(classId,clsD,myRole){
   </div>`;
 }
 
-// ── 학생/학급 CRUD (CM 통폐합, v8.82) — nameKey=출결번호 정본 준수 ──────
-function _allStudentKeys(){ const s={}; for(const arr of Object.values(config?._classStudents||{}))for(const st of (arr||[]))s[st.nameKey]=1; return s; }
-function _clsOptions(cur){ return Object.keys(config?.classes||{}).map(id=>`<option value="${esc(id)}"${id===cur?' selected':''}>${esc(id)}</option>`).join(''); }
-function addStuModal(classId){
-  if(!_rosterAdmin())return toast('학급·학생 편집 권한이 없습니다.');
-  _rpModal(`<h3>학생 추가</h3>
-    <div class="rp-hint">출결번호(nameKey)는 학생 고유 식별자 — 정확히 입력하세요.</div>
-    <label class="rp-flbl">출결번호</label><input class="rp-fin" id="st-key" inputmode="numeric" placeholder="예: 1024">
-    <label class="rp-flbl">이름</label><input class="rp-fin" id="st-name" placeholder="이름">
-    <label class="rp-flbl">반</label><select class="rp-fin" id="st-cls">${_clsOptions(classId)}</select>
-    <div class="rp-mrow"><button class="rp-btn ghost" onclick="closeRpModal()">취소</button><button class="rp-btn" onclick="saveStu(null)">추가</button></div>`);
-  setTimeout(()=>document.getElementById('st-key')?.focus(),0);
-}
-function editStu(classId,nameKey){
-  if(!_rosterAdmin())return toast('학급·학생 편집 권한이 없습니다.');
-  const s=((config?._classStudents||{})[classId]||[]).find(x=>x.nameKey===nameKey)||{};
-  _rpModal(`<h3>학생 편집</h3>
-    <label class="rp-flbl">출결번호</label><input class="rp-fin" value="${esc(nameKey)}" disabled>
-    <label class="rp-flbl">이름</label><input class="rp-fin" id="st-name" value="${esc(s.name||'')}">
-    <label class="rp-flbl">반</label><select class="rp-fin" id="st-cls">${_clsOptions(classId)}</select>
-    <div class="rp-mrow"><button class="rp-btn ghost" style="color:var(--red)" onclick="closeRpModal();rmStu('${esc(classId)}','${esc(nameKey)}')">삭제</button><button class="rp-btn ghost" onclick="closeRpModal()">취소</button><button class="rp-btn" onclick="saveStu('${esc(nameKey)}')">저장</button></div>`);
-}
-async function saveStu(editKey){
-  const isNew=!editKey;
-  const nk=isNew?(document.getElementById('st-key').value||'').trim():editKey;
-  const nm=(document.getElementById('st-name').value||'').trim();
-  const cls=document.getElementById('st-cls').value;
-  if(!nk||!nm)return toast('출결번호·이름을 입력하세요');
-  if(isNew && _allStudentKeys()[nk])return toast('이미 있는 출결번호입니다');
-  try{
-    await fbPut('students/'+encodeURIComponent(nk),{name:nm,class:cls});
-    // 로컬 _classStudents 갱신 — 이전 반에서 제거 후 새 반에 반영
-    const cs=config._classStudents=config._classStudents||{};
-    for(const k of Object.keys(cs))cs[k]=(cs[k]||[]).filter(s=>s.nameKey!==nk);
-    (cs[cls]=cs[cls]||[]).push({nameKey:nk,name:nm,class:cls});
-    closeRpModal(); toast(isNew?'학생 추가됨 ✅':'저장됨 ✅'); renderMain();
-  }catch(e){ toast('저장 실패: '+e,4000); }
-}
+// ── 학급 CRUD (설정 명단 탭) — 학생 추가·편집은 '🏫 학생 명단' 탭으로 일원화 ──────
 function addClsModal(){
   if(!_rosterAdmin())return toast('학급·학생 편집 권한이 없습니다.');
   _rpModal(`<h3>학급 추가</h3>
@@ -749,21 +710,6 @@ function rmCls(classId){
   // 해당 학급 노드만 타겟 삭제 (classes 전체 PUT 금지 — 부활 버그 방지)
   if(dbUrl&&dbPath)fbPut(`classes/${classId}`,null).then(()=>toast('학급 삭제됨 ✅')).catch(e=>toast('학급 삭제 실패: '+e,4000));
   renderMain();
-}
-
-async function rmStu(classId,nameKey){
-  if(!_rosterAdmin()){toast('학생 삭제 권한이 없습니다.');return;}
-  const stu=((config?._classStudents||{})[classId]||[]).find(s=>s.nameKey===nameKey);
-  const displayName=stu?.name||nameKey;
-  if(!confirm(`${displayName}을(를) 삭제합니까?`))return;
-  if(config._classStudents?.[classId]){
-    config._classStudents[classId]=config._classStudents[classId].filter(s=>s.nameKey!==nameKey);
-  }
-  renderMain();
-  // Firebase: students/{nameKey} 삭제
-  if(dbUrl&&dbPath){
-    try{await fbPut(`students/${nameKey}`,null);}catch(e){}
-  }
 }
 
 async function restoreCourse(classId,subject){
