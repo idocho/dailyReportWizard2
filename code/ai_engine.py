@@ -286,7 +286,7 @@ def build_batch_prompt(targets, style_block="", custom_block=""):
         "각 학생의 '직접작성메모_반드시반영' 필드는 교사가 직접 입력한 핵심 전달 사항이므로 "
         "최종 note에 반드시 자연스럽게 포함하세요.\n"
         "⭐ 하이라이트 항목이 있으면 가장 인상적인 표현으로 강조.\n\n"
-        "⚠️ 반드시 JSON 배열로만 응답 (다른 텍스트 금지):\n"
+        "⚠️ 코드블록(```)·머리말·맺음말 없이, '[' 로 시작해 ']' 로 끝나는 순수 JSON 배열만 출력:\n"
         '[{"cls":"반명","name":"이름","note":"특이사항"}, ...]\n\n'
         + (f"{custom_block}\n\n" if custom_block else "")
         + f"[학생데이터]\n{students_json}"

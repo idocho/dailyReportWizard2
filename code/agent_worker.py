@@ -138,10 +138,19 @@ def generate_batch(cfg, job, ai_call=_call_ai_hub, notes_provider=None):
     custom = (job.get("customPrompt") or "").strip()
     custom_block = (f"[강사 개별 지침 — 위 작성 지침과 사실·안전 규칙을 위반하지 않는 선에서 반영]\n{custom}" if custom else "")
     prompt = build_batch_prompt(targets, style_block=style_block, custom_block=custom_block)
-    raw = ai_call(engine, key, prompt, max_tokens=min(4096, 256 * len(targets) + 400),
+    raw = ai_call(engine, key, prompt, max_tokens=min(8192, 360 * len(targets) + 600),
                   temperature=0.75, system=_base_conditions())
+    # JSON 배열만 추출 — 일부 모델(클로드 등)이 ```펜스·서두/후미 산문을 덧붙임
     clean = raw.replace("```json", "").replace("```", "").strip()
-    parsed = json.loads(clean)
+    s, e = clean.find("["), clean.rfind("]")
+    if s != -1 and e != -1 and e > s:
+        clean = clean[s:e + 1]
+    try:
+        parsed = json.loads(clean)
+    except Exception:
+        # 잘림(토큰 초과)·형식오류 — 호출측이 단건 폴백할 수 있게 명확히 알림
+        raise RuntimeError("일괄 생성 응답 파싱 실패(응답 잘림/형식). 학생 수를 줄이거나 개별 생성을 쓰세요. "
+                           "앞부분: " + clean[:120])
     name_to_key = {st.get("displayName"): st.get("nameKey") for st in students}
     drafts = {}
     for item in (parsed if isinstance(parsed, list) else []):
