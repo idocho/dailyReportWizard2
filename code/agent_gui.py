@@ -139,12 +139,15 @@ class AgentGUI:
                  anchor="w").pack(fill="x", pady=(7, 1))
         cur_eng = e.get("ai_engine_type", AI_ENGINE_ORDER[0])
         self.eng_var = tk.StringVar(value=AI_ENGINE_LABELS.get(cur_eng, cur_eng))
-        ttk.Combobox(frm, textvariable=self.eng_var, state="readonly",
-                     values=[AI_ENGINE_LABELS[x] for x in AI_ENGINE_ORDER],
-                     font=("맑은 고딕", 11)).pack(fill="x")
-        # 키는 엔진별 — 현재 엔진 키 프리필
-        cur_key = e.get(f"{cur_eng}_api_key", "")
-        row("개인 API 키", "_api_key", cur_key, show="•")
+        cb = ttk.Combobox(frm, textvariable=self.eng_var, state="readonly",
+                          values=[AI_ENGINE_LABELS[x] for x in AI_ENGINE_ORDER],
+                          font=("맑은 고딕", 11))
+        cb.pack(fill="x")
+        cb.bind("<<ComboboxSelected>>", self._on_eng_change)
+        # 엔진별 키 분리 저장 — config에서 전부 로드, 입력칸은 선택 엔진 것만 표시(전환 시 교체)
+        self._eng_keys = {x: e.get(f"{x}_api_key", "") for x in AI_ENGINE_ORDER}
+        self._key_eng = cur_eng
+        row("개인 API 키 (엔진별 개별 저장)", "_api_key", self._eng_keys.get(cur_eng, ""), show="•")
         row("웹 로그인 비밀번호 (DB 보안 전환 대비)", "login_password",
             e.get("login_password", ""), show="•")
         row('카톡 방 접두사 (예: "오직 ")', "roomPrefix", e.get("roomPrefix", ""))
@@ -162,20 +165,47 @@ class AgentGUI:
                 return k
         return AI_ENGINE_ORDER[0]
 
+    def _on_eng_change(self, *_):
+        """엔진 전환 — 현재 입력칸 키를 이전 엔진에 보관하고, 새 엔진의 저장 키를 칸에 로드."""
+        new = self._eng_id()
+        if new == self._key_eng:
+            return
+        self._eng_keys[self._key_eng] = self.vars["_api_key"].get().strip()
+        self.vars["_api_key"].set(self._eng_keys.get(new, ""))
+        self._key_eng = new
+
     def _save_setup(self):
         v = {k: var.get().strip() for k, var in self.vars.items()}
         campus = CAMPUS.get(self.campus_var.get(), "")
-        if not campus or not v["instructorId"] or not v["_api_key"]:
-            messagebox.showwarning("입력 필요", "캠퍼스·이름·API 키는 필수입니다.")
-            return
         eng = self._eng_id()
-        fields = {
+        # 현재 입력칸 키를 선택 엔진에 반영(전환 없이 바로 저장하는 경우 포함)
+        self._eng_keys[self._key_eng] = v.get("_api_key", "")
+        if not campus or not v["instructorId"]:
+            messagebox.showwarning("입력 필요", "캠퍼스·이름은 필수입니다.")
+            return
+        if not self._eng_keys.get(eng, "").strip():
+            messagebox.showwarning("입력 필요",
+                                   f"선택한 엔진({AI_ENGINE_LABELS.get(eng, eng)}) 키를 입력하세요.")
+            return
+        # 기존 설정(smartWait·interval 등) 보존 — self.cfg는 복호화 평문
+        fields = dict(self.cfg) if self.cfg else {}
+        fields.update({
             "campus": campus, "instructorId": v["instructorId"],
             "dbUrl": W.DEFAULT_DB, "roomPrefix": v.get("roomPrefix", ""),
-            "ai_engine_type": eng, f"{eng}_api_key": v["_api_key"],
-        }
-        if v.get("login_password"):   # DB 보안 룰 전환 대비 — 미입력 시 무인증(현행) 유지
-            fields["login_password"] = v["login_password"]
+            "ai_engine_type": eng,
+        })
+        # 엔진별 키 전부 저장(빈 값은 제거) — 전환해도 각 엔진 키 보존
+        for x in AI_ENGINE_ORDER:
+            k = self._eng_keys.get(x, "").strip()
+            if k:
+                fields[f"{x}_api_key"] = k
+            else:
+                fields.pop(f"{x}_api_key", None)
+        pw = v.get("login_password", "").strip()
+        if pw:                          # DB 보안 인증 — 미입력 시 무인증(현행) 유지
+            fields["login_password"] = pw
+        else:
+            fields.pop("login_password", None)
         W.write_agent_config(fields)
         if self.auto_var.get():
             W.register_autostart()
