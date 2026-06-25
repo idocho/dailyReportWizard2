@@ -562,6 +562,7 @@ function renderSb(){
       <div class="sni${activeTab==='setting'?' on':''}" onclick="goNav('setting')">⚙️ 설정</div>
     </div>
     <div style="flex:1"></div>
+    <div onclick="doLogout()" style="display:flex;align-items:center;gap:8px;padding:10px 13px;font-size:11px;color:rgba(255,255,255,.5);cursor:pointer;border-top:1px solid rgba(255,255,255,.08);transition:background .12s,color .12s" onmouseover="this.style.background='rgba(255,255,255,.07)';this.style.color='rgba(255,255,255,.85)'" onmouseout="this.style.background='';this.style.color='rgba(255,255,255,.5)'">🚪 <span>로그아웃</span></div>
     <a href="./guide.html" target="_blank" style="display:flex;align-items:center;gap:8px;padding:10px 13px;font-size:11px;color:rgba(255,255,255,.4);text-decoration:none;border-top:1px solid rgba(255,255,255,.08);transition:background .12s,color .12s" onmouseover="this.style.background='rgba(255,255,255,.07)';this.style.color='rgba(255,255,255,.8)'" onmouseout="this.style.background='';this.style.color='rgba(255,255,255,.4)'">📖 <span>설치 · 운용 가이드</span></a>
     <div style="padding:5px 8px 8px;font-size:9px;color:rgba(255,255,255,.18);text-align:center">`+`DRW ${APP_VERSION} · IDO`+`</div>`;
 }
