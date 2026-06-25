@@ -206,23 +206,12 @@ function renderSettings(mc){
       </div>
     </div>`;
 
-  const SA_FOOT=`
-    <div class="stg-foot">
-      <button class="btn bsm" style="width:100%;justify-content:center;display:flex;gap:6px" onclick="doLogout()">🚪 로그아웃</button>
-      <button class="adm-btn${adminOn?' on':''}" onclick="toggleAdmin()" id="admBtn">
-        <span>${adminOn?'🔓':'🔒'}</span>
-        <span id="admBtnLbl">${adminOn?'관리자 모드 해제':'관리자 모드'}</span>
-      </button>
-      ${adminOn?`<button class="btn bsm" style="width:100%;justify-content:center" onclick="changeAdminPw()">🔑 관리자 암호 변경</button>`:''}
-      <div style="font-size:10px;color:var(--gray);text-align:center">`+`DailyReportWizard ${APP_VERSION} · Crafted by IDO(idocho@kakao.com) · Powered by Claude AI`+`</div>
-    </div>`;
-
   // 활성 탭 (관리자 탭은 adminOn일 때만) — 잡다한 단일 스크롤 → 4탭 좌측 레일
   // ── 평탄화: 탭 = 기능 1개, 아코디언(이중구조) 제거 → 카드 직접 표시 ──
   const _card=(ic,title,sub,body)=>`<div class="stg-card"><div class="stg-card-h"><span>${ic}</span><b>${esc(title)}</b>${sub?`<span class="stg-csub">${esc(sub)}</span>`:''}</div><div class="stg-card-b">${body}</div></div>`;
   const _aiBody=`<div style="padding:12px"><div class="sl">문체(말투)</div><select class="inp sm" id="aiStyleMode" onchange="renderAiStyleInfo()">${_AISTYLES.map(([k,l])=>`<option value="${esc(k)}"${k===aiMode?' selected':''}>${esc(l)}</option>`).join('')}</select><div id="aiStyleInfo" class="ai-style-info">${_aiStyleInfoHtml(aiMode)}</div><div class="sl" style="margin-top:12px">개별 지침 (선택) <span class="fld-tag">추가 프롬프트</span></div><div class="fld-help">리포트를 생성할 때마다 AI에게 <b>항상 함께 전달되는 추가 지시문</b>입니다. 선택한 문체에 더해 <b>내가 맡은 전 학생 메시지에 공통 적용</b>돼요.</div><textarea class="inp sm" id="aiCustom" style="min-height:64px;resize:vertical" placeholder="예: 항상 마지막에 다음 수업 준비물과 날짜를 안내해 주세요">${esc(aiCustom)}</textarea><div style="font-size:10px;color:var(--gray);margin:6px 0 10px">AI 엔진·API 키는 본인 PC 에이전트에서 설정합니다.</div><button class="btn bsm" onclick="saveAiStyle()">💾 저장</button></div>`;
   const _presetBody=`${presetChips||'<div style="padding:10px 12px;font-size:12px;color:var(--gray)">등록된 문구가 없습니다.</div>'}<div style="padding:8px 12px;border-top:1px solid var(--border);display:flex;gap:6px"><input class="inp sm" id="pInput" placeholder="새 문구 입력" style="flex:1" onkeydown="if(event.key==='Enter')addPreset()"><button class="btn bsm" onclick="addPreset()">+ 추가</button></div>`;
-  const _sysBody=`<div style="padding:12px;display:flex;flex-direction:column;gap:8px"><button class="btn bsm" style="width:100%;justify-content:center;display:flex;gap:6px" onclick="doLogout()">🚪 로그아웃</button><button class="adm-btn${adminOn?' on':''}" onclick="toggleAdmin()" id="admBtn"><span>${adminOn?'🔓':'🔒'}</span> <span id="admBtnLbl">${adminOn?'관리자 모드 해제':'관리자 모드'}</span></button>${adminOn?`<button class="btn bsm" style="width:100%;justify-content:center" onclick="changeAdminPw()">🔑 관리자 암호 변경</button>`:''}<div style="font-size:10px;color:var(--gray);text-align:center">DailyReportWizard ${APP_VERSION} · Crafted by IDO · Powered by Claude AI</div></div>`;
+  const _sysBody=`<div style="padding:12px;display:flex;flex-direction:column;gap:8px"><button class="btn bsm" style="width:100%;justify-content:center;display:flex;gap:6px" onclick="doLogout()">🚪 로그아웃</button>${_isMgr()?`<div style="font-size:11px;color:var(--sub);background:var(--bg);border-radius:8px;padding:8px 10px;line-height:1.5">관리자 모드는 좌측 사이드바의 <b>강사 ⇄ 관리자</b> 스위치로 전환합니다.</div>`:''}<div style="font-size:10px;color:var(--gray);text-align:center">DailyReportWizard ${APP_VERSION} · Crafted by IDO · Powered by Claude AI</div></div>`;
   let _subjBody='',_bookBody='';
   if(adminOn){
     const sm=new Map();
@@ -602,37 +591,6 @@ const _HARDCODED_PRESETS=[
 function _defaultPresets(){
   const saved=config?.presets?.['과제수행도'];
   return (saved&&saved.length>0)?saved:_HARDCODED_PRESETS;
-}
-
-async function hashPw(pw){
-  const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(pw));
-  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
-}
-async function toggleAdmin(){
-  // 사이드바 수업 바운더리(activeAsgns)가 adminOn에 따라 달라지므로 renderSb도 갱신
-  if(adminOn){adminOn=false;if(curAI>=(instructor?.assignments||[]).length)curAI=0;renderSb();renderMain();return;}
-  const pw=prompt('관리자 암호를 입력하세요');
-  if(pw===null)return;
-  const h=await hashPw(pw);
-  // DB(config/admin_hash) 우선, 코드 상수 폴백 — 암호 회전 시 재배포 불요
-  if(h===(config?.admin_hash||ADMIN_HASH)){adminOn=true;toast('관리자 모드 활성화 🔓 — 전체 수업 접근');renderSb();renderMain();}
-  else toast('암호가 올바르지 않습니다.');
-}
-
-// 관리자 암호 변경 — SHA-256 해시를 config/admin_hash에 저장(전 버전·전 기기 즉시 적용)
-async function changeAdminPw(){
-  if(!adminOn){toast('관리자 모드가 필요합니다.');return;}
-  const pw1=prompt('새 관리자 암호 (8자 이상)');
-  if(pw1===null)return;
-  if((pw1||'').length<8){toast('암호는 8자 이상이어야 합니다.');return;}
-  const pw2=prompt('새 암호 다시 입력');
-  if(pw2===null)return;
-  if(pw1!==pw2){toast('암호가 서로 다릅니다.');return;}
-  const h=await hashPw(pw1);
-  if(!config)config={};
-  config.admin_hash=h;saveLocal();
-  if(dbUrl&&dbPath)await fbPatch('config',{admin_hash:h}).catch(fbFail('암호 변경'));
-  toast('관리자 암호 변경됨 🔑');
 }
 
 function onCC(){

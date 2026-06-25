@@ -529,4 +529,12 @@ body{font-family:'Pretendard','Malgun Gothic','맑은 고딕',-apple-system,sans
 .rs-act button.x{font-weight:800}
 .rs-empty{padding:28px 14px;text-align:center;color:var(--gray);font-size:12px}
 @media(max-width:760px){.rs-grid{grid-template-columns:1fr}}
+
+/* ── 사이드바 강사⇄관리자 모드 스위치 (매니저 전용) ───────────── */
+.md-sw{display:flex;margin:10px 10px 4px;background:rgba(255,255,255,.07);border-radius:9px;padding:3px;gap:3px}
+.md-seg{flex:1;border:none;background:transparent;color:rgba(255,255,255,.55);font-size:11px;font-weight:700;padding:6px 0;border-radius:7px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px;font-family:inherit;transition:background .12s,color .12s}
+.md-seg:hover{color:rgba(255,255,255,.85)}
+.md-seg.on{background:#4F46E5;color:#fff;box-shadow:0 1px 3px rgba(0,0,0,.35)}
+.md-seg.on.adm{background:#D97706}
+.md-hint{font-size:9px;text-align:center;margin:0 12px 4px;color:rgba(255,255,255,.3);letter-spacing:.02em}
 </style>
