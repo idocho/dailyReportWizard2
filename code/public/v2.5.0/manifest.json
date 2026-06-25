@@ -1,6 +1,6 @@
 {
-  "name": "DailyReportWizard",
-  "short_name": "DRW",
+  "name": "Daily Report Wizard",
+  "short_name": "Daily Report Wizard",
   "description": "데일리 리포트 작성·전송",
   "start_url": ".",
   "scope": ".",
