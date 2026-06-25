@@ -281,20 +281,28 @@ def render(tmpl, name, cls):
 _ROLE_CACHE = {}
 
 
-def _lookup_role(db, cfg, instructor_id, token=None):
-    """로그인 신원의 acl 역할 조회(campus+instructorId 매칭, active만). 프로세스당 1회 캐시.
+def _lookup_role(db, cfg, instructor_id, token=None, uid=None):
+    """로그인 신원의 acl 역할 조회. 프로세스당 1회 캐시.
+    uid 있으면 acl/{uid} 직접 조회(보안 룰서 본인 엔트리 읽기 허용 — 룰 호환).
+    uid 없으면(개방 DB 폴백) acl 전체 스캔으로 campus+instructorId 매칭.
     manager/admin/super 면 캠퍼스 일괄공지 발송 권한(일반 강사 None → 미폴링)."""
-    key = (cfg.get("campus"), instructor_id)
+    key = (cfg.get("campus"), instructor_id, uid)
     if key in _ROLE_CACHE:
         return _ROLE_CACHE[key]
     role = None
     try:
-        acl = _get(db, "acl", token) or {}
-        for _uid, a in acl.items():
-            if (isinstance(a, dict) and a.get("instructorId") == instructor_id
-                    and a.get("campus") == cfg.get("campus") and a.get("active") is True):
+        if uid:
+            a = _get(db, f"acl/{urllib.parse.quote(uid)}", token) or {}
+            if (isinstance(a, dict) and a.get("active") is True
+                    and a.get("campus") == cfg.get("campus")):
                 role = a.get("role")
-                break
+        else:
+            acl = _get(db, "acl", token) or {}
+            for _uid, a in acl.items():
+                if (isinstance(a, dict) and a.get("instructorId") == instructor_id
+                        and a.get("campus") == cfg.get("campus") and a.get("active") is True):
+                    role = a.get("role")
+                    break
     except Exception:
         role = None
     _ROLE_CACHE[key] = role
@@ -418,13 +426,14 @@ def process_campus_sendjobs(cfg, db, sender_id, token=None, real=False, progress
 _CAMPUS_SEND_ROLES = ("manager", "admin", "super")
 
 
-def process_once(cfg, db, instructor_id, token=None, real=False, progress_cb=None):
+def process_once(cfg, db, instructor_id, token=None, real=False, progress_cb=None, uid=None):
     """생성 → 전송 큐를 한 번씩 처리. dry(real=False)=AI·카톡 모킹.
-    로그인 신원이 매니저/운영자면 캠퍼스 일괄공지 큐도 처리(일반 강사는 미폴링·비노출)."""
+    로그인 신원이 매니저/운영자면 캠퍼스 일괄공지 큐도 처리(일반 강사는 미폴링·비노출).
+    uid: 로그인 시 발급된 Firebase uid(보안 룰서 acl/{uid} 직접 조회용)."""
     ai = _call_ai_hub if real else (lambda e, k, p, **kw: f"[dry] {p[:0]}AI 생성 문구(테스트)")
     g = process_genjobs(cfg, db, instructor_id, token, ai_call=ai)
     s = process_sendjobs(cfg, db, instructor_id, token, real=real, progress_cb=progress_cb)
-    if _lookup_role(db, cfg, instructor_id, token) in _CAMPUS_SEND_ROLES:
+    if _lookup_role(db, cfg, instructor_id, token, uid=uid) in _CAMPUS_SEND_ROLES:
         s += process_campus_sendjobs(cfg, db, instructor_id, token=token, real=real, progress_cb=progress_cb)
     return g, s
 

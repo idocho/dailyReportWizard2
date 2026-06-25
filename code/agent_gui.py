@@ -145,6 +145,8 @@ class AgentGUI:
         # 키는 엔진별 — 현재 엔진 키 프리필
         cur_key = e.get(f"{cur_eng}_api_key", "")
         row("개인 API 키", "_api_key", cur_key, show="•")
+        row("웹 로그인 비밀번호 (DB 보안 전환 대비)", "login_password",
+            e.get("login_password", ""), show="•")
         row('카톡 방 접두사 (예: "오직 ")', "roomPrefix", e.get("roomPrefix", ""))
 
         self.auto_var = tk.BooleanVar(value=True)
@@ -172,6 +174,8 @@ class AgentGUI:
             "dbUrl": W.DEFAULT_DB, "roomPrefix": v.get("roomPrefix", ""),
             "ai_engine_type": eng, f"{eng}_api_key": v["_api_key"],
         }
+        if v.get("login_password"):   # DB 보안 룰 전환 대비 — 미입력 시 무인증(현행) 유지
+            fields["login_password"] = v["login_password"]
         W.write_agent_config(fields)
         if self.auto_var.get():
             W.register_autostart()
@@ -224,13 +228,29 @@ class AgentGUI:
         db = self.cfg["dbUrl"]; instr = self.cfg["instructorId"]
         idle = self.cfg.get("interval", 2)   # 큐 픽업 지연 단축(2s) — sonnet 호출 구조는 불변
         last_hb = 0.0
+        # DB 보안 룰 전환 대비 — 비번 설정 시 idToken 발급(자동 갱신). 미설정/실패 시 None → 무인증 폴백.
+        tm = None
+        pw = self.cfg.get("login_password", "")
+        if pw:
+            try:
+                import agent_auth
+                tm = agent_auth.TokenManager(instr, self.cfg.get("campus", ""), pw)
+                if tm.token():
+                    _Q.put({"_log": "로그인 OK (보안 토큰 사용)"})
+                else:
+                    _Q.put({"_log": "로그인 실패 — 무인증 모드(" + str(tm.last_error or "")[:40] + ")"})
+            except Exception as ex:
+                _Q.put({"_log": "auth 초기화 실패: " + str(ex)[:50]}); tm = None
         while self.running:
             now = time.time()
+            token = tm.token() if tm else None
+            uid = tm.uid if tm else None
             if now - last_hb > 15:           # 하트비트 — 웹이 에이전트 실행 여부 감지(미실행 시 설치 안내)
-                W.write_heartbeat(self.cfg, db, instr, real=self.real)
+                W.write_heartbeat(self.cfg, db, instr, token=token, real=self.real)
                 last_hb = now
             try:
-                g, s = W.process_once(self.cfg, db, instr, real=self.real, progress_cb=_progress)
+                g, s = W.process_once(self.cfg, db, instr, token=token, real=self.real,
+                                      progress_cb=_progress, uid=uid)
                 if g or s:
                     _Q.put({"_log": f"생성 {g} · 전송 {s}"})
                     continue   # 처리분 있으면 즉시 다음 루프 — 백로그 빠르게 소진

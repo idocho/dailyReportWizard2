@@ -191,9 +191,20 @@ async function checkSchemaVersion(){
     }
   }catch(e){}
 }
-async function fbGet(n){const r=await fetch(fbE(n));if(!r.ok)throw n+':'+r.status;return r.json();}
-async function fbPut(n,d){const r=await fetch(fbE(n),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)});if(!r.ok)throw n+':'+r.status;return r.json();}
-async function fbPatch(n,d){const r=await fetch(fbE(n),{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)});if(!r.ok)throw n+':'+r.status;return r.json();}
+// 토큰 만료(보안 룰 배포 후) 대비 — 401/403 시 idToken 갱신 후 1회 재시도.
+// 게이트가 window.__getFreshToken__ 주입(SDK가 내부적으로 만료 토큰 자동 재발급).
+// 룰 미배포(개방 DB)면 401 자체가 안 나므로 재시도 경로 미작동(무해).
+async function _fbReq(n,opts){
+  let r=await fetch(fbE(n),opts);
+  if((r.status===401||r.status===403)&&typeof window!=='undefined'&&window.__getFreshToken__){
+    try{ await window.__getFreshToken__(); }catch(_){}
+    r=await fetch(fbE(n),opts);  // fbE 가 갱신된 __AUTH_TOKEN__ 으로 URL 재구성
+  }
+  return r;
+}
+async function fbGet(n){const r=await _fbReq(n);if(!r.ok)throw n+':'+r.status;return r.json();}
+async function fbPut(n,d){const r=await _fbReq(n,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)});if(!r.ok)throw n+':'+r.status;return r.json();}
+async function fbPatch(n,d){const r=await _fbReq(n,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)});if(!r.ok)throw n+':'+r.status;return r.json();}
 
 const DAYS=['일','월','화','수','목','금','토'];
 function today(){

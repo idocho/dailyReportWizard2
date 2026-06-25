@@ -19,7 +19,7 @@ python -m PyInstaller --noconfirm --onefile --windowed `
   --hidden-import pyautogui --hidden-import pyperclip --hidden-import PIL `
   --collect-submodules pystray `
   --hidden-import pystray._win32 --hidden-import pystray._util --hidden-import pystray._util.win32 `
-  --hidden-import kakao_send --hidden-import secret_codec `
+  --hidden-import kakao_send --hidden-import secret_codec --hidden-import agent_auth `
   --hidden-import ai_engine --hidden-import ai_style --hidden-import constants --hidden-import agent_worker `
   --exclude-module cv2 --exclude-module numpy --exclude-module pandas `
   --exclude-module scipy --exclude-module matplotlib --exclude-module IPython --exclude-module pytest `

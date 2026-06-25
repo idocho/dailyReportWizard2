@@ -66,7 +66,26 @@
         "scores":  { ".write": "auth != null && root.child('acl').child(auth.uid).child('active').val() === true && ( root.child('acl').child(auth.uid).child('role').val() === 'admin' || ( root.child('acl').child(auth.uid).child('campus').val() === $campus && ( root.child('acl').child(auth.uid).child('role').val() === 'instructor' || root.child('acl').child(auth.uid).child('role').val() === 'manager' ) ) )" },
         "session": { ".write": "auth != null && root.child('acl').child(auth.uid).child('active').val() === true && ( root.child('acl').child(auth.uid).child('role').val() === 'admin' || ( root.child('acl').child(auth.uid).child('campus').val() === $campus && ( root.child('acl').child(auth.uid).child('role').val() === 'instructor' || root.child('acl').child(auth.uid).child('role').val() === 'manager' ) ) )" },
         "history": { ".write": "auth != null && root.child('acl').child(auth.uid).child('active').val() === true && ( root.child('acl').child(auth.uid).child('role').val() === 'admin' || ( root.child('acl').child(auth.uid).child('campus').val() === $campus && ( root.child('acl').child(auth.uid).child('role').val() === 'instructor' || root.child('acl').child(auth.uid).child('role').val() === 'manager' ) ) )" },
-        "config":  { ".write": "auth != null && root.child('acl').child(auth.uid).child('active').val() === true && ( root.child('acl').child(auth.uid).child('role').val() === 'admin' || ( root.child('acl').child(auth.uid).child('campus').val() === $campus && root.child('acl').child(auth.uid).child('role').val() === 'manager' ) )" }
+        "config":  { ".write": "auth != null && root.child('acl').child(auth.uid).child('active').val() === true && ( root.child('acl').child(auth.uid).child('role').val() === 'admin' || ( root.child('acl').child(auth.uid).child('campus').val() === $campus && root.child('acl').child(auth.uid).child('role').val() === 'manager' ) )" },
+
+        // 리포트 작업 큐 — 키=instructorId. 강사는 본인 큐만(소유권 검증), 관리자(manager) 캠퍼스 전체, 운영자(admin) 전역.
+        // 웹이 genJobs 적재 → 에이전트(본인 로그인)가 drafts/status 회신. agents=하트비트(에이전트 본인 키 기록).
+        // 읽기는 상위 campus '.read'(같은 캠퍼스 멤버)가 커버.
+        "genJobs": {
+          "$instructorId": {
+            ".write": "auth != null && root.child('acl').child(auth.uid).child('active').val() === true && ( root.child('acl').child(auth.uid).child('role').val() === 'admin' || ( root.child('acl').child(auth.uid).child('campus').val() === $campus && ( root.child('acl').child(auth.uid).child('role').val() === 'manager' || ( root.child('acl').child(auth.uid).child('role').val() === 'instructor' && $instructorId === root.child('acl').child(auth.uid).child('instructorId').val() ) ) ) )"
+          }
+        },
+        "sendJobs": {
+          "$instructorId": {
+            ".write": "auth != null && root.child('acl').child(auth.uid).child('active').val() === true && ( root.child('acl').child(auth.uid).child('role').val() === 'admin' || ( root.child('acl').child(auth.uid).child('campus').val() === $campus && ( root.child('acl').child(auth.uid).child('role').val() === 'manager' || ( root.child('acl').child(auth.uid).child('role').val() === 'instructor' && $instructorId === root.child('acl').child(auth.uid).child('instructorId').val() ) ) ) )"
+          }
+        },
+        "agents": {
+          "$instructorId": {
+            ".write": "auth != null && root.child('acl').child(auth.uid).child('active').val() === true && ( root.child('acl').child(auth.uid).child('role').val() === 'admin' || ( root.child('acl').child(auth.uid).child('campus').val() === $campus && ( root.child('acl').child(auth.uid).child('role').val() === 'manager' || ( root.child('acl').child(auth.uid).child('role').val() === 'instructor' && $instructorId === root.child('acl').child(auth.uid).child('instructorId').val() ) ) ) )"
+          }
+        }
       }
     }
   }
