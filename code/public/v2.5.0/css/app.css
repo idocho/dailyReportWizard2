@@ -403,18 +403,23 @@ body{font-family:'Pretendard','Malgun Gothic','맑은 고딕',-apple-system,sans
 .rp-av{width:28px;height:28px;border-radius:9px;background:var(--indigo-l);color:var(--indigo-ink);font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .rp-si.on .rp-av{background:var(--indigo);color:#fff}
 /* 디렉토리 트리 레일 (리포트·일괄 공통) */
-.rp-cls{border-bottom:1px solid var(--line-soft)}
-.rp-cls-h{display:flex;align-items:center;gap:7px;padding:9px 12px;cursor:pointer;background:var(--panel-2);font-size:12.5px;font-weight:700}
+.rp-cls{border-bottom:1px solid var(--border)}
+/* 학급(부모) — 크고 진하게 + 배경·구분선으로 레벨 강조 */
+.rp-cls-h{display:flex;align-items:center;gap:8px;padding:10px 12px;cursor:pointer;background:var(--panel-2);font-size:13px;font-weight:800;color:var(--text);letter-spacing:-.01em;border-bottom:1px solid var(--line-soft)}
 .rp-cls-h:hover{background:var(--border)}
-.rp-arw{font-size:10px;color:var(--gray);width:10px;flex-shrink:0}
+.rp-arw{font-size:10px;color:var(--gray);width:12px;flex-shrink:0}
 .rp-cls-nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .rp-cls-cnt{margin-left:auto;font-size:10px;font-weight:700;color:var(--indigo-ink);background:var(--indigo-l);border-radius:8px;padding:1px 7px}
 .rp-today{font-size:9px;font-weight:800;color:#047857;background:#ECFDF5;border:1px solid #A7F3D0;border-radius:7px;padding:1px 6px}
-.rp-stu{display:flex;align-items:center;gap:8px;padding:5px 12px 5px 26px;cursor:pointer;border-left:3px solid transparent;font-size:13px}
+/* 학생(자식) — 작게·연하게 + 들여쓰기 + 세로 가이드선으로 종속 표시 */
+.rp-stu{display:flex;align-items:center;gap:8px;padding:4px 12px 4px 34px;cursor:pointer;border-left:3px solid transparent;font-size:12px;position:relative}
+.rp-stu::before{content:"";position:absolute;left:20px;top:0;bottom:0;width:1px;background:var(--border)}
 .rp-stu:hover{background:var(--panel-2)}
 .rp-stu.on{background:var(--indigo-l);border-left-color:var(--indigo)}
-.rp-stu-nm{flex:1;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.rp-cls-h input[type=checkbox],.rp-stu input[type=checkbox]{width:15px;height:15px;accent-color:var(--indigo);cursor:pointer;flex-shrink:0}
+.rp-stu-nm{flex:1;font-weight:500;color:var(--sub);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rp-stu.on .rp-stu-nm{color:var(--indigo-ink);font-weight:700}
+.rp-cls-h input[type=checkbox]{width:16px;height:16px;accent-color:var(--indigo);cursor:pointer;flex-shrink:0}
+.rp-stu input[type=checkbox]{width:14px;height:14px;accent-color:var(--indigo);cursor:pointer;flex-shrink:0}
 /* 편집 */
 .rp-grid .rp-edit{min-width:0;padding:18px 20px}
 .rp-ed-h{display:flex;align-items:center;gap:11px;margin-bottom:14px}
