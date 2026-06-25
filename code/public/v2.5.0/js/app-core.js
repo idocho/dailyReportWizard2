@@ -136,6 +136,8 @@ let clsDrillSh=null; // 학급 관리 드릴다운 상태 (null=최상위, class
 let adminOn=false;   // 관리자 세션 상태 (새로고침 시 해제)
 // acl 역할 기반 — 매니저/운영자만 관리 메뉴(강사 계정 등) 노출. instructor.role는 로그인 시 주입(index.html)
 function _isMgr(){ const r=(typeof instructor!=='undefined'&&instructor&&instructor.role)||''; return r==='manager'||r==='admin'||r==='super'; }
+// 모바일(폰) 판정 — 리포트·전송/일괄공지는 강사 에이전트(PC) 필요해 모바일선 비노출
+function _isMobile(){ try{ return /Mobi|Android|iPhone|iPod/i.test(navigator.userAgent) || window.innerWidth < 760; }catch(_){ return false; } }
 let sbFolded={};     // 사이드바 그룹 섹션 접힘 상태 {그룹명: true/false}
 let archOpen={};     // 학급 관리 보관 과목 행 펼침 상태 {classId: true} — 재렌더에도 유지(세션)
 let clsAccOpen={};   // 학급 관리 학급 아코디언 펼침 상태 {classId: true} — renderMain마다 접히는 문제 방지(세션)
@@ -554,9 +556,9 @@ function renderSb(){
     <div class="sb-nav">
       <div class="sni${activeTab==='input'?' on':''}" onclick="goNav('input')">✏️ 수업 입력</div>
       ${aHtml}
-      <div class="sni${activeTab==='report'?' on':''}" onclick="goNav('report')">📤 리포트·전송</div>
+      ${_isMobile()?'':`<div class="sni${activeTab==='report'?' on':''}" onclick="goNav('report')">📤 리포트·전송</div>`}
       <div class="sni${activeTab==='scores'?' on':''}" onclick="goNav('scores')">📊 성적 입력</div>
-      <div class="sni${activeTab==='bulk'?' on':''}" onclick="goNav('bulk')">📢 일괄 공지</div>
+      ${_isMobile()?'':`<div class="sni${activeTab==='bulk'?' on':''}" onclick="goNav('bulk')">📢 일괄 공지</div>`}
       ${_isMgr()?`<div class="sb-lbl" style="margin-top:8px">관리</div>
       <div class="sni${activeTab==='accounts'?' on':''}" onclick="goNav('accounts')">👥 강사 계정</div>`:''}
       <div class="sni${activeTab==='setting'?' on':''}" onclick="goNav('setting')">⚙️ 설정</div>
@@ -591,6 +593,7 @@ function makeTb(title,sub=''){
 function render(){renderSb();renderMain();}
 function renderMain(){
   const mc=document.getElementById('mc');if(!mc)return;
+  if(_isMobile()&&(activeTab==='report'||activeTab==='bulk')){ mc.innerHTML=makeTb('PC 전용 기능')+`<div class="empty" style="padding:30px 18px;line-height:1.7">📱 <b>리포트·전송 / 일괄공지</b>는 AI 생성·카톡 전송을 위해 <b>강사 PC의 에이전트</b>가 필요합니다.<br>모바일에선 이용할 수 없으니 <b>PC</b>에서 접속해 주세요.<br><br>모바일에선 <b>수업 입력 · 성적 입력</b>을 이용하세요.</div>`; return; }
   if(activeTab==='input')renderInput(mc);
   else if(activeTab==='scores')renderScores(mc);
   else if(activeTab==='report')renderReport(mc);
