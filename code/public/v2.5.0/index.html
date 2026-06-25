@@ -19,7 +19,7 @@
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png?v=2">
 <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png?v=2">
 <title>DailyReportWizard</title>
-<link rel="stylesheet" href="css/app.css?v=20260629">
+<link rel="stylesheet" href="css/app.css?v=20260630">
 <style>
   #drw-gate{position:fixed;inset:0;z-index:9999;background:linear-gradient(160deg,#EEF0FF 0%,#FAFAFB 55%);
     display:flex;align-items:center;justify-content:center;padding:24px;
@@ -73,7 +73,7 @@
     try{ localStorage.setItem('drw_db_url',cfg.databaseURL); localStorage.setItem('drw_db_path',CAMPUS_PATH);
          localStorage.removeItem('drw_db_secret'); }catch(_){}
     $('drw-gate').remove(); $('wr').style.display='';
-    const order=['data/curriculum.js?v=202606112000','js/app-core.js?v=v296','js/app-input.js?v=v296','js/app-settings.js?v=v296','js/app-scores.js?v=v296','js/app-report.js?v=v296'];
+    const order=['data/curriculum.js?v=202606112000','js/app-core.js?v=v297','js/app-input.js?v=v297','js/app-settings.js?v=v297','js/app-scores.js?v=v297','js/app-report.js?v=v297'];
     window.APP_VERSION='v2.5.0'; document.title='DailyReportWizard v2.5.0';
     (function next(i){ if(i>=order.length)return; const s=document.createElement('script'); s.src=order[i]; s.onload=()=>next(i+1); document.body.appendChild(s); })(0);
   }

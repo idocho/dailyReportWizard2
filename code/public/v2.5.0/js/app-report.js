@@ -30,7 +30,7 @@ function _railTreeHtml(mode){
     const cid = c.classId, opened = _clsOpen(c, mode), studs = _clsStudents(cid);
     const today = _isTodayCls(c) ? '<span class="rp-today">오늘</span>' : '';
     const cb = mode === 'bulk'
-      ? `<input type="checkbox" onclick="event.stopPropagation();bulkChkCls('${esc(cid)}',this.checked)" ${studs.length && studs.every(s => _bulkSel.has(s.nameKey)) ? 'checked' : ''}>` : '';
+      ? `<input type="checkbox" data-clsbox="${esc(cid)}" onclick="event.stopPropagation();bulkChkCls('${esc(cid)}',this.checked)" ${studs.length && studs.every(s => _bulkSel.has(s.nameKey)) ? 'checked' : ''}>` : '';
     const head = `<div class="rp-cls-h" onclick="toggleTreeCls('${esc(cid)}','${mode}')"><span class="rp-arw">${opened ? '▾' : '▸'}</span>${cb}<span class="rp-cls-nm">${esc(cid)}</span>${today}<span class="rp-cls-cnt">${studs.length}</span></div>`;
     let rows = '';
     if(opened) rows = studs.map(s => {
@@ -484,9 +484,9 @@ function renderBulk(mc){
   renderMhdr('일괄 공지');
   if(!config){ mc.innerHTML = makeTb('일괄 공지') + `<div class="empty">⚙️ 설정 후 이용하세요.</div>`; return; }
   if(!(instructor?.assignments || []).length){ mc.innerHTML = makeTb('일괄 공지') + `<div class="empty">설정 → 담당 수업을 추가해 주세요.</div>`; return; }
-  // 트리 선택서 사라진 학생 정리
+  // 진입 시 기본 전체선택 → 예외만 해제(CM 일괄전송과 조작감 통일)
   const valid = _allMyStudents();
-  for(const k of [..._bulkSel]) if(!valid[k]) _bulkSel.delete(k);
+  _bulkSel = new Set(Object.keys(valid));
   const tmpl = (typeof _bulkTmplCache === 'string') ? _bulkTmplCache : '';
   const tmplOpts = _bulkTemplates().map(t => `<option value="${esc(t.name)}">${esc(t.name)}</option>`).join('');
   const imgPv = _bulkImg ? `<div class="rp-imgpv"><img src="${_bulkImg}"><span>${esc(_bulkImgName)}</span><button class="rp-btn ghost" onclick="bulkClearImg()">제거</button><label class="rp-imgopt"><input type="checkbox" id="bulk-imgfirst">이미지 먼저</label></div>` : '';
@@ -507,8 +507,9 @@ function renderBulk(mc){
     </div>`;
   mc.innerHTML = makeTb('일괄 공지', '여러 반 가로질러 선택 — 같은 메시지 발송') + `
     <div class="rp-bar">
-      <span class="rp-ctx">📢 트리에서 반·학생 체크 · 선택 <b id="bulk-cnt">${_bulkSel.size}</b>명</span>
-      <button class="rp-btn ghost" onclick="bulkAll(false)" style="margin-left:auto">선택 해제</button>
+      <span class="rp-ctx">📢 기본 전체 · 보낼 필요 없는 학생만 해제 · 선택 <b id="bulk-cnt">${_bulkSel.size}</b>명</span>
+      <button class="rp-btn ghost" onclick="bulkAll(true)" style="margin-left:auto">전체 선택</button>
+      <button class="rp-btn ghost" onclick="bulkAll(false)">전체 해제</button>
       <button class="rp-btn" onclick="bulkSend()">📢 일괄 전송 →</button>
     </div>
     <div class="rp-grid">
@@ -523,6 +524,7 @@ function renderBulk(mc){
         <div id="rp-jobs" class="rp-statcol-list"><div class="rp-job">작업 없음</div></div>
       </div>
     </div>`;
+  _bulkSyncCls();
   bulkPreview();
   loadReportJobs();
   clearInterval(_rpJobTimer); _rpJobTimer = setInterval(loadReportJobs, 2500);
@@ -555,8 +557,10 @@ function bulkDelTmpl(){
   _saveBulkTemplates(_bulkTemplates().filter(x => x.name !== name)); toast('삭제됨: ' + name); renderBulk(document.getElementById('mc'));
 }
 function _bulkCnt(){ ['bulk-cnt', 'bulk-cnt2'].forEach(id => { const c = document.getElementById(id); if(c) c.textContent = _bulkSel.size; }); }
-function _bulkRefreshTree(){ const list = document.querySelector('.rp-grid .rp-rail-list'); if(list) list.innerHTML = _railTreeHtml('bulk'); _bulkCnt(); bulkPreview(); }
-function bulkChk(nk, on){ on ? _bulkSel.add(nk) : _bulkSel.delete(nk); _bulkCnt(); bulkPreview(); }   // 체크박스는 사용자 클릭상태 유지 → 트리 미재렌더
+// 반 체크박스 3-state 동기화 — 전체=checked, 일부=indeterminate, 없음=해제 (트리 재렌더 없이)
+function _bulkSyncCls(){ document.querySelectorAll('.rp-rail-list [data-clsbox]').forEach(cb => { const studs = _clsStudents(cb.dataset.clsbox); const n = studs.filter(s => _bulkSel.has(s.nameKey)).length; cb.checked = studs.length > 0 && n === studs.length; cb.indeterminate = n > 0 && n < studs.length; }); }
+function _bulkRefreshTree(){ const list = document.querySelector('.rp-grid .rp-rail-list'); if(list) list.innerHTML = _railTreeHtml('bulk'); _bulkSyncCls(); _bulkCnt(); bulkPreview(); }
+function bulkChk(nk, on){ on ? _bulkSel.add(nk) : _bulkSel.delete(nk); _bulkSyncCls(); _bulkCnt(); bulkPreview(); }   // 개별 체크: 트리 미재렌더, 반 체크박스 3-state만 동기화
 function bulkChkCls(cid, on){ _clsStudents(cid).forEach(s => on ? _bulkSel.add(s.nameKey) : _bulkSel.delete(s.nameKey)); _bulkRefreshTree(); }
 function bulkAll(on){ if(on){ Object.keys(_allMyStudents()).forEach(nk => _bulkSel.add(nk)); } else { _bulkSel.clear(); } _bulkRefreshTree(); }
 function bulkInsertVar(v){ const ta = document.getElementById('bulk-tmpl'); if(!ta) return; const s = ta.selectionStart, e = ta.selectionEnd; ta.value = ta.value.slice(0, s) + v + ta.value.slice(e); ta.selectionStart = ta.selectionEnd = s + v.length; ta.focus(); _bulkTmplCache = ta.value; bulkPreview(); }

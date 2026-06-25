@@ -1,7 +1,7 @@
 # DailyReportWizard — 요구사항 명세서
 
 **Crafted by IDO(idocho@kakao.com) · Powered by Claude AI**  
-**문서 버전**: 8.79 · **앱 버전**: v2.5.0(정식·전면도입) · **최종 수정**: 2026-06-25
+**문서 버전**: 8.80 · **앱 버전**: v2.5.0(정식·전면도입) · **최종 수정**: 2026-06-25
 
 > Firebase 스키마 전체 명세: [ClassManager/documents/DB_SCHEMA.md](../../ClassManager/documents/DB_SCHEMA.md)
 
@@ -11,6 +11,7 @@
 
 | 문서 버전 | 날짜 | 주요 변경 |
 |-----------|------|-----------|
+| 8.80 | 2026-06-25 | **DRW 일괄공지 ↔ CM 일괄전송 UX 통일 (베스트-오브-보스, 목업 승인)**. 기능 동일(범주만 다름: DRW=본인 담당 반 / CM=캠퍼스 전 반)인데 UX 갈라진 부채 해소. 통합 사양: 디렉토리 트리(반 3-state 체크박스 indeterminate·접기·기본 전체선택→예외 해제·전체선택/해제·촘촘 행) + 작성(템플릿·**변수 삽입버튼** {이름}/{반}/{날짜}·이미지 첨부+이미지먼저 체크박스·미리보기) + 독립 **전송 모니터**. **DRW**(app-report.js): 반 체크박스 tristate(`_bulkSyncCls` data-clsbox, 개별토글 시 트리 미재렌더로 동기화)·renderBulk 진입 시 기본 전체선택·전체선택/전체해제 버튼·`.rp-stu` 행 8→5px(웹 v297·CSS v20260630). **CM**(app.js): 작성부 변수 삽입버튼 추가(캐시 v22). 두 화면 조작감 일치(코드는 repo 분리라 사양만 동기화). |
 | 8.79 | 2026-06-25 | **자가 계정생성 차단 — 발급을 Cloud Function으로 일원화**. 온보딩 점검: DRW는 자가가입 없음(로그인만, 위저드 폐지)이나, CM `provision.createInstructor`가 **공개 `accounts:signUp`** REST를 써서 apiKey만으로 누구나 자가 계정생성 가능(합성이메일 선점·정크 위험)이 구멍이었음. `functions/index.js`에 `createInstructor`(onCall, `admin.auth().createUser`+acl, 권한검증: admin=전캠퍼스·강사/관리자, manager=자기캠퍼스·강사만, 합성이메일 동일규칙) 추가. CM `app.js` 계정발급을 `A.callFn('createInstructor')`로 전환(provision.createInstructor는 dead, CM 캐시 v19). 함수 4개 배포(서울). **남은 콘솔 작업**: Authentication→설정→사용자 작업→**"가입 사용 설정" 해제**(자가가입 차단) — 이후엔 인증된 관리자(함수)만 계정 생성. (migrate_instructors.py는 signUp 의존이라 차단 후 미동작 — 1회성이라 무방) |
 | 8.78 | 2026-06-25 | **DRW에서 강사 관리 일괄 제거 (이중 관리 방지, 웹 v296)**. 강사 생성·전환·삭제·신규등록을 CampusManager 전담으로 일원화 → DRW `app-settings.js`서 제거: 설정 탭 `강사(instr)` 탭·pane·`_valid`/adminOn 게이트 항목, dead였던 `instrMgmt` 아코디언 const, `loadInstrsSection`·`createI`·`switchInstr`·`rmInstr`·`closeIM`(iModal), 그리고 수동 계정 조회/등록 `lookupInstr`·`_registerInstr`(로그인 게이트가 신원 주입하므로 불요, 이름만으로 신원 전환되던 우회 소지도 제거). 프리셋 헬퍼(`_HARDCODED_PRESETS`·`_defaultPresets`)는 초기화서도 쓰여 보존. 강사 본인 프로필(담당수업·문구·AI문체) 자가편집은 유지. config/instructors는 로그인 강사가 설정 저장 시 lazy 생성. |
 | 8.77 | 2026-06-25 | **CM 강사 비번 리셋·삭제 활성화 — Cloud Functions 백엔드**. 브라우저는 남의 Auth 비번변경·계정삭제 불가(Admin 필요) → CM 웹 버튼이 `disabled`였음. 기존 작성돼 있던 `functions/index.js`(onCall: `resetInstructorPassword`·`deleteInstructor`·`clearMustChangePw`, requireAdmin로 admin/super+동일캠퍼스 검증, 서울 리전) 배포 연결. `firebase.json`에 `functions.source` 추가. CM `auth.js`에 `callFn`(getFunctions/httpsCallable, asia-northeast3), `app.js` 계정행 버튼 활성화(isTop=운영자 한정, reset=genPw 임시비번 토스트·삭제=확인 후 호출), CSP connect-src에 `*.cloudfunctions.net`·`*.run.app` 추가, 캐시 v17. **전제: Blaze 요금제**(사용 무료 한도, 카드 등록). 배포: DRW repo서 `firebase deploy --only functions` + CM hosting 재배포. |
