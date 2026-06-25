@@ -9,7 +9,8 @@
  */
 // SDK 버전 변경 시 아래 3개 URL을 함께 갱신. (import 지정자는 문자열 리터럴이어야 함)
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getAuth, signInWithEmailAndPassword, updatePassword, signOut, onAuthStateChanged }
+import { getAuth, signInWithEmailAndPassword, updatePassword, signOut, onAuthStateChanged,
+         setPersistence, browserLocalPersistence, browserSessionPersistence }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { getDatabase, ref, get } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 import { firebaseConfig } from "./firebase-config.js";
@@ -37,10 +38,12 @@ function humanize(code) {
  *   { uid, campus, role, instructorId, active, mustChangePw }
  * acl 미존재/비활성이면 로그아웃 후 오류 throw. allowRoles 지정 시 역할 게이트.
  */
-export async function loginByName(campus, name, password, allowRoles) {
+export async function loginByName(campus, name, password, allowRoles, remember) {
   const email = window.SynthEmail.synthEmail(name, campus);
   let uid;
   try {
+    // 로그인 유지 체크 시 local(무기한), 미체크 시 session(브라우저 닫으면 만료→재로그인)
+    await setPersistence(auth, remember ? browserLocalPersistence : browserSessionPersistence);
     const cred = await signInWithEmailAndPassword(auth, email, password);
     uid = cred.user.uid;
   } catch (e) {

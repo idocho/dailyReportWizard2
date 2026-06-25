@@ -46,6 +46,7 @@
     <label>캠퍼스</label><select id="gt-campus"><option value="dongsuwon">동수원</option></select>
     <label>이름</label><input id="gt-name" autocomplete="off">
     <label>비밀번호</label><input id="gt-pw" type="password" autocomplete="current-password">
+    <label style="display:flex;align-items:center;gap:7px;font-weight:600;margin-top:12px;cursor:pointer"><input type="checkbox" id="gt-remember" style="width:auto;margin:0"> 로그인 유지 (아이디 저장)</label>
     <button class="btn" id="gt-btn">로그인</button>
     <div class="m" id="gt-msg"></div>
     <div class="foot">비밀번호 분실 시 관리자에게 문의하세요.</div>
@@ -63,7 +64,7 @@
   const $=id=>document.getElementById(id);
   let CAMPUS_PATH='drw2_cbt'; // 로그인 후 acl.campus 기반 campus/{campus}로 설정
   let A;
-  try{ A=await import('./js/auth/auth.js'); }
+  try{ A=await import('./js/auth/auth.js?v=2'); }
   catch(e){ $('gt-msg').className='m show'; $('gt-msg').textContent='설정 오류: '+(e&&e.message||e); }
 
   const cfg=(await import('./js/auth/firebase-config.js')).firebaseConfig;
@@ -98,11 +99,16 @@
       }catch(_){ /* 조회 실패 시에도 부팅은 진행(가용성) */ }
       booted=true; bootApp();
     });
+    // 아이디(이름) 저장 prefill — '로그인 유지' 선택 시 저장됨
+    try{ const saved=JSON.parse(localStorage.getItem('drw_login')||'null'); if(saved){ $('gt-name').value=saved.name||''; if(saved.campus) $('gt-campus').value=saved.campus; $('gt-remember').checked=true; } }catch(_){}
     $('gt-btn').onclick=async()=>{
-      $('gt-msg').className='m'; const name=$('gt-name').value.trim(),pw=$('gt-pw').value,c=$('gt-campus').value;
+      $('gt-msg').className='m'; const name=$('gt-name').value.trim(),pw=$('gt-pw').value,c=$('gt-campus').value,remember=$('gt-remember').checked;
       if(!name){ $('gt-msg').className='m show'; $('gt-msg').textContent='이름을 입력하세요.'; return; }
       $('gt-btn').disabled=true; $('gt-btn').textContent='로그인 중…';
-      try{ await A.loginByName(c,name,pw,['instructor','manager','admin']); /* onAuth → bootApp */ }
+      try{
+        await A.loginByName(c,name,pw,['instructor','manager','admin'],remember); /* onAuth → bootApp */
+        try{ remember ? localStorage.setItem('drw_login',JSON.stringify({name,campus:c})) : localStorage.removeItem('drw_login'); }catch(_){}
+      }
       catch(e){ $('gt-msg').className='m show'; $('gt-msg').textContent=e.message||String(e); $('gt-btn').disabled=false; $('gt-btn').textContent='로그인'; }
     };
     $('gt-name').addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); $('gt-pw').focus(); } });
