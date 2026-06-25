@@ -23,20 +23,20 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 CONFIG_PATH = SCRIPT_DIR.parent / "config.json"
 BACKUP_DIR = SCRIPT_DIR / "backup"
 
-# config.json 의 firebase_secret 은 DPAPI 암호문일 수 있음 → 같은 코덱으로 복호.
+# 인증은 공용 모듈(_fb_auth) — 서비스 계정(권장) 또는 레거시 시크릿.
 sys.path.insert(0, str(SCRIPT_DIR.parent))
-from secret_codec import unprotect
+from _fb_auth import auth_param
 
 
 def fb_url(cfg, node=""):
+    # 루트 백업과 정합 — firebase_path 접두사 없이 루트(/) 기준. node 는 최상위 키(또는 deep path).
     base = cfg["firebase_url"].rstrip("/")
-    path = cfg["firebase_path"].strip("/")
-    suffix = f"/{node}" if node else ""
-    url = f"{base}/{path}{suffix}.json"
-    secret = unprotect(cfg.get("firebase_secret") or "").strip()
-    if secret:  # Security Rules 전환 후에도 복원 동작 유지(#15)
-        url += "?auth=" + urllib.parse.quote(secret, safe="")
-    return url
+    leaf = f"/{node}.json" if node else "/.json"
+    param, _ = auth_param(cfg)
+    if not param:
+        raise SystemExit("인증 수단 없음 — sa-key.json(서비스 계정) 또는 config.firebase_secret 필요. "
+                         "잠긴 DB는 무인증 복원 불가.")
+    return f"{base}{leaf}?{param}"
 
 
 def http(method, url, payload=None):

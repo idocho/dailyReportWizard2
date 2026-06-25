@@ -36,3 +36,8 @@ code/skills-lock.json
 # 강사 에이전트 로컬 설정(개인 키 포함 가능)
 code/agent_config.json
 migration/
+
+# 서비스 계정 키(백업/복원 Admin 인증) — 절대 커밋 금지
+code/scripts/sa-key.json
+code/scripts/*sa-key*.json
+*serviceAccount*.json
