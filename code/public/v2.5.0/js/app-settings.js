@@ -301,7 +301,7 @@ function renderClsMgmtTop(){
     <div class="sh">🏫 학급 &amp; 학생 관리</div>
     <div class="sh2">내 담당 학급</div>
     ${myRows||'<div style="padding:8px 12px;font-size:11px;color:var(--gray)">담당 수업을 추가하면 여기에 표시됩니다.</div>'}
-    <div class="sh2">전체 학급 탐색</div>
+    <div class="sh2" style="display:flex;align-items:center;justify-content:space-between">전체 학급 탐색${adminOn?`<button class="btn bsm" onclick="addClsModal()" style="font-size:11px;padding:3px 9px">+ 학급 추가</button>`:''}</div>
     ${drillBtns||'<div style="padding:8px 12px;font-size:11px;color:var(--gray)">등록된 학급이 없습니다.</div>'}
   </div>`;
 }
@@ -370,10 +370,10 @@ function _clsSectionsHtml(classId,clsD){
   const students=(config?._classStudents||{})[classId]||[];
   // 학급·학생 정보 변경은 관리자 전용 (강사는 조회만) — 명단 소유권 분리
   const stuChips=students.map(s=>adminOn
-    ?`<span class="chip" onclick="rmStu('${esc(classId)}','${esc(s.nameKey)}')">${esc(s.name||s.nameKey)} <span>×</span></span>`
+    ?`<span class="chip" style="cursor:pointer" onclick="editStu('${esc(classId)}','${esc(s.nameKey)}')" title="클릭=편집">${esc(s.name||s.nameKey)} <span style="color:var(--gray);font-size:9px">${esc(s.nameKey)}</span></span>`
     :`<span class="chip" style="cursor:default">${esc(s.name||s.nameKey)}</span>`).join('');
   return `<div class="sl">학생</div>
-      <div class="chips" data-classid="${esc(classId)}" data-chip-type="stu">${stuChips}${adminOn?`<span class="chip" style="color:var(--gray);cursor:pointer" onclick="addStuInline()" title="명단 추가는 ClassManager에서 (nameKey=출결번호)">＋ CM에서 추가</span>`:''}</div>
+      <div class="chips" data-classid="${esc(classId)}" data-chip-type="stu">${stuChips}${adminOn?`<span class="chip" style="background:var(--indigo-l);border-color:var(--indigo);color:var(--indigo);cursor:pointer" onclick="addStuModal('${esc(classId)}')">+ 학생 추가</span>`:''}</div>
       <div class="sl" style="margin-top:10px">과목</div>
       <div data-course-block="${esc(classId)}">${_courseChipsBlockHtml(classId,clsD)}</div>`;
 }
@@ -396,22 +396,62 @@ function buildClsAccordion(classId,clsD,myRole){
   </div>`;
 }
 
-// ── 학생 추가: ClassManager 일원화 (v8.27) ──────────────────────
-// 종전 웹 인라인 추가는 nameKey=이름(+숫자)으로 생성해 스키마 정본(nameKey=출결번호)을
-// 위반했음 — 명단 CRUD는 CM 단일 소유(v8.13)이므로 웹은 안내만 한다.
-function addStuInline(){
-  toast('학생 추가는 ClassManager에서 합니다 (출결번호 필요) 🖥️');
+// ── 학생/학급 CRUD (CM 통폐합, v8.82) — nameKey=출결번호 정본 준수 ──────
+function _allStudentKeys(){ const s={}; for(const arr of Object.values(config?._classStudents||{}))for(const st of (arr||[]))s[st.nameKey]=1; return s; }
+function _clsOptions(cur){ return Object.keys(config?.classes||{}).map(id=>`<option value="${esc(id)}"${id===cur?' selected':''}>${esc(id)}</option>`).join(''); }
+function addStuModal(classId){
+  if(!adminOn)return toast('관리자 모드가 필요합니다.');
+  _rpModal(`<h3>학생 추가</h3>
+    <div class="rp-hint">출결번호(nameKey)는 학생 고유 식별자 — 정확히 입력하세요.</div>
+    <label class="rp-flbl">출결번호</label><input class="rp-fin" id="st-key" inputmode="numeric" placeholder="예: 1024">
+    <label class="rp-flbl">이름</label><input class="rp-fin" id="st-name" placeholder="이름">
+    <label class="rp-flbl">반</label><select class="rp-fin" id="st-cls">${_clsOptions(classId)}</select>
+    <div class="rp-mrow"><button class="rp-btn ghost" onclick="closeRpModal()">취소</button><button class="rp-btn" onclick="saveStu(null)">추가</button></div>`);
+  setTimeout(()=>document.getElementById('st-key')?.focus(),0);
 }
-
-function refreshStuChips(classId){
-  const sCls=classId.replace(/\\/g,'\\\\').replace(/"/g,'\\"');
-  const el=document.querySelector(`[data-chip-type="stu"][data-classid="${sCls}"]`);
-  if(!el)return;
-  const students=(config?._classStudents||{})[classId]||[];
-  const stuChips=students.map(s=>adminOn
-    ?`<span class="chip" onclick="rmStu('${esc(classId)}','${esc(s.nameKey)}')">${esc(s.name||s.nameKey)} <span>×</span></span>`
-    :`<span class="chip" style="cursor:default">${esc(s.name||s.nameKey)}</span>`).join('');
-  el.innerHTML=stuChips+(adminOn?`<span class="chip" style="color:var(--gray);cursor:pointer" onclick="addStuInline()" title="명단 추가는 ClassManager에서 (nameKey=출결번호)">＋ CM에서 추가</span>`:'');
+function editStu(classId,nameKey){
+  if(!adminOn)return toast('관리자 모드가 필요합니다.');
+  const s=((config?._classStudents||{})[classId]||[]).find(x=>x.nameKey===nameKey)||{};
+  _rpModal(`<h3>학생 편집</h3>
+    <label class="rp-flbl">출결번호</label><input class="rp-fin" value="${esc(nameKey)}" disabled>
+    <label class="rp-flbl">이름</label><input class="rp-fin" id="st-name" value="${esc(s.name||'')}">
+    <label class="rp-flbl">반</label><select class="rp-fin" id="st-cls">${_clsOptions(classId)}</select>
+    <div class="rp-mrow"><button class="rp-btn ghost" style="color:var(--red)" onclick="closeRpModal();rmStu('${esc(classId)}','${esc(nameKey)}')">삭제</button><button class="rp-btn ghost" onclick="closeRpModal()">취소</button><button class="rp-btn" onclick="saveStu('${esc(nameKey)}')">저장</button></div>`);
+}
+async function saveStu(editKey){
+  const isNew=!editKey;
+  const nk=isNew?(document.getElementById('st-key').value||'').trim():editKey;
+  const nm=(document.getElementById('st-name').value||'').trim();
+  const cls=document.getElementById('st-cls').value;
+  if(!nk||!nm)return toast('출결번호·이름을 입력하세요');
+  if(isNew && _allStudentKeys()[nk])return toast('이미 있는 출결번호입니다');
+  try{
+    await fbPut('students/'+encodeURIComponent(nk),{name:nm,class:cls});
+    // 로컬 _classStudents 갱신 — 이전 반에서 제거 후 새 반에 반영
+    const cs=config._classStudents=config._classStudents||{};
+    for(const k of Object.keys(cs))cs[k]=(cs[k]||[]).filter(s=>s.nameKey!==nk);
+    (cs[cls]=cs[cls]||[]).push({nameKey:nk,name:nm,class:cls});
+    closeRpModal(); toast(isNew?'학생 추가됨 ✅':'저장됨 ✅'); renderMain();
+  }catch(e){ toast('저장 실패: '+e,4000); }
+}
+function addClsModal(){
+  if(!adminOn)return toast('관리자 모드가 필요합니다.');
+  _rpModal(`<h3>학급 추가</h3>
+    <label class="rp-flbl">반 이름</label><input class="rp-fin" id="cl-id" placeholder="예: 중1A">
+    <label class="rp-flbl">그룹</label><select class="rp-fin" id="cl-grp"><option value="M">M반 (월수금)</option><option value="T">T반 (화목토)</option></select>
+    <div class="rp-mrow"><button class="rp-btn ghost" onclick="closeRpModal()">취소</button><button class="rp-btn" onclick="saveCls()">추가</button></div>`);
+  setTimeout(()=>document.getElementById('cl-id')?.focus(),0);
+}
+async function saveCls(){
+  const id=(document.getElementById('cl-id').value||'').trim();
+  const grp=document.getElementById('cl-grp').value;
+  if(!id)return toast('반 이름을 입력하세요');
+  if(config?.classes?.[id])return toast('이미 있는 반입니다');
+  try{
+    await fbPut('classes/'+encodeURIComponent(id),{group:grp,courses:{}});
+    config.classes=config.classes||{}; config.classes[id]={group:grp,courses:{}};
+    closeRpModal(); toast(`${id} 추가됨 ✅`); clsDrillSh=id; renderMain();
+  }catch(e){ toast('학급 추가 실패: '+e,4000); }
 }
 
 // ── 과목 인라인 추가 ─────────────────────────────────────────────

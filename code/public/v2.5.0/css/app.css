@@ -350,6 +350,10 @@ body{font-family:'Pretendard','Malgun Gothic','맑은 고딕',-apple-system,sans
 .rp-ov.on{display:flex}
 .rp-modal{background:var(--panel);border:1px solid var(--border);border-radius:14px;width:100%;max-width:360px;padding:18px}
 .rp-modal h3{margin:0 0 4px;font-size:15px}
+.rp-flbl{display:block;font-size:11px;font-weight:700;color:var(--sub);margin:10px 2px 4px}
+.rp-fin{width:100%;padding:9px 11px;border:1px solid var(--border);border-radius:9px;font-size:13px;font-family:inherit;background:var(--bg);color:inherit;box-sizing:border-box}
+.rp-fin:focus{border-color:var(--indigo);outline:none}
+.rp-fin:disabled{color:var(--gray);background:var(--line-soft)}
 .rp-cks{max-height:260px;overflow:auto}
 .rp-ck{display:flex;align-items:center;gap:8px;padding:6px;border-radius:8px;font-size:13px}
 .rp-send-cls{margin-bottom:8px}
