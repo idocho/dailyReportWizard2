@@ -136,8 +136,16 @@ let clsDrillSh=null; // 학급 관리 드릴다운 상태 (null=최상위, class
 let adminOn=false;   // 관리자 세션 상태 (새로고침 시 해제)
 // acl 역할 기반 — 매니저/운영자만 관리 메뉴(강사 계정 등) 노출. instructor.role는 로그인 시 주입(index.html)
 function _isMgr(){ const r=(typeof instructor!=='undefined'&&instructor&&instructor.role)||''; return r==='manager'||r==='admin'||r==='super'; }
-// 모바일(폰) 판정 — 리포트·전송/일괄공지는 강사 에이전트(PC) 필요해 모바일선 비노출
-function _isMobile(){ try{ return /Mobi|Android|iPhone|iPod/i.test(navigator.userAgent) || window.innerWidth < 760; }catch(_){ return false; } }
+// 모바일·태블릿(=강사 에이전트 없는 기기) 판정 — 리포트·전송/일괄공지 비노출.
+// 데스크톱모드 UA 위장 대비: 터치전용(마우스 없음) 기기는 pointer:coarse로 잡음(데스크톱모드서도 불변).
+function _isMobile(){
+  try{
+    if(/Mobi|Android|iPhone|iPod|iPad|Tablet|Silk|PlayBook/i.test(navigator.userAgent)) return true;
+    if(window.matchMedia && matchMedia('(pointer: coarse)').matches && !matchMedia('(pointer: fine)').matches) return true;
+    if(window.innerWidth < 760) return true;
+    return false;
+  }catch(_){ return false; }
+}
 let sbFolded={};     // 사이드바 그룹 섹션 접힘 상태 {그룹명: true/false}
 let archOpen={};     // 학급 관리 보관 과목 행 펼침 상태 {classId: true} — 재렌더에도 유지(세션)
 let clsAccOpen={};   // 학급 관리 학급 아코디언 펼침 상태 {classId: true} — renderMain마다 접히는 문제 방지(세션)
