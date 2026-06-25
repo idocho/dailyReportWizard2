@@ -512,13 +512,16 @@ function renderBulk(mc){
     </div>`;
   mc.innerHTML = makeTb('일괄 공지', '여러 반 가로질러 선택 — 같은 메시지 발송') + `
     <div class="rp-bar">
-      <span class="rp-ctx">📢 기본 전체 · 보낼 필요 없는 학생만 해제 · 선택 <b id="bulk-cnt">${_bulkSel.size}</b>명</span>
-      <button class="rp-btn ghost" onclick="bulkAll(true)" style="margin-left:auto">전체 선택</button>
-      <button class="rp-btn ghost" onclick="bulkAll(false)">전체 해제</button>
+      <span class="rp-ctx">📢 기본 전체 선택 · 보낼 필요 없는 학생만 체크 해제하세요</span>
     </div>
     <div class="rp-grid rp-grid-3">
       <div class="rp-rail">
-        <div class="rp-rail-h">수신자 선택 <b id="bulk-cnt2">${_bulkSel.size}</b>명</div>
+        <div class="rp-rail-h">수신자 <b id="bulk-cnt2">${_bulkSel.size}</b>명
+          <span style="display:flex;gap:4px;margin-left:auto">
+            <button class="rp-btn ghost" style="padding:2px 7px;font-size:11px" onclick="bulkAll(true)">전체</button>
+            <button class="rp-btn ghost" style="padding:2px 7px;font-size:11px" onclick="bulkAll(false)">해제</button>
+          </span>
+        </div>
         <div class="rp-rail-list">${_railTreeHtml('bulk')}</div>
       </div>
       <div class="rp-edit" id="rp-edit" style="padding:0">${composer}</div>
