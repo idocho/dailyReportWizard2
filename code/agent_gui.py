@@ -176,6 +176,9 @@ class AgentGUI:
 
     def _save_setup(self):
         v = {k: var.get().strip() for k, var in self.vars.items()}
+        # 방 접두사는 trim 금지 — "오직 " 처럼 끝 공백이 방 이름 일부(prefix+이름)
+        if "roomPrefix" in self.vars:
+            v["roomPrefix"] = self.vars["roomPrefix"].get()
         campus = CAMPUS.get(self.campus_var.get(), "")
         eng = self._eng_id()
         # 현재 입력칸 키를 선택 엔진에 반영(전환 없이 바로 저장하는 경우 포함)
