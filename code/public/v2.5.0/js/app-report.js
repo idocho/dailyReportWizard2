@@ -506,15 +506,13 @@ function renderBulk(mc){
       <div class="rp-lblr">이미지 첨부 (선택)</div>
       <div class="rp-bar"><input type="file" id="bulk-imgfile" accept="image/*" onchange="bulkPickImg(event)" style="font-size:12px;flex:1"></div>
       ${imgPv}
-      <div class="rp-lblr">미리보기</div>
-      <div class="rp-right" id="rp-right"></div>
       <button class="rp-btn" onclick="bulkSend()" style="width:100%;margin-top:12px">📢 일괄 전송 →</button>
     </div>`;
   mc.innerHTML = makeTb('일괄 공지', '여러 반 가로질러 선택 — 같은 메시지 발송') + `
     <div class="rp-bar">
       <span class="rp-ctx">📢 기본 전체 선택 · 보낼 필요 없는 학생만 체크 해제하세요</span>
     </div>
-    <div class="rp-grid rp-grid-3">
+    <div class="rp-grid">
       <div class="rp-rail">
         <div class="rp-rail-h">수신자 <b id="bulk-cnt2">${_bulkSel.size}</b>명
           <span style="display:flex;gap:4px;margin-left:auto">
@@ -525,6 +523,7 @@ function renderBulk(mc){
         <div class="rp-rail-list">${_railTreeHtml('bulk')}</div>
       </div>
       <div class="rp-edit" id="rp-edit" style="padding:0">${composer}</div>
+      <div class="rp-right" id="rp-right"></div>
       <div class="rp-statcol">
         <div class="rp-rail-h">전송 모니터 <span class="rp-live"><i></i>실시간</span></div>
         <div id="rp-jobs" class="rp-statcol-list"><div class="rp-job">작업 없음</div></div>
