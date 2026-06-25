@@ -154,7 +154,7 @@ function _saveDraft(nk, val){
 
 // ── 에이전트 실행 감지 + 미실행 시 설치 안내 ──────────────────────────
 // 에이전트가 agents/{id}.ts(ms) 하트비트를 ~15s마다 기록 → 90s 이내면 살아있음
-const AGENT_DL = 'https://github.com/idocho/dailyReportWizard2/releases/download/agent/DRW-AI-Agent-0.91.exe';
+const AGENT_DL = 'https://github.com/idocho/dailyReportWizard2/releases/download/agent/DRW-AI-Agent-0.92.exe';
 let _rpPending = null;
 async function _agentAlive(){
   try{ const a = await fbGet(`agents/${instructor.id}`); return !!(a && a.ts && Date.now() - a.ts < 90000); }

@@ -27,7 +27,7 @@ except Exception:
     _HAS_TRAY = False   # pystray 미설치/실패 → 트레이 비활성(일반 창으로 동작)
 
 INDIGO, INK, GREEN, RED, SUB = "#4F46E5", "#15171F", "#16A34A", "#DC2626", "#94A3B8"
-AGENT_VERSION = "0.91"
+AGENT_VERSION = "0.92"
 # 캠퍼스 표시명 → id (app.py / 웹 게이트와 동일 정본). 캠퍼스 추가 시 여기만 갱신.
 CAMPUS = {"동수원": "dongsuwon"}
 _Q = queue.Queue()

@@ -1,7 +1,7 @@
 # DailyReportWizard — 요구사항 명세서
 
 **Crafted by IDO(idocho@kakao.com) · Powered by Claude AI**  
-**문서 버전**: 8.74 · **앱 버전**: v2.5.0(정식·전면도입) · **최종 수정**: 2026-06-25
+**문서 버전**: 8.75 · **앱 버전**: v2.5.0(정식·전면도입) · **최종 수정**: 2026-06-25
 
 > Firebase 스키마 전체 명세: [ClassManager/documents/DB_SCHEMA.md](../../ClassManager/documents/DB_SCHEMA.md)
 
@@ -11,6 +11,7 @@
 
 | 문서 버전 | 날짜 | 주요 변경 |
 |-----------|------|-----------|
+| 8.75 | 2026-06-25 | **에이전트 버전 0.92** — `AGENT_VERSION`·산출물명(`DRW-AI-Agent-0.92.exe`)·웹 `AGENT_DL`·guide·CM agent README 동기화(웹 JS v295). 릴리스 에셋 교체(0.91 삭제, DL 200). 직전 엔진별 키 분리 저장 포함. |
 | 8.74 | 2026-06-25 | **에이전트 AI 엔진별 키 분리 저장**. 기존: 설정창이 선택 엔진 키 1개만 `fields`에 담아 저장 → `write_agent_config`가 파일 전체 교체라 **다른 엔진 키·smartWait 유실**(엔진 전환 시 재입력). 수정: `agent_gui` 설정창에 엔진 드롭다운 `<<ComboboxSelected>>` 바인딩(`_on_eng_change`) — 입력칸 키를 이전 엔진에 보관하고 새 엔진 저장 키 로드. `_eng_keys`에 gemini/claude/openai 키 전부 보유, `_save_setup`이 기존 config(`self.cfg`, smartWait 등) 보존하며 엔진별 키 전부 기록(빈 값 제거). 활성 엔진 키는 `_call_ai_hub`가 `cfg[ai_engine_type]_api_key`로 선택(불변). 라운드트립 검증(3엔진 키+smartWait 보존). exe 재빌드·재업로드. |
 | 8.73 | 2026-06-25 | **v2.5.0 전면 도입 — 구버전 접근 경로 전부 제거**. 보안 잠금 후 구버전(v2.0.5~v2.4.0)은 무인증·`drw2_cbt` 경로라 잠긴 DB 접근 불가(죽은 화면) → 접근 차단. `firebase.json`: ignore에 v2.2.2/v2.2.3/v2.3.0/v2.4.0 추가(호스팅서 제거, 파일 87→23), redirect 전부 `/v2.5.0/`로 변경 + v2.2.2~v2.4.0·**루트 `/`** 추가(11개 경로 302). `versions.json` v2.5.0 단일(정식). 검증: `/`·`/v2.4.0/`·구버전 deep path 전부 302→`/v2.5.0/`, `/v2.5.0/` 200. **잔여 보안 권고**: 레거시 DB 시크릿(`?auth=secret`은 룰 우회) Firebase 콘솔서 비활성화 — 단 `backup_db.py`/`restore_db.py`가 시크릿 의존이라 서비스계정 토큰 전환 후 봉인. AI 실명 가명화·미성년 동의도 잔여. |
 | 8.72 | 2026-06-25 | **🔒 보안 룰 cutover 실행 — DB 잠금 라이브(최대 위협 해소)**. v2.5 이래 개방돼 있던 DB를 Firebase Auth+acl 룰로 잠금. `firebase.json`에 `database.rules`=`database.rules.v2.json` 연결 → `firebase deploy --only database`. **검증**: 무인증 루트 read **200→401 "Permission denied"**(acl 포함 차단), 라이브 에이전트 **"로그인 OK 보안 토큰 사용"** + **AI 생성·카톡 전송 E2E 성공**(genJobs/sendJobs 쓰기 규칙 라이브 검증) 확인. 웹 v294 동반 배포(401 재시도 훅). 롤백 자산 `database.rules.open.json` 보유(30초 복구). ⚠️ **운영 주의**: 기존 강사 6명 에이전트는 **신규 exe 업데이트 + 웹 비번 입력 전까지 잠금 후 동작 불가**(다음 접속 시 무장 필요) — 현재 단독 테스트라 수용. 매니저 캠퍼스 일괄공지(root sendJobs)·CM 웹도 manager/admin 토큰으로 동작. |
