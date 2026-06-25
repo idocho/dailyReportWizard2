@@ -140,7 +140,9 @@ function _isMgr(){ const r=(typeof instructor!=='undefined'&&instructor&&instruc
 // 데스크톱모드 UA 위장 대비: 터치전용(마우스 없음) 기기는 pointer:coarse로 잡음(데스크톱모드서도 불변).
 function _isMobile(){
   try{
-    if(/Mobi|Android|iPhone|iPod|iPad|Tablet|Silk|PlayBook/i.test(navigator.userAgent)) return true;
+    const ua=navigator.userAgent||'';
+    if(/Windows NT/i.test(ua)) return false;   // 윈도우 = 에이전트 가능 PC(터치노트북 포함) → 항상 노출
+    if(/Mobi|Android|iPhone|iPod|iPad|Tablet|Silk|PlayBook/i.test(ua)) return true;
     if(window.matchMedia && matchMedia('(pointer: coarse)').matches && !matchMedia('(pointer: fine)').matches) return true;
     if(window.innerWidth < 760) return true;
     return false;
