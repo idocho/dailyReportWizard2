@@ -106,7 +106,7 @@
       if(!name){ $('gt-msg').className='m show'; $('gt-msg').textContent='이름을 입력하세요.'; return; }
       $('gt-btn').disabled=true; $('gt-btn').textContent='로그인 중…';
       try{
-        await A.loginByName(c,name,pw,['instructor','manager','admin'],remember); /* onAuth → bootApp */
+        await A.loginByName(c,name,pw,['instructor','manager','admin','super'],remember); /* onAuth → bootApp */
         try{ remember ? localStorage.setItem('drw_login',JSON.stringify({name,campus:c})) : localStorage.removeItem('drw_login'); }catch(_){}
       }
       catch(e){ $('gt-msg').className='m show'; $('gt-msg').textContent=e.message||String(e); $('gt-btn').disabled=false; $('gt-btn').textContent='로그인'; }
