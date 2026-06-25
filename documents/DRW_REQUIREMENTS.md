@@ -1,7 +1,7 @@
 # DailyReportWizard — 요구사항 명세서
 
 **Crafted by IDO(idocho@kakao.com) · Powered by Claude AI**  
-**문서 버전**: 8.71 · **앱 버전**: v2.5.0(개발·배포)/v2.4.0(안정) · **최종 수정**: 2026-06-25
+**문서 버전**: 8.72 · **앱 버전**: v2.5.0(개발·배포)/v2.4.0(안정) · **최종 수정**: 2026-06-25
 
 > Firebase 스키마 전체 명세: [ClassManager/documents/DB_SCHEMA.md](../../ClassManager/documents/DB_SCHEMA.md)
 
@@ -11,6 +11,7 @@
 
 | 문서 버전 | 날짜 | 주요 변경 |
 |-----------|------|-----------|
+| 8.72 | 2026-06-25 | **🔒 보안 룰 cutover 실행 — DB 잠금 라이브(최대 위협 해소)**. v2.5 이래 개방돼 있던 DB를 Firebase Auth+acl 룰로 잠금. `firebase.json`에 `database.rules`=`database.rules.v2.json` 연결 → `firebase deploy --only database`. **검증**: 무인증 루트 read **200→401 "Permission denied"**(acl 포함 차단), 라이브 에이전트 **"로그인 OK 보안 토큰 사용"**(강사 계정 idToken으로 잠긴 DB 쓰기 성공) 확인. 웹 v294 동반 배포(401 재시도 훅). 롤백 자산 `database.rules.open.json` 보유(30초 복구). ⚠️ **운영 주의**: 기존 강사 6명 에이전트는 **신규 exe 업데이트 + 웹 비번 입력 전까지 잠금 후 동작 불가**(다음 접속 시 무장 필요) — 현재 단독 테스트라 수용. 매니저 캠퍼스 일괄공지(root sendJobs)·CM 웹도 manager/admin 토큰으로 동작. |
 | 8.71 | 2026-06-25 | **보안 룰 cutover 준비 — 에이전트 인증·룰 보완·웹 토큰재시도 (배포 전 단계, 라이브 룰 미반영)**. 최대 위협=DB 전면 개방(무인증 read 200 검증) 닫기 위한 선결 작업. ① **에이전트 로그인**: `agent_auth.py`(웹 synth_email·auth.js 파이썬 포팅 — `synth_email`/`sign_in`/`refresh`/`TokenManager`, JS와 바이트동일 검증). 설정창에 "웹 로그인 비밀번호" 입력(선택) → DPAPI 암호화(`secret_codec` SENSITIVE_KEYS에 `login_password` 추가) → 강사 본인 계정으로 idToken 발급, `process_once`/`write_heartbeat`에 토큰 전달. **무중단 안전장치**: 비번 미설정·로그인 실패 시 `token()`→None→무인증 폴백(룰 미배포 동안 기존 에이전트 무중단). ② **룰 보완**: `database.rules.v2.json` campus 하위에 `genJobs`/`sendJobs`/`agents` 쓰기 규칙 누락분 추가(강사=본인 키 소유권 검증, manager=캠퍼스, admin=전역). 미보완 시 잠금 후 리포트 생성·전송·하트비트 전멸이라 필수. `_lookup_role`이 uid 있으면 `acl/{uid}` 직접 조회(룰 호환). ③ **웹 토큰만료 재시도**: `app-core` fb헬퍼가 401/403 시 `window.__getFreshToken__`(index.html, getIdToken 재발급)으로 1회 재시도(웹 v294). ④ 에이전트 재빌드(`agent_auth` 번들)·재업로드. **미실행(최종 go 대기)**: 라이브 룰 배포·웹 v294 배포 — 검증 후 수동. |
 | 8.70 | 2026-06-25 | **에이전트 단일화 — DRW + CampusManager 공용**. CM 전용 에이전트(`CampusManager/agent/`의 send_agent·agent_gui·kakao_send 복붙본, DRW 대비 stale)를 폐지하고 **DRW AI Agent 하나로 통합**. `agent_worker`: ① `process_sendjobs` 일반화(`base`/`claim_id` 파라미터, 수신자 `msg` 없으면 `job.body`를 `{이름}/{반}/{날짜}` 치환 `render`로 생성) ② `process_campus_sendjobs`(루트 `sendJobs/{campus}` 큐) ③ `_lookup_role`(acl에서 campus+instructorId 매칭 역할 조회, 프로세스 캐시) ④ `process_once`가 역할 `manager/admin/super`면 캠퍼스 일괄공지 큐도 처리(일반 강사는 미폴링·비노출 — 공지 가능자는 전 톡방 입장 매니저 소수). 다중 매니저 경쟁은 status 필터(1차)+sender 선점 사전/사후 확인(2차, best-effort, 캠퍼스당 1대 권장). GUI 변경 없음(역할 자동감지). CM 잡 구조(`{cls,body,recipients:[{nameKey,name}],image?,imageFirst?}`) 호환 검증(모킹 dry: room=prefix+name·msg=body render·선점 양보). 단일 exe 재빌드·재업로드. CM repo: 중복 .py 4개 git rm, README 통합 안내로 교체. |
 | 8.69 | 2026-06-25 | **호스팅 배포(v2.5.0 v293) + CSP Auth 차단 버그 수정**. 배포 직전 발견: v2.5.0 로그인 게이트가 Firebase SDK를 `gstatic.com`에서 import + Auth가 `identitytoolkit`/`securetoken.googleapis.com` 호출하나 `firebase.json` CSP `script-src`에 gstatic 없고 `connect-src`에 auth 엔드포인트 없음 → **배포판 로그인 전면 차단**(localhost는 CSP 미적용이라 미검출). 수정: `script-src`에 `https://www.gstatic.com`, `connect-src`에 `https://*.googleapis.com` 추가. `firebase deploy --only hosting`(87파일). 라이브 검증: 포털·v2.5.0·guide·v2.4.0 전부 200, CSP 헤더에 gstatic·googleapis 반영, 배포 JS v293. 에이전트 릴리스(`DRW-AI-Agent-0.91.exe`) 동반 공개. |

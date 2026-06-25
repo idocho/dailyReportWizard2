@@ -1,4 +1,7 @@
 {
+  "database": {
+    "rules": "database.rules.v2.json"
+  },
   "hosting": {
     "public": "code/public",
     "ignore": [
