@@ -27,7 +27,7 @@
 | 강사 에이전트 (PC 앱 대체) | `code/agent_gui.py`(셋업·상태 GUI)·`agent_worker.py`(생성·전송 워커)·`kakao_send.py`·`ai_engine.py`(프롬프트·`_call_ai_hub`)·`ai_style.py`·`constants.py`·`secret_codec.py`. 빌드: `scripts/build-agent.ps1`. ※ PC 풀 클라이언트(`app.py`/`main.py`/`firebase.py`/`storage.py`/`errors.py`/`message.py`/`kakao_image.py`)는 웹+에이전트 통합으로 **제거됨**(필요 시 git 이력 복원) |
 | 요구사항 문서 | `documents/DRW_REQUIREMENTS.md` |
 | Analyzer 요구사항 | `documents/ANALYZER_REQUIREMENTS.md` |
-| 공유 DB 스키마 정본 | `../ClassManager/documents/DB_SCHEMA.md` |
+| DB 스키마 정본 | `documents/DB_SCHEMA.md` (구 ClassManager에서 이관 — repo 삭제) |
 | 커리큘럼 원본 JSON | `code/public/v2.4.0/data/math-curriculum-2022.json` (버전 디렉터리 내 — 별도 `src/` 없음) |
 
 ### 버전 정책 (2026-06-11~)

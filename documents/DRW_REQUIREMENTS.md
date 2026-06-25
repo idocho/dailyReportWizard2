@@ -3,7 +3,7 @@
 **Crafted by IDO(idocho@kakao.com) · Powered by Claude AI**  
 **문서 버전**: 8.86 · **앱 버전**: v2.5.0(정식·전면도입) · **최종 수정**: 2026-06-26
 
-> Firebase 스키마 전체 명세: [ClassManager/documents/DB_SCHEMA.md](../../ClassManager/documents/DB_SCHEMA.md)
+> Firebase 스키마 전체 명세: [DB_SCHEMA.md](DB_SCHEMA.md) (구 ClassManager에서 이관)
 
 ---
 
