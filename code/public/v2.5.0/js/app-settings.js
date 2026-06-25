@@ -1032,3 +1032,67 @@ function toggleAcc(hdr,classId){
   if(arrow)arrow.textContent=open?'▼':'▶';
   if(classId!==undefined)clsAccOpen[classId]=open; // 세션 보존 — renderMain 재빌드 시 복원
 }
+
+// ══════════════════════════════════════════════════════════
+//  강사 계정 관리 (CM 통폐합 — 매니저/운영자 전용, Cloud Functions)
+// ══════════════════════════════════════════════════════════
+function _accGenPw(){ const c='ABCDEFGHJKMNPQRSTUVWXYZ23456789'; let s=''; for(let i=0;i<8;i++)s+=c[Math.floor(Math.random()*c.length)]; return s; }
+function _accIsAdmin(){ return ['admin','super'].includes(instructor?.role); }
+async function _aclAll(){
+  try{ const r=await fetch(dbUrl.replace(/\/$/,'')+'/acl.json?auth='+encodeURIComponent(window.__AUTH_TOKEN__||'')); return r.ok?((await r.json())||{}):{}; }
+  catch(_){ return {}; }
+}
+async function _aclPut(uid,field,val){
+  const r=await fetch(`${dbUrl.replace(/\/$/,'')}/acl/${encodeURIComponent(uid)}/${field}.json?auth=${encodeURIComponent(window.__AUTH_TOKEN__||'')}`,
+    {method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(val)});
+  if(!r.ok) throw new Error('변경 실패 '+r.status);
+}
+function renderAccounts(mc){
+  if(!_isMgr()){ activeTab='input'; renderMain(); return; }
+  mc.innerHTML=makeTb('강사 계정','발급·비활성·비번 리셋·삭제 (관리자 전용)')+`
+    <div style="padding:16px 18px;max-width:760px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+        <b style="font-size:13px">계정 발급</b>
+        <input class="rp-ta" id="ac-name" placeholder="강사 이름" style="min-height:0;height:34px;flex:1;max-width:160px">
+        ${_accIsAdmin()?`<select class="bulk-tsel-like" id="ac-role" style="height:34px;border:1px solid var(--border);border-radius:8px;padding:0 8px"><option value="instructor">강사</option><option value="manager">관리자</option></select>`:''}
+        <input class="rp-ta" id="ac-pw" value="${_accGenPw()}" readonly style="min-height:0;height:34px;width:96px;font-family:monospace">
+        <button class="rp-btn ghost" onclick="document.getElementById('ac-pw').value=_accGenPw()" title="임시비번 재생성">↻</button>
+        <button class="rp-btn" onclick="accCreate()">발급</button>
+      </div>
+      <div id="ac-list"><div class="rp-hint" style="padding:12px">불러오는 중…</div></div>
+    </div>`;
+  loadAccounts();
+}
+async function loadAccounts(){
+  const el=document.getElementById('ac-list'); if(!el)return;
+  const isAdmin=_accIsAdmin(), myCampus=instructor?.campus||'';
+  const all=await _aclAll();
+  const mine=Object.entries(all).filter(([u,a])=> a && a.role!=='admin' && a.role!=='super'
+    && (isAdmin ? (a.role==='instructor'||a.role==='manager') : (a.role==='instructor' && a.campus===myCampus)));
+  if(!mine.length){ el.innerHTML='<div class="rp-hint" style="padding:12px">계정이 없습니다. 위에서 발급하세요.</div>'; return; }
+  el.innerHTML=`<table style="width:100%;border-collapse:collapse;font-size:12.5px">
+    <thead><tr style="text-align:left;color:var(--sub);font-size:11px">
+      <th style="padding:7px 8px">이름</th><th>역할</th><th>상태</th>${isAdmin?'<th>캠퍼스</th>':''}<th style="text-align:right;padding-right:8px">작업</th></tr></thead>
+    <tbody>${mine.map(([uid,a])=>`<tr style="border-top:1px solid var(--line-soft)">
+      <td style="padding:7px 8px;font-weight:700">${esc(a.instructorId||'?')}</td>
+      <td><span class="rp-badge ${a.role==='manager'?'ok':'no'}">${a.role==='manager'?'관리자':'강사'}</span></td>
+      <td><span class="rp-badge ${a.active?'ok':'no'}">${a.active?'활성':'비활성'}</span></td>
+      ${isAdmin?`<td style="color:var(--sub)">${esc(a.campus||'')}</td>`:''}
+      <td style="text-align:right;padding-right:8px;white-space:nowrap">
+        ${isAdmin?`<button class="rp-btn ghost" style="padding:3px 8px;font-size:11px" onclick="accRole('${esc(uid)}','${a.role==='manager'?'instructor':'manager'}')">${a.role==='manager'?'강사로':'관리자로'}</button>`:''}
+        <button class="rp-btn ghost" style="padding:3px 8px;font-size:11px" onclick="accToggle('${esc(uid)}',${!a.active})">${a.active?'비활성':'활성화'}</button>
+        <button class="rp-btn ghost" style="padding:3px 8px;font-size:11px" onclick="accReset('${esc(uid)}','${esc(a.instructorId||'')}')">비번 리셋</button>
+        <button class="rp-btn ghost" style="padding:3px 8px;font-size:11px;color:var(--red)" onclick="accDel('${esc(uid)}','${esc(a.instructorId||'')}')">삭제</button>
+      </td></tr>`).join('')}</tbody></table>`;
+}
+async function accCreate(){
+  const name=(document.getElementById('ac-name').value||'').trim(); if(!name){toast('이름을 입력하세요');return;}
+  const pw=document.getElementById('ac-pw').value;
+  const role=document.getElementById('ac-role')?document.getElementById('ac-role').value:'instructor';
+  try{ await window.__drwCallFn('createInstructor',{campus:instructor?.campus,name,password:pw,role}); toast(`${name} 발급 — 임시비번 ${pw}`); loadAccounts(); document.getElementById('ac-name').value=''; document.getElementById('ac-pw').value=_accGenPw(); }
+  catch(e){ toast(e.message||String(e)); }
+}
+async function accToggle(uid,active){ try{ await _aclPut(uid,'active',active===true); toast(active?'활성화':'비활성(즉시 차단)'); loadAccounts(); }catch(e){ toast(e.message||String(e)); } }
+async function accRole(uid,role){ try{ await _aclPut(uid,'role',role); toast(role==='manager'?'관리자로 지정':'강사로 변경'); loadAccounts(); }catch(e){ toast(e.message||String(e)); } }
+async function accReset(uid,name){ const np=_accGenPw(); if(!confirm(`${name} 비번을 임시비번으로 초기화할까요?\n새 임시비번: ${np}\n(첫 로그인 시 변경 강제)`))return; try{ await window.__drwCallFn('resetInstructorPassword',{uid,newPassword:np}); toast(`${name} 임시비번: ${np}`); }catch(e){ toast(e.message||String(e)); } }
+async function accDel(uid,name){ if(!confirm(`${name} 계정을 영구 삭제할까요?\nAuth+권한 제거 — 되돌릴 수 없습니다.`))return; try{ await window.__drwCallFn('deleteInstructor',{uid}); toast(`${name} 삭제됨`); loadAccounts(); }catch(e){ toast(e.message||String(e)); } }

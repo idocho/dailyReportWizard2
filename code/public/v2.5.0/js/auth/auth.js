@@ -13,11 +13,20 @@ import { getAuth, signInWithEmailAndPassword, updatePassword, signOut, onAuthSta
          setPersistence, browserLocalPersistence, browserSessionPersistence }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { getDatabase, ref, get } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-functions.js";
 import { firebaseConfig } from "./firebase-config.js";
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getDatabase(app);
+const functions = getFunctions(app, "asia-northeast3");   // 관리자 백엔드 리전(index.js와 일치)
+
+/** 관리자 백엔드(Cloud Functions) 호출 — onCall. 호출자 idToken 자동 첨부, acl 검증은 서버. */
+export async function callFn(name, data){
+  const r = await httpsCallable(functions, name)(data || {});
+  return r.data;
+}
+window.__drwCallFn = callFn;   // 앱 스크립트(비모듈)에서 사용
 
 // Firebase 오류코드 → 한국어
 function humanize(code) {

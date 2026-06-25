@@ -134,6 +134,8 @@ let activeTab='input',curAI=0,dbUrl='',dbPath='',dbSecret='',activeGroup='';
 let _devDate=null; // 🔧 테스트용 날짜 오버라이드 (null=오늘)
 let clsDrillSh=null; // 학급 관리 드릴다운 상태 (null=최상위, classId)
 let adminOn=false;   // 관리자 세션 상태 (새로고침 시 해제)
+// acl 역할 기반 — 매니저/운영자만 관리 메뉴(강사 계정 등) 노출. instructor.role는 로그인 시 주입(index.html)
+function _isMgr(){ const r=(typeof instructor!=='undefined'&&instructor&&instructor.role)||''; return r==='manager'||r==='admin'||r==='super'; }
 let sbFolded={};     // 사이드바 그룹 섹션 접힘 상태 {그룹명: true/false}
 let archOpen={};     // 학급 관리 보관 과목 행 펼침 상태 {classId: true} — 재렌더에도 유지(세션)
 let clsAccOpen={};   // 학급 관리 학급 아코디언 펼침 상태 {classId: true} — renderMain마다 접히는 문제 방지(세션)
@@ -550,6 +552,8 @@ function renderSb(){
       <div class="sni${activeTab==='report'?' on':''}" onclick="goNav('report')">📤 리포트·전송</div>
       <div class="sni${activeTab==='scores'?' on':''}" onclick="goNav('scores')">📊 성적 입력</div>
       <div class="sni${activeTab==='bulk'?' on':''}" onclick="goNav('bulk')">📢 일괄 공지</div>
+      ${_isMgr()?`<div class="sb-lbl" style="margin-top:8px">관리</div>
+      <div class="sni${activeTab==='accounts'?' on':''}" onclick="goNav('accounts')">👥 강사 계정</div>`:''}
       <div class="sni${activeTab==='setting'?' on':''}" onclick="goNav('setting')">⚙️ 설정</div>
     </div>
     <div style="flex:1"></div>
@@ -585,5 +589,6 @@ function renderMain(){
   else if(activeTab==='scores')renderScores(mc);
   else if(activeTab==='report')renderReport(mc);
   else if(activeTab==='bulk')renderBulk(mc);
+  else if(activeTab==='accounts'){ if(_isMgr())renderAccounts(mc); else{activeTab='input';renderInput(mc);} }
   else renderSettings(mc);
 }

@@ -64,7 +64,7 @@
   const $=id=>document.getElementById(id);
   let CAMPUS_PATH='drw2_cbt'; // 로그인 후 acl.campus 기반 campus/{campus}로 설정
   let A;
-  try{ A=await import('./js/auth/auth.js?v=2'); }
+  try{ A=await import('./js/auth/auth.js?v=3'); }
   catch(e){ $('gt-msg').className='m show'; $('gt-msg').textContent='설정 오류: '+(e&&e.message||e); }
 
   const cfg=(await import('./js/auth/firebase-config.js')).firebaseConfig;
@@ -74,7 +74,7 @@
     try{ localStorage.setItem('drw_db_url',cfg.databaseURL); localStorage.setItem('drw_db_path',CAMPUS_PATH);
          localStorage.removeItem('drw_db_secret'); }catch(_){}
     $('drw-gate').remove(); $('wr').style.display='';
-    const order=['data/curriculum.js?v=202606112000','js/app-core.js?v=v300','js/app-input.js?v=v300','js/app-settings.js?v=v300','js/app-scores.js?v=v300','js/app-report.js?v=v300'];
+    const order=['data/curriculum.js?v=202606112000','js/app-core.js?v=v301','js/app-input.js?v=v301','js/app-settings.js?v=v301','js/app-scores.js?v=v301','js/app-report.js?v=v301'];
     window.APP_VERSION='v2.5.0'; document.title='DailyReportWizard v2.5.0';
     (function next(i){ if(i>=order.length)return; const s=document.createElement('script'); s.src=order[i]; s.onload=()=>next(i+1); document.body.appendChild(s); })(0);
   }
@@ -95,7 +95,7 @@
         const acl=await (await fetch(cfg.databaseURL.replace(/\/$/,'')+'/acl/'+user.uid+'.json?auth='+window.__AUTH_TOKEN__)).json();
         if(!acl || acl.active!==true){ await A.logout(); $('gt-msg').className='m show'; $('gt-msg').textContent='비활성화된 계정입니다. 관리자에게 문의하세요.'; return; }
         if(acl.campus) CAMPUS_PATH='campus/'+acl.campus;   // 캠퍼스 경로 분리
-        localStorage.setItem('drw_instr', JSON.stringify({ id: acl.instructorId, name: acl.instructorId, assignments: [] }));
+        localStorage.setItem('drw_instr', JSON.stringify({ id: acl.instructorId, name: acl.instructorId, assignments: [], role: acl.role||'instructor', campus: acl.campus||'', uid: user.uid }));
       }catch(_){ /* 조회 실패 시에도 부팅은 진행(가용성) */ }
       booted=true; bootApp();
     });

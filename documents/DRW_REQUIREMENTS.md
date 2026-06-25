@@ -1,7 +1,7 @@
 # DailyReportWizard — 요구사항 명세서
 
 **Crafted by IDO(idocho@kakao.com) · Powered by Claude AI**  
-**문서 버전**: 8.80 · **앱 버전**: v2.5.0(정식·전면도입) · **최종 수정**: 2026-06-25
+**문서 버전**: 8.81 · **앱 버전**: v2.5.0(정식·전면도입) · **최종 수정**: 2026-06-25
 
 > Firebase 스키마 전체 명세: [ClassManager/documents/DB_SCHEMA.md](../../ClassManager/documents/DB_SCHEMA.md)
 
@@ -11,6 +11,7 @@
 
 | 문서 버전 | 날짜 | 주요 변경 |
 |-----------|------|-----------|
+| 8.81 | 2026-06-25 | **세션 유지 선택제 + CM→DRW 통폐합 Phase 1(강사 계정 관리)**. ① **세션**: Firebase 기본 무기한 로그인 → `auth.loginByName(...,remember)`가 미체크 시 `browserSessionPersistence`(브라우저 닫으면 만료→재로그인), 체크 시 `browserLocalPersistence`+아이디 prefill 저장(`drw_login`). 비번은 브라우저 비밀번호관리자 위임. 로그인 게이트에 "로그인 유지" 체크박스. auth.js import `?v=3`. ② **통폐합 P1**: CM 강사 계정 관리를 DRW로. index.html이 acl `role`·`campus`·`uid`를 `drw_instr`에 주입 → `_isMgr()`(manager/admin/super)로 사이드바 "👥 강사 계정"·메인 분기. `auth.js`에 `callFn`(getFunctions/httpsCallable, asia-northeast3)+`window.__drwCallFn`. `app-settings.renderAccounts`(발급=createInstructor·비활성/역할=acl REST PUT·리셋/삭제=Functions, 매니저=자기캠퍼스 강사·운영자=전체). CSP에 cloudfunctions·run.app. 웹 v301. **남은 통폐합**: 학생 명단 CRUD(P2)·일괄공지 매니저 전캠퍼스 범위(P3)·CM 은퇴 리다이렉트(P4). |
 | 8.80 | 2026-06-25 | **DRW 일괄공지 ↔ CM 일괄전송 UX 통일 (베스트-오브-보스, 목업 승인)**. 기능 동일(범주만 다름: DRW=본인 담당 반 / CM=캠퍼스 전 반)인데 UX 갈라진 부채 해소. 통합 사양: 디렉토리 트리(반 3-state 체크박스 indeterminate·접기·기본 전체선택→예외 해제·전체선택/해제·촘촘 행) + 작성(템플릿·**변수 삽입버튼** {이름}/{반}/{날짜}·이미지 첨부+이미지먼저 체크박스·미리보기) + 독립 **전송 모니터**. **DRW**(app-report.js): 반 체크박스 tristate(`_bulkSyncCls` data-clsbox, 개별토글 시 트리 미재렌더로 동기화)·renderBulk 진입 시 기본 전체선택·전체선택/전체해제 버튼·`.rp-stu` 행 8→5px(웹 v297·CSS v20260630). **CM**(app.js): 작성부 변수 삽입버튼 추가(캐시 v22). 두 화면 조작감 일치(코드는 repo 분리라 사양만 동기화). |
 | 8.79 | 2026-06-25 | **자가 계정생성 차단 — 발급을 Cloud Function으로 일원화**. 온보딩 점검: DRW는 자가가입 없음(로그인만, 위저드 폐지)이나, CM `provision.createInstructor`가 **공개 `accounts:signUp`** REST를 써서 apiKey만으로 누구나 자가 계정생성 가능(합성이메일 선점·정크 위험)이 구멍이었음. `functions/index.js`에 `createInstructor`(onCall, `admin.auth().createUser`+acl, 권한검증: admin=전캠퍼스·강사/관리자, manager=자기캠퍼스·강사만, 합성이메일 동일규칙) 추가. CM `app.js` 계정발급을 `A.callFn('createInstructor')`로 전환(provision.createInstructor는 dead, CM 캐시 v19). 함수 4개 배포(서울). **남은 콘솔 작업**: Authentication→설정→사용자 작업→**"가입 사용 설정" 해제**(자가가입 차단) — 이후엔 인증된 관리자(함수)만 계정 생성. (migrate_instructors.py는 signUp 의존이라 차단 후 미동작 — 1회성이라 무방) |
 | 8.78 | 2026-06-25 | **DRW에서 강사 관리 일괄 제거 (이중 관리 방지, 웹 v296)**. 강사 생성·전환·삭제·신규등록을 CampusManager 전담으로 일원화 → DRW `app-settings.js`서 제거: 설정 탭 `강사(instr)` 탭·pane·`_valid`/adminOn 게이트 항목, dead였던 `instrMgmt` 아코디언 const, `loadInstrsSection`·`createI`·`switchInstr`·`rmInstr`·`closeIM`(iModal), 그리고 수동 계정 조회/등록 `lookupInstr`·`_registerInstr`(로그인 게이트가 신원 주입하므로 불요, 이름만으로 신원 전환되던 우회 소지도 제거). 프리셋 헬퍼(`_HARDCODED_PRESETS`·`_defaultPresets`)는 초기화서도 쓰여 보존. 강사 본인 프로필(담당수업·문구·AI문체) 자가편집은 유지. config/instructors는 로그인 강사가 설정 저장 시 lazy 생성. |
