@@ -515,6 +515,7 @@ async function _purgeScoreTrash(k){
 function init(){
   loadLocal();
   loadCurriculum();
+  if(_isTopAdmin())adminOn=true; // 운영자(admin/super)는 관리자 모드 고정 — 강사 모드 불요
   renderSb();
   if(!instructor){
     // v2.5.0: 온보딩 위저드 폐지 — 신원은 로그인 게이트(index.html)가 acl에서 주입.

@@ -136,6 +136,8 @@ let clsDrillSh=null; // 학급 관리 드릴다운 상태 (null=최상위, class
 let adminOn=false;   // 관리자 세션 상태 (새로고침 시 해제)
 // acl 역할 기반 — 매니저/운영자만 관리 메뉴(강사 계정 등) 노출. instructor.role는 로그인 시 주입(index.html)
 function _isMgr(){ const r=(typeof instructor!=='undefined'&&instructor&&instructor.role)||''; return r==='manager'||r==='admin'||r==='super'; }
+// 운영자(admin/super) — 순수 운영 계정(담당수업 없음). 강사 모드 불요 → 관리자 모드 고정·토글 미노출
+function _isTopAdmin(){ const r=(typeof instructor!=='undefined'&&instructor&&instructor.role)||''; return r==='admin'||r==='super'; }
 // 학급·학생 명단 편집 권한 — acl 매니저/운영자 신원 전용(공유 암호 adminOn으로는 불가, 명단 소유권 분리)
 function _rosterAdmin(){ return _isMgr(); }
 // 강사 ⇄ 관리자 모드 전환 — 매니저 신원 전용(암호 없음). adminOn=전체수업+교무 권한, 기본 강사(false)
@@ -571,7 +573,7 @@ function renderSb(){
         <span style="font-size:10px;color:rgba(255,255,255,.4)">▾</span>
       </div>
     </div>
-    ${_isMgr()?`<div class="md-sw">
+    ${(_isMgr()&&!_isTopAdmin())?`<div class="md-sw">
       <button class="md-seg${!adminOn?' on':''}" onclick="setAdminMode(false)">👤 강사</button>
       <button class="md-seg${adminOn?' on adm':''}" onclick="setAdminMode(true)">🛠 관리자</button>
     </div>
