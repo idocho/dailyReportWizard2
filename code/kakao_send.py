@@ -252,7 +252,7 @@ def close_rooms(rooms) -> int:
     return max(0, len(before) - len(_matched()))
 
 
-def room_opened(room: str, tries: int = 15, interval: float = 0.1) -> bool:
+def room_opened(room: str, tries: int = 18, interval: float = 0.07) -> bool:
     """채팅방 열림 검증 — 전면 창 제목=방 이름 폴링(공백 무시). 미검증 본문 발사 차단.
 
     공백 무시: 카톡 검색이 공백을 무시해 room_prefix 공백 유무로 제목만 어긋나는
@@ -324,7 +324,7 @@ class SmartWait:
     범위 [0.25, 1.2]s. 게이트가 바닥을 받치므로 가속해도 오발송 불가 —
     적응은 1차 통과율만 조절. 학습값은 호출측이 config(smart_wait)에 영속.
     """
-    MIN, MAX = 0.25, 1.2
+    MIN, MAX = 0.18, 1.2
 
     def __init__(self, initial=0.5):
         try:
@@ -456,7 +456,7 @@ def send_messages(msgs, wait_time=0.5, status_cb=None, done_cb=None, wait_ctrl=N
                     t_open_box[0] = time.time() - _t0
                     return ok
                 retried = False
-                if not _open(max(0.15, wait * 0.5), max(0.3, wait), 0.1):
+                if not _open(max(0.1, wait * 0.5), max(0.22, wait), 0.08):
                     retried = True
                     pyautogui.press("esc"); time.sleep(0.3)
                     focus_kakao(0.4)
@@ -484,7 +484,7 @@ def send_messages(msgs, wait_time=0.5, status_cb=None, done_cb=None, wait_ctrl=N
                     lingering.append(m["room"])
                 elif _IS_WIN:
                     for _ in range(4):
-                        pyautogui.press("esc"); time.sleep(0.12)
+                        pyautogui.press("esc"); time.sleep(0.08)
                         if not room_opened(m["room"], tries=1, interval=0):
                             break
                 else:
@@ -497,7 +497,7 @@ def send_messages(msgs, wait_time=0.5, status_cb=None, done_cb=None, wait_ctrl=N
                 lingering.append(m["room"])   # 오류 중단 방도 열려 있을 수 있음
                 if item_cb:
                     item_cb(i, False, m["room"], str(e))
-            time.sleep(0.1)  # 학생 간 간격 — 게이트(room_opened) 검증이 보호하므로 최소화(0.3→0.1)
+            time.sleep(0.05)  # 학생 간 간격 — 게이트(room_opened)가 보호하므로 최소화(0.3→0.1→0.05)
         # 전체 전송 완료 → 자동화로 열어둔 잔류 창 일괄 닫기.
         # 2초 유예: 마지막 이미지 업로드 여유 — 그래도 진행 중이면 카톡이 닫기를
         # 보류하므로 그 창만 남고 업로드는 보호됨(자동 확인 안 함).
