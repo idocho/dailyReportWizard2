@@ -15,39 +15,24 @@
       "v2.1.1/**",
       "v2.1.2/**",
       "v2.2.0/**",
-      "v2.2.1/**"
+      "v2.2.1/**",
+      "v2.2.2/**",
+      "v2.2.3/**",
+      "v2.3.0/**",
+      "v2.4.0/**"
     ],
     "redirects": [
-      {
-        "source": "/v2.0.5{,/**}",
-        "destination": "/v2.4.0/",
-        "type": 302
-      },
-      {
-        "source": "/v2.1.0{,/**}",
-        "destination": "/v2.4.0/",
-        "type": 302
-      },
-      {
-        "source": "/v2.1.1{,/**}",
-        "destination": "/v2.4.0/",
-        "type": 302
-      },
-      {
-        "source": "/v2.1.2{,/**}",
-        "destination": "/v2.4.0/",
-        "type": 302
-      },
-      {
-        "source": "/v2.2.0{,/**}",
-        "destination": "/v2.4.0/",
-        "type": 302
-      },
-      {
-        "source": "/v2.2.1{,/**}",
-        "destination": "/v2.4.0/",
-        "type": 302
-      }
+      { "source": "/v2.0.5{,/**}", "destination": "/v2.5.0/", "type": 302 },
+      { "source": "/v2.1.0{,/**}", "destination": "/v2.5.0/", "type": 302 },
+      { "source": "/v2.1.1{,/**}", "destination": "/v2.5.0/", "type": 302 },
+      { "source": "/v2.1.2{,/**}", "destination": "/v2.5.0/", "type": 302 },
+      { "source": "/v2.2.0{,/**}", "destination": "/v2.5.0/", "type": 302 },
+      { "source": "/v2.2.1{,/**}", "destination": "/v2.5.0/", "type": 302 },
+      { "source": "/v2.2.2{,/**}", "destination": "/v2.5.0/", "type": 302 },
+      { "source": "/v2.2.3{,/**}", "destination": "/v2.5.0/", "type": 302 },
+      { "source": "/v2.3.0{,/**}", "destination": "/v2.5.0/", "type": 302 },
+      { "source": "/v2.4.0{,/**}", "destination": "/v2.5.0/", "type": 302 },
+      { "source": "/", "destination": "/v2.5.0/", "type": 302 }
     ],
     "headers": [
       {
