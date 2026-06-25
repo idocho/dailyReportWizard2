@@ -387,6 +387,10 @@ body{font-family:'Pretendard','Malgun Gothic','맑은 고딕',-apple-system,sans
 @media(max-width:880px){.rp-2col{grid-template-columns:1fr}.rp-right{position:static;max-height:none}}
 /* ── 리포트·전송 4열 리디자인 (레일 · 편집 · 미리보기 · 전송 모니터) ── */
 .rp-grid{display:grid;grid-template-columns:212px minmax(0,1fr) 360px 208px;gap:12px;align-items:start;padding:14px}
+.rp-grid.rp-grid-3{grid-template-columns:212px minmax(0,1fr) 208px}
+.rp-edit .rp-right{position:static;max-height:none;background:var(--bg);overflow:visible;margin-top:4px}
+.rp-edit .rp-right .rp-pv-body{margin:0;max-height:200px}
+.rp-lblr{display:flex;align-items:center;font-size:11px;font-weight:700;color:var(--sub);margin:12px 2px 5px}
 .rp-grid .rp-rail,.rp-grid .rp-edit,.rp-grid .rp-right,.rp-grid .rp-statcol{background:var(--panel);border:1px solid var(--border);border-radius:14px;box-shadow:0 1px 2px rgba(20,20,40,.03)}
 .rp-grid .rp-rail,.rp-grid .rp-right,.rp-grid .rp-statcol{position:sticky;top:14px;max-height:calc(100vh - 100px);display:flex;flex-direction:column;overflow:hidden}
 .rp-rail-h{padding:11px 14px;font-size:11px;font-weight:700;color:var(--sub);border-bottom:1px solid var(--line-soft);flex-shrink:0;display:flex;align-items:center;justify-content:space-between}

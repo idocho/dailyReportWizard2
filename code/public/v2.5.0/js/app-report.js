@@ -490,35 +490,38 @@ function renderBulk(mc){
   const tmpl = (typeof _bulkTmplCache === 'string') ? _bulkTmplCache : '';
   const tmplOpts = _bulkTemplates().map(t => `<option value="${esc(t.name)}">${esc(t.name)}</option>`).join('');
   const imgPv = _bulkImg ? `<div class="rp-imgpv"><img src="${_bulkImg}"><span>${esc(_bulkImgName)}</span><button class="rp-btn ghost" onclick="bulkClearImg()">제거</button><label class="rp-imgopt"><input type="checkbox" id="bulk-imgfirst">이미지 먼저</label></div>` : '';
-  const composer = `<div style="padding:16px 18px">
+  const composer = `<div style="padding:14px 16px">
       <div class="bulk-tmpls">저장 템플릿:
         <select id="bulk-tsel" onchange="bulkLoadTmpl(this.value)"><option value="">— 불러오기 —</option>${tmplOpts}</select>
         <button class="rp-btn ghost" onclick="bulkSaveTmpl()" title="현재 메시지를 이름 붙여 저장">💾 저장</button>
         <button class="rp-btn ghost" onclick="bulkDelTmpl()" title="선택한 템플릿 삭제">🗑</button>
       </div>
-      <div class="bulk-vars">변수:
-        <button class="rp-tag k-neutral" onclick="bulkInsertVar('{이름}')">{이름}</button>
-        <button class="rp-tag k-neutral" onclick="bulkInsertVar('{반}')">{반}</button>
-        <button class="rp-tag k-neutral" onclick="bulkInsertVar('{날짜}')">{날짜}</button>
-      </div>
+      <div class="rp-lblr">메시지
+        <span style="margin-left:auto;display:flex;gap:4px">
+          <button class="rp-btn ghost" style="padding:2px 8px;font-size:11px" onclick="bulkInsertVar('{이름}')">+이름</button>
+          <button class="rp-btn ghost" style="padding:2px 8px;font-size:11px" onclick="bulkInsertVar('{반}')">+반</button>
+          <button class="rp-btn ghost" style="padding:2px 8px;font-size:11px" onclick="bulkInsertVar('{날짜}')">+날짜</button>
+        </span></div>
       <textarea class="rp-ta" id="bulk-tmpl" oninput="bulkOnInput(this)" placeholder="예: 안녕하세요 {이름} 학부모님. {날짜} {반} 공지드립니다.">${esc(tmpl)}</textarea>
-      <div class="rp-bar" style="margin-top:8px"><input type="file" id="bulk-imgfile" accept="image/*" onchange="bulkPickImg(event)" style="font-size:12px;flex:1"></div>
+      <div class="rp-lblr">이미지 첨부 (선택)</div>
+      <div class="rp-bar"><input type="file" id="bulk-imgfile" accept="image/*" onchange="bulkPickImg(event)" style="font-size:12px;flex:1"></div>
       ${imgPv}
+      <div class="rp-lblr">미리보기</div>
+      <div class="rp-right" id="rp-right"></div>
+      <button class="rp-btn" onclick="bulkSend()" style="width:100%;margin-top:12px">📢 일괄 전송 →</button>
     </div>`;
   mc.innerHTML = makeTb('일괄 공지', '여러 반 가로질러 선택 — 같은 메시지 발송') + `
     <div class="rp-bar">
       <span class="rp-ctx">📢 기본 전체 · 보낼 필요 없는 학생만 해제 · 선택 <b id="bulk-cnt">${_bulkSel.size}</b>명</span>
       <button class="rp-btn ghost" onclick="bulkAll(true)" style="margin-left:auto">전체 선택</button>
       <button class="rp-btn ghost" onclick="bulkAll(false)">전체 해제</button>
-      <button class="rp-btn" onclick="bulkSend()">📢 일괄 전송 →</button>
     </div>
-    <div class="rp-grid">
+    <div class="rp-grid rp-grid-3">
       <div class="rp-rail">
         <div class="rp-rail-h">수신자 선택 <b id="bulk-cnt2">${_bulkSel.size}</b>명</div>
         <div class="rp-rail-list">${_railTreeHtml('bulk')}</div>
       </div>
       <div class="rp-edit" id="rp-edit" style="padding:0">${composer}</div>
-      <div class="rp-right" id="rp-right"></div>
       <div class="rp-statcol">
         <div class="rp-rail-h">전송 모니터 <span class="rp-live"><i></i>실시간</span></div>
         <div id="rp-jobs" class="rp-statcol-list"><div class="rp-job">작업 없음</div></div>
