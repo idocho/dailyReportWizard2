@@ -126,17 +126,7 @@ function renderSettings(mc){
     </div>`;
   })() : '';
 
-  // ── 강사 관리 (관리자 전용) ──
-  const instrMgmt=adminOn?`
-    <div class="sa admin-sec" id="sa-admin">
-      <div class="sa-hdr${openSaIds.has('sa-admin')?' open':''}" onclick="_saToggle('sa-admin')">
-        <span class="sa-ico">👑</span>
-        <span class="sa-lbl">강사 관리</span>
-        <span style="font-size:10px;background:#FEF3C7;color:#92400E;border-radius:8px;padding:1px 6px;font-weight:700;margin-right:4px">관리자</span>
-        <span class="sa-chv">›</span>
-      </div>
-      <div class="sa-body${openSaIds.has('sa-admin')?' open':''}" id="instrMgmtCard"><div style="padding:10px 12px;font-size:12px;color:var(--gray)">불러오는 중...</div></div>
-    </div>`:'';
+  // 강사 관리(생성·전환·삭제)는 CampusManager 전담 — DRW에서 제거(이중 관리 방지).
 
   // v2.5.0 슬림화: Firebase 연결(SA_FB)·자가등록 계정(SA_ACCT) 제거 — 로그인이 대체.
   //   연결정보는 로그인 게이트가 자동 주입(index.html), 신원은 acl(instructorId)에서 옴.
@@ -241,9 +231,9 @@ function renderSettings(mc){
     const bn=Object.keys(config?.textbooks||{}).sort((a,b)=>a.localeCompare(b,'ko'));
     _bookBody=`<div style="padding:6px 12px;font-size:11px;color:var(--gray)">반 삭제와 무관하게 보존되는 전역 교재 목록(자동완성).</div>`+(bn.map(n=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 12px;border-bottom:1px solid var(--border)"><span style="font-size:12px;font-weight:600">${esc(n)}</span><button style="background:none;border:none;cursor:pointer;color:var(--red);font-size:13px;padding:0 2px" onclick="rmTbName('${esc(n)}')">✕</button></div>`).join('')||'<div style="padding:8px 12px;font-size:11px;color:var(--gray)">등록된 교재명 없음</div>')+`<div style="display:flex;gap:6px;padding:10px 12px"><input class="inp sm" id="newTbName" placeholder="교재명 직접 추가" style="flex:1" onkeydown="if(event.key==='Enter'){event.preventDefault();addTbName();}"><button class="btn bp bsm" onclick="addTbName()">+ 추가</button></div>`;
   }
-  const _valid=['asgn','style','preset','roster','subj','book','instr','reset','system'];
+  const _valid=['asgn','style','preset','roster','subj','book','reset','system'];
   let T=_valid.includes(stgTab)?stgTab:'asgn';
-  if(['subj','book','instr'].includes(T)&&!adminOn)T='asgn';
+  if(['subj','book'].includes(T)&&!adminOn)T='asgn';
   const _tab=(k,ic,lb,adm)=> (adm&&!adminOn)?'' : `<button class="stg-tab${T===k?' on':''}" data-stg="${k}" onclick="setStg('${k}')">${ic} ${lb}</button>`;
   const _pane=(k,html,adm)=> (adm&&!adminOn)?'' : `<div class="stg-pane${T===k?' on':''}" data-stg="${k}">${html}</div>`;
   mc.innerHTML=makeTb('설정')+`<div class="stg">
@@ -254,7 +244,6 @@ function renderSettings(mc){
       ${_tab('roster','🏫','명단')}
       ${_tab('subj','📖','과목',true)}
       ${_tab('book','📚','교재',true)}
-      ${_tab('instr','👥','강사',true)}
       ${_tab('reset','🗑','초기화')}
       ${_tab('system','⚙️','시스템')}
     </div>
@@ -265,14 +254,12 @@ function renderSettings(mc){
       ${_pane('roster',_card('🏫','학급 · 학생','',renderClsMgmt()))}
       ${_pane('subj',_card('📖','과목 목록','관리자',_subjBody),true)}
       ${_pane('book',_card('📚','교재 명단','관리자',_bookBody),true)}
-      ${_pane('instr',_card('👥','강사 관리','관리자','<div id="instrMgmtCard"><div style="padding:10px 12px;font-size:12px;color:var(--gray)">불러오는 중...</div></div>'),true)}
       ${_pane('reset',_card('🗑','초기화','',resetHtml))}
       ${_pane('system',_card('⚙️','시스템','',_sysBody))}
     </div>
   </div>`;
 
   setSync(!!dbUrl&&!!dbPath);
-  if(adminOn)loadInstrsSection();
 }
 
 // ══════════════════════════════════════════════════════════
@@ -606,24 +593,6 @@ async function saveAiStyle(){
   }catch(e){toast('저장 실패: '+(e.message||e));}
 }
 
-async function lookupInstr(){
-  const name=(document.getElementById('acctName')?.value||'').trim();
-  if(!name){toast('이름을 입력해 주세요.');return;}
-  if(!dbUrl||!dbPath){toast('Firebase 연결 정보를 먼저 저장하세요.');return;}
-  try{
-    const d=await fbGet(`config/instructors/${encodeURIComponent(name)}`);
-    if(d){
-      // 기존 엔트리에 name 필드가 없으면(구 데이터) id로 백필
-      if(!d.name){d.name=name;fbPatch(`config/instructors/${encodeURIComponent(name)}`,{name}).catch(fbFail('계정'));}
-      instructor={id:name,...d};saveLocal();curAI=0;renderSb();renderMain();
-      toast(`${name} 계정으로 로그인됨 ✅`);
-    } else {
-      if(confirm(`"${name}" 계정이 없습니다.\n신규 등록하시겠습니까?`)){
-        await _registerInstr(name);
-      }
-    }
-  }catch(e){toast('조회 실패: '+e);}
-}
 const _HARDCODED_PRESETS=[
   '채점 미실시','오답 풀이 안함',
   '교재 미지참','과제 이행 의지 없어 보임',
@@ -632,12 +601,6 @@ const _HARDCODED_PRESETS=[
 function _defaultPresets(){
   const saved=config?.presets?.['과제수행도'];
   return (saved&&saved.length>0)?saved:_HARDCODED_PRESETS;
-}
-async function _registerInstr(name){
-  const defPresets=_defaultPresets();
-  instructor={id:name,name,assignments:[],presets:defPresets};saveLocal();
-  if(dbUrl&&dbPath)await fbPatch(`config/instructors/${encodeURIComponent(name)}`,{name,assignments:[],presets:defPresets}).catch(fbFail('계정 등록'));
-  renderSb();renderMain();toast(`${name} 등록됨 ✅ — 담당 수업·자주 쓰는 문구를 설정해 주세요`);
 }
 
 async function hashPw(pw){
@@ -1039,50 +1002,7 @@ async function showIM(){
   goNav('setting');
   setTimeout(()=>_saOpen('sa-acct'),50);
 }
-async function createI(ctx){
-  const inputId=ctx==='modal'?'niNameModal':'niNameCard';
-  const name=document.getElementById(inputId)?.value.trim()||'';
-  if(!name){toast('이름을 입력해 주세요.');return;}
-  await _registerInstr(name);
-  if(ctx==='modal')closeIM();
-}
-
-async function loadInstrsSection(){
-  const card=document.getElementById('instrMgmtCard');if(!card)return;
-  if(!adminOn){card.innerHTML='<div style="padding:10px 12px;font-size:12px;color:var(--gray)">관리자 모드가 필요합니다.</div>';return;}
-  if(!dbUrl||!dbPath){card.innerHTML='<div style="padding:10px 12px;font-size:12px;color:var(--gray)">Firebase 연결 후 사용 가능합니다.</div>';return;}
-  let instrs=[];
-  try{const d=await fbGet('config/instructors');if(d)instrs=Object.entries(d).map(([id,v])=>({id,...v})).sort((a,b)=>(a.name||'').localeCompare(b.name||'','ko'));}catch(e){}
-  const list=instrs.map(ins=>{
-    const isCur=instructor?.id===ins.id;
-    const dispName=ins.name||ins.id||'?';
-    return `<div style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid var(--border)">
-      <div class="avatar" style="width:32px;height:32px;font-size:10px;flex-shrink:0">${esc(dispName.slice(0,3))}</div>
-      <div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:700">${esc(dispName)}</div><div style="font-size:10px;color:var(--sub)">${(ins.assignments||[]).length}개 수업</div></div>
-      <div style="display:flex;gap:4px;flex-shrink:0">
-        ${isCur?'<span class="badge b-g">현재</span>':`<button class="btn bsm" onclick="switchInstr('${esc(ins.id)}')">전환</button>`}
-        <button class="btn bsm" style="color:var(--red)" onclick="rmInstr('${esc(ins.id)}','${esc(dispName)}')">삭제</button>
-      </div>
-    </div>`;
-  }).join('');
-  const newForm=`<div style="padding:10px 12px;border-top:1px solid var(--border)">
-    <div style="font-size:11px;font-weight:700;color:var(--sub);margin-bottom:8px">신규 강사 등록</div>
-    <div style="display:flex;gap:6px"><input class="inp sm" id="niNameCard" placeholder="이름" style="flex:1" onkeydown="if(event.key==='Enter')createI('card')"><button class="btn bp bsm" onclick="createI('card')">등록</button></div>
-  </div>`;
-  card.innerHTML=`${list||'<div style="padding:10px 12px;font-size:12px;color:var(--gray)">등록된 강사가 없습니다.</div>'}${newForm}`;
-}
-async function switchInstr(id){
-  if(!dbUrl||!dbPath){toast('Firebase 연결이 필요합니다.');return;}
-  try{const d=await fbGet(`config/instructors/${encodeURIComponent(id)}`);if(!d){toast('강사 데이터 없음');return;}
-  instructor={id,...d};saveLocal();curAI=0;renderSb();renderMain();toast(`${instructor.name}으로 전환됨 ✅`);}
-  catch(e){toast('전환 실패: '+e);}
-}
-async function rmInstr(id,name){
-  if(!adminOn){toast('관리자 모드가 필요합니다.');return;}
-  if(!confirm(`"${name}" 강사를 삭제합니까?\n이 작업은 되돌릴 수 없습니다.`))return;
-  try{await fbPut(`config/instructors/${encodeURIComponent(id)}`,null);toast(`${name} 삭제됨`);loadInstrsSection();}
-  catch(e){toast('삭제 실패: '+e);}
-}
+// 강사 생성·전환·삭제(createI·switchInstr·rmInstr·loadInstrsSection)는 CampusManager 전담으로 이관 — DRW서 제거(이중 관리 방지).
 
 // ══════════════════════════════════════════════════════════
 //  프리셋 추가 / 삭제
@@ -1105,7 +1025,6 @@ function rmPreset(i){
   renderMain();
 }
 
-function closeIM(){document.getElementById('iModal').classList.remove('show');}
 function toggleAcc(hdr,classId){
   const body=hdr.nextElementSibling;
   const arrow=hdr.querySelector('.acc-arr');
