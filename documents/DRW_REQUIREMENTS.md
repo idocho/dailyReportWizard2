@@ -1,7 +1,7 @@
 # DailyReportWizard — 요구사항 명세서
 
 **Crafted by IDO(idocho@kakao.com) · Powered by Claude AI**  
-**문서 버전**: 8.78 · **앱 버전**: v2.5.0(정식·전면도입) · **최종 수정**: 2026-06-25
+**문서 버전**: 8.79 · **앱 버전**: v2.5.0(정식·전면도입) · **최종 수정**: 2026-06-25
 
 > Firebase 스키마 전체 명세: [ClassManager/documents/DB_SCHEMA.md](../../ClassManager/documents/DB_SCHEMA.md)
 
@@ -11,6 +11,7 @@
 
 | 문서 버전 | 날짜 | 주요 변경 |
 |-----------|------|-----------|
+| 8.79 | 2026-06-25 | **자가 계정생성 차단 — 발급을 Cloud Function으로 일원화**. 온보딩 점검: DRW는 자가가입 없음(로그인만, 위저드 폐지)이나, CM `provision.createInstructor`가 **공개 `accounts:signUp`** REST를 써서 apiKey만으로 누구나 자가 계정생성 가능(합성이메일 선점·정크 위험)이 구멍이었음. `functions/index.js`에 `createInstructor`(onCall, `admin.auth().createUser`+acl, 권한검증: admin=전캠퍼스·강사/관리자, manager=자기캠퍼스·강사만, 합성이메일 동일규칙) 추가. CM `app.js` 계정발급을 `A.callFn('createInstructor')`로 전환(provision.createInstructor는 dead, CM 캐시 v19). 함수 4개 배포(서울). **남은 콘솔 작업**: Authentication→설정→사용자 작업→**"가입 사용 설정" 해제**(자가가입 차단) — 이후엔 인증된 관리자(함수)만 계정 생성. (migrate_instructors.py는 signUp 의존이라 차단 후 미동작 — 1회성이라 무방) |
 | 8.78 | 2026-06-25 | **DRW에서 강사 관리 일괄 제거 (이중 관리 방지, 웹 v296)**. 강사 생성·전환·삭제·신규등록을 CampusManager 전담으로 일원화 → DRW `app-settings.js`서 제거: 설정 탭 `강사(instr)` 탭·pane·`_valid`/adminOn 게이트 항목, dead였던 `instrMgmt` 아코디언 const, `loadInstrsSection`·`createI`·`switchInstr`·`rmInstr`·`closeIM`(iModal), 그리고 수동 계정 조회/등록 `lookupInstr`·`_registerInstr`(로그인 게이트가 신원 주입하므로 불요, 이름만으로 신원 전환되던 우회 소지도 제거). 프리셋 헬퍼(`_HARDCODED_PRESETS`·`_defaultPresets`)는 초기화서도 쓰여 보존. 강사 본인 프로필(담당수업·문구·AI문체) 자가편집은 유지. config/instructors는 로그인 강사가 설정 저장 시 lazy 생성. |
 | 8.77 | 2026-06-25 | **CM 강사 비번 리셋·삭제 활성화 — Cloud Functions 백엔드**. 브라우저는 남의 Auth 비번변경·계정삭제 불가(Admin 필요) → CM 웹 버튼이 `disabled`였음. 기존 작성돼 있던 `functions/index.js`(onCall: `resetInstructorPassword`·`deleteInstructor`·`clearMustChangePw`, requireAdmin로 admin/super+동일캠퍼스 검증, 서울 리전) 배포 연결. `firebase.json`에 `functions.source` 추가. CM `auth.js`에 `callFn`(getFunctions/httpsCallable, asia-northeast3), `app.js` 계정행 버튼 활성화(isTop=운영자 한정, reset=genPw 임시비번 토스트·삭제=확인 후 호출), CSP connect-src에 `*.cloudfunctions.net`·`*.run.app` 추가, 캐시 v17. **전제: Blaze 요금제**(사용 무료 한도, 카드 등록). 배포: DRW repo서 `firebase deploy --only functions` + CM hosting 재배포. |
 | 8.76 | 2026-06-25 | **백업/복원 서비스 계정 인증 전환 (잠금 후 백업 복구)**. DB 잠금 후 `backup_db.py`(루트 GET)·`restore_db.py`(PUT)가 무인증이라 **401로 깨짐**(시크릿 미설정). 루트 read/write는 룰상 사용자 토큰 불가 → **서비스 계정(Admin, 룰 우회)** 필요. 공용 모듈 `scripts/_fb_auth.py` 신설: `auth_param(cfg)` = ① `sa-key.json`(또는 `config.service_account_path`)+`google-auth`로 OAuth2 `access_token` ② 레거시 시크릿 `auth=` 폴백 ③ 없으면 에러. backup=루트 전체(`/`) 스냅샷(campus·acl·sendJobs 등, `backup_path`로 변경 가능), restore=루트 기준(firebase_path 접두사 제거 — 루트 백업 정합). `sa-key.json`·`*serviceAccount*.json` gitignore. **운영**: 콘솔서 서비스계정 키 발급→`code/scripts/sa-key.json` 배치 + `pip install google-auth` 하면 일일 백업 재가동, 이후 레거시 시크릿 비활성화 가능. |
