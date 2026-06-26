@@ -852,7 +852,13 @@ async function clrSelected(){
   }
 
   if(!dbUrl||!dbPath){
-    if(sel.includes('input')){const{inputKeys}=_myResetKeys();for(const k of inputKeys)delete inputData[k];}
+    if(sel.includes('input')){
+      const asgns=instructor?.assignments||[];
+      for(const a of asgns){
+        const students=(config?._classStudents||{})[a.classId]||[];
+        for(const s of students){ if(inputData[s.nameKey]){delete inputData[s.nameKey][a.subject];delete inputData[s.nameKey]['__note__'];} }
+      }
+    }
     if(sel.includes('tags')){
       const dk=todayKey();const asgns=instructor?.assignments||[];
       for(const a of asgns){
@@ -870,16 +876,17 @@ async function clrSelected(){
   try{
     const ops=[];
     if(sel.includes('input')){
-      const{inputKeys}=_myResetKeys();
-      for(const k of inputKeys)delete inputData[k];
-      // 신규: input/{nameKey}/{subject} 구조 + 특이사항 __note__(학생별 단일)
+      // 로컬 inputData는 중첩 구조(input[nameKey][subject] / input[nameKey].__note__) — 평면키 삭제 금지
       const asgns=instructor?.assignments||[];
       const noteDone=new Set();
       for(const a of asgns){
         const students=(config?._classStudents||{})[a.classId]||[];
         for(const s of students){
+          if(inputData[s.nameKey])delete inputData[s.nameKey][a.subject];
           ops.push(fbPut(`input/${s.nameKey}/${a.subject}`,null).catch(fbFail('초기화')));
-          if(!noteDone.has(s.nameKey)){noteDone.add(s.nameKey);ops.push(fbPut(`input/${s.nameKey}/__note__`,null).catch(fbFail('초기화')));}
+          if(!noteDone.has(s.nameKey)){noteDone.add(s.nameKey);
+            if(inputData[s.nameKey])delete inputData[s.nameKey]['__note__'];   // 특이사항 메모(학생별 단일)
+            ops.push(fbPut(`input/${s.nameKey}/__note__`,null).catch(fbFail('초기화')));}
         }
       }
     }
