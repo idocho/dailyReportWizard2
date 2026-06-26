@@ -1004,7 +1004,7 @@ async function _aclPut(uid,field,val){
 //   스키마: students/{nameKey}={name,class} · classes/{id}={group:'M'|'T',courses}
 let _rs={group:'M',sel:null,classes:{},students:{}};
 async function renderStudents(mc){
-  if(!_isMgr()){ activeTab='input'; renderMain(); return; }
+  if(!(_isMgr()&&adminOn)){ activeTab='input'; renderMain(); return; }
   mc.innerHTML=makeTb('학생 명단','반·학생 추가·편집 (관리자)')+`
     <div class="rs-wrap">
       <div class="rs-head"><span class="rs-cnt" id="rsCnt">불러오는 중…</span>
@@ -1138,7 +1138,7 @@ function _rsSyncConfig(){
 }
 
 function renderAccounts(mc){
-  if(!_isMgr()){ activeTab='input'; renderMain(); return; }
+  if(!(_isMgr()&&adminOn)){ activeTab='input'; renderMain(); return; }
   mc.innerHTML=makeTb('강사 계정','발급·비활성·비번 리셋·삭제 (관리자 전용)')+`
     <div style="padding:16px 18px;max-width:760px">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">

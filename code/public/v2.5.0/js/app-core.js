@@ -584,7 +584,7 @@ function renderSb(){
       ${_isMobile()?'':`<div class="sni${activeTab==='report'?' on':''}" onclick="goNav('report')">📤 리포트·전송</div>`}
       <div class="sni${activeTab==='scores'?' on':''}" onclick="goNav('scores')">📊 성적 입력</div>
       ${_isMobile()?'':`<div class="sni${activeTab==='bulk'?' on':''}" onclick="goNav('bulk')">📢 일괄 공지</div>`}
-      ${_isMgr()?`<div class="sb-lbl" style="margin-top:8px">관리</div>
+      ${(_isMgr()&&adminOn)?`<div class="sb-lbl" style="margin-top:8px">관리</div>
       <div class="sni${activeTab==='students'?' on':''}" onclick="goNav('students')">🏫 학생 명단</div>
       <div class="sni${activeTab==='accounts'?' on':''}" onclick="goNav('accounts')">👥 강사 계정</div>`:''}
       <div class="sni${activeTab==='setting'?' on':''}" onclick="goNav('setting')">⚙️ 설정</div>
