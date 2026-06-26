@@ -132,11 +132,14 @@ function _buildMessage(classId, nk, name, note){
     const a = (assignMap[tb] || '').trim(); if(!a) return '';
     const l = lbl(tb); return l ? `[${l}] ${a}` : a;
   }).filter(Boolean).join('\n');
-  return `[데일리 리포트] ${_todayStr()}\n-------------------------\n`
-    + `▶ 오늘의 진도\n${section('progress')}\n\n`
-    + `▶ 오늘의 과제\n${section('homework')}\n\n`
-    + `▶ 과제 수행도\n${assignLines}\n\n`
-    + `▶ 오늘의 ${_nickSuffix(name)}?\n${note || ''}`;
+  // 입력 없는 항목은 헤더째 제외 — 빈 "▶ 오늘의 진도" 같은 빈 섹션 방지
+  const prog = section('progress'), hw = section('homework');
+  const blocks = [];
+  if(prog) blocks.push(`▶ 오늘의 진도\n${prog}`);
+  if(hw) blocks.push(`▶ 오늘의 과제\n${hw}`);
+  if(assignLines) blocks.push(`▶ 과제 수행도\n${assignLines}`);
+  blocks.push(`▶ 오늘의 ${_nickSuffix(name)}?\n${note || ''}`);
+  return `[데일리 리포트] ${_todayStr()}\n-------------------------\n` + blocks.join('\n\n');
 }
 
 // 발송 특이사항(발송문) — 세션 편집 > 저장된 오늘 draft > 빈값. (강사 원천 메모와 별개)
