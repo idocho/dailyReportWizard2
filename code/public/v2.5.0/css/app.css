@@ -539,12 +539,13 @@ body{font-family:'Pretendard','Malgun Gothic','맑은 고딕',-apple-system,sans
 .md-hint{font-size:9px;text-align:center;margin:0 12px 4px;color:rgba(255,255,255,.3);letter-spacing:.02em}
 
 /* ── 결석 하드 차단 — 결석 선택 시 그 학생의 나머지 입력 버튼 비활성(메모·결석 버튼만 허용) ── */
+/* 결석 하드 차단 — 결석 버튼은 si-left(차단존 밖)이라 자동으로 또렷. 우측 입력만 비활성(메모 input 제외) */
 .si-card.si-absent{background:var(--red-l)}
-.si-card.si-absent .tg-cell button:not([data-p="결석"]){pointer-events:none;opacity:.38;filter:grayscale(.35)}
+.si-card.si-absent .tg-cell button{pointer-events:none;opacity:.38;filter:grayscale(.35)}
 .si-card.si-absent .si-row .si-lbl{opacity:.5}
-.si-card.si-absent .tg-cell button[data-p="결석"]{opacity:1;filter:none;pointer-events:auto}
-/* 결석 전용 버튼 (프리셋 독립) — 빨강 테마로 구분 */
-.tg-absent{padding:5px 11px;border-radius:8px;border:1px solid #FCA5A5;background:var(--panel);color:#DC2626;font-size:11px;font-family:inherit;font-weight:700;cursor:pointer;white-space:nowrap;transition:all .12s;line-height:1.4}
+.si-card.si-absent .si-lname{color:#DC2626;text-decoration:line-through}
+/* 결석 전용 버튼 (프리셋 독립, si-left 학생 식별 영역) — 빨강 테마로 구분 */
+.tg-absent{padding:4px 0;width:100%;border-radius:7px;border:1px solid #FCA5A5;background:var(--panel);color:#DC2626;font-size:11px;font-family:inherit;font-weight:700;cursor:pointer;white-space:nowrap;transition:all .12s;line-height:1.3}
 .tg-absent:hover{background:var(--red-l)}
 .tg-absent:active{transform:scale(.96)}
 .tg-absent.on{background:#DC2626;border-color:transparent;color:#fff}

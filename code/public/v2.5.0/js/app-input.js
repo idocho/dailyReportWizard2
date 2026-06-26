@@ -199,11 +199,12 @@ function renderInput(mc){
       <div class="si-left">
         <span class="dot ${dc}" data-namekey="${esc(nameKey)}" data-subject="${esc(subject)}"></span>
         <span class="si-lname">${esc(displayName)}</span>
+        ${absentBtn}
       </div>
       <div class="si-right">
         <div class="si-row">
           <span class="si-lbl">과제</span>
-          <div class="si-btns tg-cell">${absentBtn}<div class="tg-sep"></div>${agBtns}${apBtns?`<div class="tg-sep"></div>${apBtns}`:''}</div>
+          <div class="si-btns tg-cell">${agBtns}${apBtns?`<div class="tg-sep"></div>${apBtns}`:''}</div>
         </div>
         <div class="si-div"></div>
         <div class="si-row">
