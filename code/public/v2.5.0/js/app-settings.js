@@ -789,7 +789,8 @@ const _RESET_ITEMS=[
 ];
 function _renderResetHtml(){
   const hasAdmin=adminOn;
-  const normalItems=_RESET_ITEMS.filter(it=>!it.admin);
+  // 일반(강사 단위) 초기화는 담당수업(assignments) 기준 — 담당 없는 계정(운영자)은 no-op이므로 미노출
+  const normalItems=(instructor?.assignments||[]).length?_RESET_ITEMS.filter(it=>!it.admin):[];
   const adminItems=_RESET_ITEMS.filter(it=>it.admin);
   const _card=(it)=>{
     const sel=_resetSel.has(it.id);
@@ -823,7 +824,8 @@ function _renderResetHtml(){
 }
 function _resetToggle(id){
   if(_resetSel.has(id))_resetSel.delete(id);else _resetSel.add(id);
-  const body=document.querySelector('#sa-reset .sa-body');
+  // 실제 렌더는 설정 탭(stg-pane) — 구 아코디언(#sa-reset)은 사문. 탭 컨테이너 우선 갱신.
+  const body=document.querySelector('.stg-pane[data-stg="reset"] .stg-card-b')||document.querySelector('#sa-reset .sa-body');
   if(body)body.innerHTML=_renderResetHtml();
 }
 async function _doResetPresets(){

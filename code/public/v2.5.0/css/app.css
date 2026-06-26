@@ -537,4 +537,10 @@ body{font-family:'Pretendard','Malgun Gothic','맑은 고딕',-apple-system,sans
 .md-seg.on{background:#4F46E5;color:#fff;box-shadow:0 1px 3px rgba(0,0,0,.35)}
 .md-seg.on.adm{background:#D97706}
 .md-hint{font-size:9px;text-align:center;margin:0 12px 4px;color:rgba(255,255,255,.3);letter-spacing:.02em}
+
+/* ── 결석 하드 차단 — 결석 선택 시 그 학생의 나머지 입력 버튼 비활성(메모·결석 버튼만 허용) ── */
+.si-card.si-absent{background:var(--red-l)}
+.si-card.si-absent .tg-cell button:not([data-p="결석"]){pointer-events:none;opacity:.38;filter:grayscale(.35)}
+.si-card.si-absent .si-row .si-lbl{opacity:.5}
+.si-card.si-absent .tg-cell button[data-p="결석"]{opacity:1;filter:none;pointer-events:auto}
 </style>

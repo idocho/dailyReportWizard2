@@ -1,7 +1,7 @@
 # DailyReportWizard — 요구사항 명세서
 
 **Crafted by IDO(idocho@kakao.com) · Powered by Claude AI**  
-**문서 버전**: 8.86 · **앱 버전**: v2.5.0(정식·전면도입) · **최종 수정**: 2026-06-26
+**문서 버전**: 8.87 · **앱 버전**: v2.5.0(정식·전면도입) · **최종 수정**: 2026-06-26
 
 > Firebase 스키마 전체 명세: [DB_SCHEMA.md](DB_SCHEMA.md) (구 ClassManager에서 이관)
 
@@ -11,6 +11,7 @@
 
 | 문서 버전 | 날짜 | 주요 변경 |
 |-----------|------|-----------|
+| 8.87 | 2026-06-26 | **초기화 버튼 먹통 수정 + 결석 하드 차단**. ① **초기화 오작동**: 설정 초기화 탭이 탭(`stg-pane`)으로 렌더되는데 `_resetToggle`이 죽은 구 아코디언(`#sa-reset .sa-body`)을 갱신 → 카드 선택·실행버튼 활성화가 **전 역할에서 먹통**이었음(데이터 토글은 됐으나 화면 미반영). `_resetToggle`을 `.stg-pane[data-stg="reset"] .stg-card-b` 우선 갱신으로 교정. 추가로 일반(강사 단위) 초기화 항목은 `instructor.assignments` 기준이라 담당수업 없는 **운영자(super)에겐 no-op** → 담당수업 0이면 일반 항목 미노출(운영자는 전체 항목만). ② **결석 하드 차단**: 학생 과제 행에서 `결석` 프리셋 선택 시 그 학생 카드의 나머지 입력 버튼(수행도·컨디션·이해도·참여·주의·시험) 전부 **비활성**(`pointer-events:none`+흐림), 메모·결석 버튼만 허용 — 결석 학생에 다른 항목 실수 입력 방지. `si-absent` 카드 클래스(renderInput 초기 + onAssignTag 토글 동기화), CSS `.si-card.si-absent`. 웹 v315·CSS v20260639. |
 | 8.86 | 2026-06-26 | **CM 웹앱 은퇴 — 통폐합 완료(P4-A)**. 기능 패리티 확인 후 CampusManager 웹앱 폐지: ① **계정 관리**(발급·활성/비활성·역할변경·리셋·삭제, 운영자 크로스캠퍼스) DRW `renderAccounts`로 동등 ② **학생 명단**(반/학생 CRUD·M/T·무소속·이름변경 migrate) DRW `renderStudents`로 동등 ③ **일괄전송 캠퍼스 전체** = 매니저가 관리자 모드 시 `activeAsgns` 전 학급 확장으로 달성(P3 사실상 해소) — 무소속 학생 공지는 불요로 확정. CM 단독 기능 0. **조치**: (1단계) `CampusManager/firebase.json` catch-all 302 리다이렉트 배포 → (2단계, 사용자 요청) **`gritptmanager` 호스팅 사이트 영구 삭제**(`firebase hosting:sites:delete`, 서브도메인 해제·비가역). 현재 `gritptmanager.web.app`=**404**, 프로젝트 hosting 사이트는 `dailyreportwizard` 단독. CM 소스는 git 보존(repo의 firebase.json은 삭제된 site 참조하는 사문 — repo 동결). DB/Auth/Functions는 DRW와 동일 프로젝트 공유라 **미접촉**(hosting만). 통합 에이전트는 이미 단일화(8.70). **남은 정리**: 없음(통폐합 종결). |
 | 8.85 | 2026-06-26 | **캠퍼스 목록 데이터화 — 추가 시 코드 변경 불요(취약점 개선)**. 로그인 캠퍼스 드롭다운이 DRW·CM index.html에 하드코딩(`<option value="dongsuwon">`)돼 캠퍼스 추가마다 코드 수정·재배포 필요했음. ① **공개읽기 `campuses` 노드** 신설(룰): `campuses/{slug}={name,order?,active?}`, `.read:true`(로그인 *전* 표시라 무인증 필요·캠퍼스명은 비민감), 쓰기는 admin/super만. ② **DRW 로그인 게이트**가 무인증 REST로 `campuses.json` 로드해 드롭다운 동적 생성(active≠false, order 정렬), 실패 시 기본 옵션 폴백(로그인 불능 방지). ③ 시드 `campuses/dongsuwon={name:"동수원",order:1}`. **검증**: 무인증 campuses 읽힘·acl/campus는 여전히 401(과개방 없음)·게이트 정상 렌더. 이후 캠퍼스 추가 = **DB 항목 1개**(운영자가 콘솔/CLI) + 운영 셋업(계정·명단·에이전트·카톡방). 룰은 `$campus` 와일드카드라 변경 불요. CM 드롭다운은 미변경(통폐합 대상). **남은 코드 약점**: 없음(드롭다운 해소). |
 | 8.84 | 2026-06-26 | **운영자(super) 로그인 버그 수정 + 운영자 관리자모드 고정**. ① **버그**: 역할체계 instructor<manager<admin<super 중 `super`가 DRW 로그인 게이트 allowRoles(`['instructor','manager','admin']`)에 누락 → `auth.js`가 super 계정 로그인 거부(통폐합 P1/8.81부터). allowRoles에 `'super'` 추가(index.html). ② **운영자=관리자모드 고정**: admin/super는 담당수업 없는 순수 운영 계정 → 강사 모드 무의미. `_isTopAdmin()`(app-core) 신설, `init()`에서 운영자면 `adminOn=true` 기본, 사이드바 강사⇄관리자 토글은 **manager 전용**(`_isMgr()&&!_isTopAdmin()`)으로 운영자에겐 미노출(아바타 앰버+"전체 수업(관리자)" 라벨로 표시). 설정 시스템탭 안내문도 분기(운영자="항상 관리자 모드"). 웹 v314. CM 미변경(요청). |

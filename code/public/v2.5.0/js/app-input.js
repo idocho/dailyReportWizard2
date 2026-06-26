@@ -192,7 +192,8 @@ function renderInput(mc){
       const sel=hlArr.includes(t.key);
       return `<button class="tg-check${sel?' sel-m':''}" data-k="${esc(t.key)}" data-g="highlight" onclick="onTagMulti(this,'${esc(classId)}','${esc(nameKey)}','highlight','${esc(subject)}')">${esc(t.label)}</button>`;
     }).join('');
-    dtRows+=`<div class="si-card">
+    const isAbsent=(tags.assign_tags||[]).includes('결석');
+    dtRows+=`<div class="si-card${isAbsent?' si-absent':''}">
       <div class="si-left">
         <span class="dot ${dc}" data-namekey="${esc(nameKey)}" data-subject="${esc(subject)}"></span>
         <span class="si-lname">${esc(displayName)}</span>
@@ -272,6 +273,8 @@ function onAssignTag(el,classId,nameKey,subject){
   const idx=tags.assign_tags.indexOf(p);
   if(idx>=0)tags.assign_tags.splice(idx,1); else tags.assign_tags.push(p);
   el.classList.toggle('sel-m',tags.assign_tags.includes(p));
+  // 결석=하드 차단: 결석 선택 시 해당 학생의 나머지 입력 버튼 비활성(메모·결석 제외). CSS .si-absent 처리.
+  if(p==='결석'){ const card=el.closest('.si-card'); if(card)card.classList.toggle('si-absent',tags.assign_tags.includes('결석')); }
   pushObs(classId,nameKey,subject,'assign_tags');
 }
 
