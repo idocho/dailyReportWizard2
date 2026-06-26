@@ -139,14 +139,17 @@ function renderInput(mc){
     const note=_readNote(nameKey);
     const dc=dotClass(classId,nameKey,subject);
     const tags=tagData?.[nameKey]?.[subject]?.[dk]||{};
+    const isAbsent=(tags.assign_tags||[]).includes('결석');
 
+    // 결석 — 전용 버튼(프리셋 독립, 항상 노출). 저장은 assign_tags['결석'] 유지(AI·리포트 호환). 선택 시 카드 하드 차단.
+    const absentBtn=`<button class="tg-absent${isAbsent?' on':''}" data-p="결석" onclick="onAssignTag(this,'${esc(classId)}','${esc(nameKey)}','${esc(subject)}')">결석</button>`;
     // 과제 고정 등급 (택1)
     const agBtns=ASSIGN_GRADES.map(g=>{
       const sel=tags.assign_grade===g.key;
       return `<button class="tg-radio${sel?' sel-c ag-'+g.key:''}" data-k="${esc(g.key)}" onclick="onAssignGrade(this,'${esc(classId)}','${esc(nameKey)}','${esc(subject)}')">${esc(g.label)}</button>`;
     }).join('');
-    // 추가 프리셋 (복수선택)
-    const apBtns=presets.map(p=>{
+    // 추가 프리셋 (복수선택) — '결석'은 전용 버튼으로 분리했으므로 제외
+    const apBtns=presets.filter(p=>p!=='결석').map(p=>{
       const sel=(tags.assign_tags||[]).includes(p);
       return `<button class="tg-check${sel?' sel-m':''}" data-p="${esc(p)}" onclick="onAssignTag(this,'${esc(classId)}','${esc(nameKey)}','${esc(subject)}')">${esc(p)}</button>`;
     }).join('');
@@ -192,7 +195,6 @@ function renderInput(mc){
       const sel=hlArr.includes(t.key);
       return `<button class="tg-check${sel?' sel-m':''}" data-k="${esc(t.key)}" data-g="highlight" onclick="onTagMulti(this,'${esc(classId)}','${esc(nameKey)}','highlight','${esc(subject)}')">${esc(t.label)}</button>`;
     }).join('');
-    const isAbsent=(tags.assign_tags||[]).includes('결석');
     dtRows+=`<div class="si-card${isAbsent?' si-absent':''}">
       <div class="si-left">
         <span class="dot ${dc}" data-namekey="${esc(nameKey)}" data-subject="${esc(subject)}"></span>
@@ -201,7 +203,7 @@ function renderInput(mc){
       <div class="si-right">
         <div class="si-row">
           <span class="si-lbl">과제</span>
-          <div class="si-btns tg-cell">${agBtns}${presets.length?`<div class="tg-sep"></div>${apBtns}`:''}</div>
+          <div class="si-btns tg-cell">${absentBtn}<div class="tg-sep"></div>${agBtns}${apBtns?`<div class="tg-sep"></div>${apBtns}`:''}</div>
         </div>
         <div class="si-div"></div>
         <div class="si-row">

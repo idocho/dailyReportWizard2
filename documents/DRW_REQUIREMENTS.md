@@ -1,7 +1,7 @@
 # DailyReportWizard — 요구사항 명세서
 
 **Crafted by IDO(idocho@kakao.com) · Powered by Claude AI**  
-**문서 버전**: 8.88 · **앱 버전**: v2.5.0(정식·전면도입) · **최종 수정**: 2026-06-26
+**문서 버전**: 8.89 · **앱 버전**: v2.5.0(정식·전면도입) · **최종 수정**: 2026-06-26
 
 > Firebase 스키마 전체 명세: [DB_SCHEMA.md](DB_SCHEMA.md) (구 ClassManager에서 이관)
 
@@ -11,6 +11,7 @@
 
 | 문서 버전 | 날짜 | 주요 변경 |
 |-----------|------|-----------|
+| 8.89 | 2026-06-26 | **결석 전용 버튼 독립 (프리셋 비종속)**. 결석 하드 차단이 '결석' 프리셋 존재에 의존 → 강사가 프리셋에서 빼면 무력화되던 문제. 결석을 과제 행 맨 앞 **전용 버튼**(빨강 테마 `.tg-absent`, 항상 노출)으로 분리. 클릭=`onAssignTag` 재사용(저장은 `assign_tags['결석']` 유지 → AI·리포트 호환), 선택 시 `si-absent` 하드 차단 그대로. 추가 프리셋(`apBtns`) 렌더에서 '결석' 제외(중복 방지). 웹 v318·CSS v20260640. |
 | 8.88 | 2026-06-26 | **관리 메뉴를 관리자 모드 종속으로 (강사 모드 시 숨김)**. `_isMgr()`(신원)만으로 사이드바 '관리'(학생 명단·강사 계정)를 노출해 매니저가 **강사 모드인데도 관리 메뉴가 보이던** 문제. 모드 메타포 일치 위해 `_isMgr()&&adminOn`으로 게이트 — 강사 모드=관리 메뉴 숨김, 관리자 모드=노출. 운영자(super)는 adminOn 고정이라 항상 노출. renderStudents·renderAccounts 가드도 `_isMgr()&&adminOn`(강사 모드 전환 시 해당 탭이면 입력으로 복귀). 웹 v317. |
 | 8.87 | 2026-06-26 | **초기화 버튼 먹통 수정 + 결석 하드 차단**. ① **초기화 오작동**: 설정 초기화 탭이 탭(`stg-pane`)으로 렌더되는데 `_resetToggle`이 죽은 구 아코디언(`#sa-reset .sa-body`)을 갱신 → 카드 선택·실행버튼 활성화가 **전 역할에서 먹통**이었음(데이터 토글은 됐으나 화면 미반영). `_resetToggle`을 `.stg-pane[data-stg="reset"] .stg-card-b` 우선 갱신으로 교정. 추가로 일반(강사 단위) 초기화 항목은 `instructor.assignments` 기준이라 담당수업 없는 **운영자(super)에겐 no-op** → 담당수업 0이면 일반 항목 미노출(운영자는 전체 항목만). ② **결석 하드 차단**: 학생 과제 행에서 `결석` 프리셋 선택 시 그 학생 카드의 나머지 입력 버튼(수행도·컨디션·이해도·참여·주의·시험) 전부 **비활성**(`pointer-events:none`+흐림), 메모·결석 버튼만 허용 — 결석 학생에 다른 항목 실수 입력 방지. `si-absent` 카드 클래스(renderInput 초기 + onAssignTag 토글 동기화), CSS `.si-card.si-absent`. 웹 v315·CSS v20260639. |
 | 8.86 | 2026-06-26 | **CM 웹앱 은퇴 — 통폐합 완료(P4-A)**. 기능 패리티 확인 후 CampusManager 웹앱 폐지: ① **계정 관리**(발급·활성/비활성·역할변경·리셋·삭제, 운영자 크로스캠퍼스) DRW `renderAccounts`로 동등 ② **학생 명단**(반/학생 CRUD·M/T·무소속·이름변경 migrate) DRW `renderStudents`로 동등 ③ **일괄전송 캠퍼스 전체** = 매니저가 관리자 모드 시 `activeAsgns` 전 학급 확장으로 달성(P3 사실상 해소) — 무소속 학생 공지는 불요로 확정. CM 단독 기능 0. **조치**: (1단계) `CampusManager/firebase.json` catch-all 302 리다이렉트 배포 → (2단계, 사용자 요청) **`gritptmanager` 호스팅 사이트 영구 삭제**(`firebase hosting:sites:delete`, 서브도메인 해제·비가역). 현재 `gritptmanager.web.app`=**404**, 프로젝트 hosting 사이트는 `dailyreportwizard` 단독. CM 소스는 git 보존(repo의 firebase.json은 삭제된 site 참조하는 사문 — repo 동결). DB/Auth/Functions는 DRW와 동일 프로젝트 공유라 **미접촉**(hosting만). 통합 에이전트는 이미 단일화(8.70). **남은 정리**: 없음(통폐합 종결). |

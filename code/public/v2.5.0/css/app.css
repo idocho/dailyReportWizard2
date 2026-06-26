@@ -543,4 +543,9 @@ body{font-family:'Pretendard','Malgun Gothic','맑은 고딕',-apple-system,sans
 .si-card.si-absent .tg-cell button:not([data-p="결석"]){pointer-events:none;opacity:.38;filter:grayscale(.35)}
 .si-card.si-absent .si-row .si-lbl{opacity:.5}
 .si-card.si-absent .tg-cell button[data-p="결석"]{opacity:1;filter:none;pointer-events:auto}
+/* 결석 전용 버튼 (프리셋 독립) — 빨강 테마로 구분 */
+.tg-absent{padding:5px 11px;border-radius:8px;border:1px solid #FCA5A5;background:var(--panel);color:#DC2626;font-size:11px;font-family:inherit;font-weight:700;cursor:pointer;white-space:nowrap;transition:all .12s;line-height:1.4}
+.tg-absent:hover{background:var(--red-l)}
+.tg-absent:active{transform:scale(.96)}
+.tg-absent.on{background:#DC2626;border-color:transparent;color:#fff}
 </style>
