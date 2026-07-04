@@ -291,7 +291,7 @@ function renderClsMgmtTop(){
     <div class="sh">🏫 학급 &amp; 학생 관리</div>
     <div class="sh2">내 담당 학급</div>
     ${myRows||'<div style="padding:8px 12px;font-size:11px;color:var(--gray)">담당 수업을 추가하면 여기에 표시됩니다.</div>'}
-    ${_rosterAdmin()?`<div class="sh2" style="display:flex;align-items:center;justify-content:space-between">전체 학급 탐색<button class="btn bsm" onclick="addClsModal()" style="font-size:11px;padding:3px 9px">+ 학급 추가</button></div>
+    ${_rosterAdmin()?`<div class="sh2">전체 학급 탐색 <span style="font-weight:400;font-size:10px;color:var(--gray)">· 과정·교재 관리 (학급 추가·삭제는 ‘학생 명단’ 탭)</span></div>
     ${drillBtns||'<div style="padding:8px 12px;font-size:11px;color:var(--gray)">등록된 학급이 없습니다.</div>'}`:''}
   </div>`;
 }
@@ -304,8 +304,7 @@ function renderClsMgmtClass(classId){
   return `<div class="card">
     <div class="sh" style="display:flex;align-items:center;gap:8px;padding:7px 10px 7px 14px">
       <button class="btn bsm" onclick="clsDrillSh=null;renderMain()" style="flex-shrink:0;font-size:11px">← 뒤로</button>
-      <span style="flex:1">🏫 ${esc(classId)} 학급 관리</span>
-      ${_rosterAdmin()?`<button class="btn br bsm" onclick="rmCls('${esc(classId)}')" style="padding:2px 7px;font-size:11px;flex-shrink:0">학급 삭제</button>`:''}
+      <span style="flex:1">🏫 ${esc(classId)} 과정·교재 관리</span>
     </div>
     <div style="padding:12px 14px">${_clsSectionsHtml(classId,clsD)}</div>
   </div>`;
@@ -378,32 +377,12 @@ function buildClsAccordion(classId,clsD,myRole){
       <span style="font-size:13px;font-weight:700;flex:1">${esc(classId)}</span>
       ${subBadge}
       <span style="font-size:10px;color:var(--gray);margin:0 6px;white-space:nowrap">학생 ${students.length} · 과목 ${subjects.length}</span>
-      ${_rosterAdmin()?`<button class="btn br bsm" onclick="rmCls('${esc(classId)}');event.stopPropagation()" style="padding:2px 7px;font-size:11px;flex-shrink:0">✕</button>`:''}
     </div>
     <div class="acc-body${open?' open':''}">${_clsSectionsHtml(classId,clsD)}</div>
   </div>`;
 }
 
-// ── 학급 CRUD (설정 명단 탭) — 학생 추가·편집은 '🏫 학생 명단' 탭으로 일원화 ──────
-function addClsModal(){
-  if(!_rosterAdmin())return toast('학급·학생 편집 권한이 없습니다.');
-  _rpModal(`<h3>학급 추가</h3>
-    <label class="rp-flbl">반 이름</label><input class="rp-fin" id="cl-id" placeholder="예: 중1A">
-    <label class="rp-flbl">그룹</label><select class="rp-fin" id="cl-grp"><option value="M">M반 (월수금)</option><option value="T">T반 (화목토)</option></select>
-    <div class="rp-mrow"><button class="rp-btn ghost" onclick="closeRpModal()">취소</button><button class="rp-btn" onclick="saveCls()">추가</button></div>`);
-  setTimeout(()=>document.getElementById('cl-id')?.focus(),0);
-}
-async function saveCls(){
-  const id=(document.getElementById('cl-id').value||'').trim();
-  const grp=document.getElementById('cl-grp').value;
-  if(!id)return toast('반 이름을 입력하세요');
-  if(config?.classes?.[id])return toast('이미 있는 반입니다');
-  try{
-    await fbPut('classes/'+encodeURIComponent(id),{group:grp,courses:{}});
-    config.classes=config.classes||{}; config.classes[id]={group:grp,courses:{}};
-    closeRpModal(); toast(`${id} 추가됨 ✅`); clsDrillSh=id; renderMain();
-  }catch(e){ toast('학급 추가 실패: '+e,4000); }
-}
+// 학급 추가/삭제(addClsModal·saveCls·rmCls)는 '🏫 학생 명단' 탭(rsAddCls/rsDelCls)으로 일원화 — 여기선 제거(경로 중복 방지). 설정 명단 탭은 과정·교재 관리 전용.
 
 // ── 과목 인라인 추가 ─────────────────────────────────────────────
 function addCourseInline(classId,btnEl){
@@ -650,25 +629,6 @@ function _syncAssignments(){
   saveLocal();
   if(dbUrl&&dbPath&&instructor.id)
     fbPatch(`config/instructors/${encodeURIComponent(instructor.id)}`,{assignments:instructor.assignments}).catch(fbFail('담당 수업'));
-}
-
-function rmCls(classId){
-  if(!_rosterAdmin()){toast('학급 삭제 권한이 없습니다.');return;}
-  if(!confirm(`${classId} 학급을 삭제합니까?`))return;
-  delete config.classes[classId];
-  if(config._classStudents)delete config._classStudents[classId];
-  if(instructor?.assignments){
-    const before=instructor.assignments.length;
-    instructor.assignments=instructor.assignments.filter(a=>a.classId!==classId);
-    if(instructor.assignments.length!==before){
-      if(curAI>=instructor.assignments.length)curAI=0;
-      if(dbUrl&&dbPath&&instructor.id)fbPatch(`config/instructors/${encodeURIComponent(instructor.id)}`,{assignments:instructor.assignments}).catch(fbFail('담당 수업'));
-    }
-  }
-  saveLocal();
-  // 해당 학급 노드만 타겟 삭제 (classes 전체 PUT 금지 — 부활 버그 방지)
-  if(dbUrl&&dbPath)fbPut(`classes/${classId}`,null).then(()=>toast('학급 삭제됨 ✅')).catch(e=>toast('학급 삭제 실패: '+e,4000));
-  renderMain();
 }
 
 async function restoreCourse(classId,subject){
