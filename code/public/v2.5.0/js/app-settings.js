@@ -255,6 +255,7 @@ function renderSettings(mc){
 //  학급 관리 — 신규: classes/ 구조
 // ══════════════════════════════════════════════════════════
 function renderClsMgmt(){
+  if(clsDrillSh!==null&&!_rosterAdmin())clsDrillSh=null; // 강사는 전체 학급 드릴인 접근 불가(본인 담당만)
   if(clsDrillSh===null)return renderClsMgmtTop();
   return renderClsMgmtClass(clsDrillSh);
 }
@@ -290,8 +291,8 @@ function renderClsMgmtTop(){
     <div class="sh">🏫 학급 &amp; 학생 관리</div>
     <div class="sh2">내 담당 학급</div>
     ${myRows||'<div style="padding:8px 12px;font-size:11px;color:var(--gray)">담당 수업을 추가하면 여기에 표시됩니다.</div>'}
-    <div class="sh2" style="display:flex;align-items:center;justify-content:space-between">전체 학급 탐색${_rosterAdmin()?`<button class="btn bsm" onclick="addClsModal()" style="font-size:11px;padding:3px 9px">+ 학급 추가</button>`:''}</div>
-    ${drillBtns||'<div style="padding:8px 12px;font-size:11px;color:var(--gray)">등록된 학급이 없습니다.</div>'}
+    ${_rosterAdmin()?`<div class="sh2" style="display:flex;align-items:center;justify-content:space-between">전체 학급 탐색<button class="btn bsm" onclick="addClsModal()" style="font-size:11px;padding:3px 9px">+ 학급 추가</button></div>
+    ${drillBtns||'<div style="padding:8px 12px;font-size:11px;color:var(--gray)">등록된 학급이 없습니다.</div>'}`:''}
   </div>`;
 }
 
