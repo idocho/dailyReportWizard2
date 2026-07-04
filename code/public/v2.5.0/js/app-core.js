@@ -138,8 +138,9 @@ let adminOn=false;   // 관리자 세션 상태 (새로고침 시 해제)
 function _isMgr(){ const r=(typeof instructor!=='undefined'&&instructor&&instructor.role)||''; return r==='manager'||r==='admin'||r==='super'; }
 // 운영자(admin/super) — 순수 운영 계정(담당수업 없음). 강사 모드 불요 → 관리자 모드 고정·토글 미노출
 function _isTopAdmin(){ const r=(typeof instructor!=='undefined'&&instructor&&instructor.role)||''; return r==='admin'||r==='super'; }
-// 학급·학생 명단 편집 권한 — acl 매니저/운영자 신원 전용(공유 암호 adminOn으로는 불가, 명단 소유권 분리)
-function _rosterAdmin(){ return _isMgr(); }
+// 학급·학생 명단 편집 권한 — 매니저/운영자 신원 + 관리자 모드(adminOn). 강사 모드 매니저는 불가
+// (사이드바 관리 메뉴·학생 명단 탭과 동일 기준 — 모드 토글 하나로 전체 관리 surface 일괄 제어)
+function _rosterAdmin(){ return _isMgr() && adminOn; }
 // 강사 ⇄ 관리자 모드 전환 — 매니저 신원 전용(암호 없음). adminOn=전체수업+교무 권한, 기본 강사(false)
 function setAdminMode(on){
   if(!_isMgr())return;            // 매니저/운영자만 — 일반 강사는 토글 미노출
