@@ -17,19 +17,19 @@
 
     "acl": {
       // 전체 명단 읽기는 운영자(admin)/관리자(manager) 만(프라이버시)
-      ".read": "auth != null && (root.child('acl').child(auth.uid).child('role').val() === 'manager' || root.child('acl').child(auth.uid).child('role').val() === 'admin')",
+      ".read": "auth != null && (root.child('acl').child(auth.uid).child('role').val() === 'manager' || ( root.child('acl').child(auth.uid).child('role').val() === 'admin' || root.child('acl').child(auth.uid).child('role').val() === 'super' ))",
       "$uid": {
         // 본인 엔트리는 본인도 읽기(로그인 직후 campus/role 파악)
         ".read": "auth != null && auth.uid === $uid",
         // admin(운영자): 전체 / manager(관리자): 자기 캠퍼스 instructor 만(권한상승 차단)
-        ".write": "auth != null && ( root.child('acl').child(auth.uid).child('role').val() === 'admin' || ( root.child('acl').child(auth.uid).child('role').val() === 'manager' && newData.child('campus').val() === root.child('acl').child(auth.uid).child('campus').val() && newData.child('role').val() === 'instructor' && ( !data.exists() || data.child('role').val() === 'instructor' ) ) )",
-        ".validate": "newData.hasChildren(['campus','role','active']) && newData.child('role').val().matches(/^(instructor|manager|admin|agent)$/)"
+        ".write": "auth != null && ( ( root.child('acl').child(auth.uid).child('role').val() === 'admin' || root.child('acl').child(auth.uid).child('role').val() === 'super' ) || ( root.child('acl').child(auth.uid).child('role').val() === 'manager' && newData.child('campus').val() === root.child('acl').child(auth.uid).child('campus').val() && newData.child('role').val() === 'instructor' && ( !data.exists() || data.child('role').val() === 'instructor' ) ) )",
+        ".validate": "newData.hasChildren(['campus','role','active']) && newData.child('role').val().matches(/^(instructor|manager|admin|super|agent)$/)"
       }
     },
 
     "schema_version": {
       ".read": "auth != null",
-      ".write": "auth != null && root.child('acl').child(auth.uid).child('role').val() === 'admin'"
+      ".write": "auth != null && ( root.child('acl').child(auth.uid).child('role').val() === 'admin' || root.child('acl').child(auth.uid).child('role').val() === 'super' )"
     },
 
     "campuses": {
@@ -37,7 +37,7 @@
       // 쓰기는 운영자(admin/super)만. {slug}={name, order?, active?}
       ".read": true,
       "$slug": {
-        ".write": "auth != null && ( root.child('acl').child(auth.uid).child('role').val() === 'admin' || root.child('acl').child(auth.uid).child('role').val() === 'super' )",
+        ".write": "auth != null && ( ( root.child('acl').child(auth.uid).child('role').val() === 'admin' || root.child('acl').child(auth.uid).child('role').val() === 'super' ) || root.child('acl').child(auth.uid).child('role').val() === 'super' )",
         ".validate": "newData.hasChild('name')"
       }
     },
@@ -45,13 +45,13 @@
     "sendJobs": {
       "$campus": {
         // 읽기: 운영자(admin·전역) 또는 같은 캠퍼스 관리자(manager)/agent
-        ".read": "auth != null && root.child('acl').child(auth.uid).child('active').val() === true && ( root.child('acl').child(auth.uid).child('role').val() === 'admin' || ( ( root.child('acl').child(auth.uid).child('campus').val() === $campus ) && ( root.child('acl').child(auth.uid).child('role').val() === 'manager' || root.child('acl').child(auth.uid).child('role').val() === 'agent' ) ) )",
+        ".read": "auth != null && root.child('acl').child(auth.uid).child('active').val() === true && ( ( root.child('acl').child(auth.uid).child('role').val() === 'admin' || root.child('acl').child(auth.uid).child('role').val() === 'super' ) || ( ( root.child('acl').child(auth.uid).child('campus').val() === $campus ) && ( root.child('acl').child(auth.uid).child('role').val() === 'manager' || root.child('acl').child(auth.uid).child('role').val() === 'agent' ) ) )",
         "$jobId": {
           // 작업 생성/수정: 같은 캠퍼스 운영자(admin)/관리자(manager)
-          ".write": "auth != null && root.child('acl').child(auth.uid).child('active').val() === true && ( root.child('acl').child(auth.uid).child('role').val() === 'admin' || ( root.child('acl').child(auth.uid).child('campus').val() === $campus && root.child('acl').child(auth.uid).child('role').val() === 'manager' ) )",
+          ".write": "auth != null && root.child('acl').child(auth.uid).child('active').val() === true && ( ( root.child('acl').child(auth.uid).child('role').val() === 'admin' || root.child('acl').child(auth.uid).child('role').val() === 'super' ) || ( root.child('acl').child(auth.uid).child('campus').val() === $campus && root.child('acl').child(auth.uid).child('role').val() === 'manager' ) )",
           "status": {
             // 상태는 같은 캠퍼스 agent 도 기록(전송 진행/결과)
-            ".write": "auth != null && root.child('acl').child(auth.uid).child('active').val() === true && root.child('acl').child(auth.uid).child('campus').val() === $campus && ( root.child('acl').child(auth.uid).child('role').val() === 'agent' || root.child('acl').child(auth.uid).child('role').val() === 'manager' || root.child('acl').child(auth.uid).child('role').val() === 'admin' )"
+            ".write": "auth != null && root.child('acl').child(auth.uid).child('active').val() === true && root.child('acl').child(auth.uid).child('campus').val() === $campus && ( root.child('acl').child(auth.uid).child('role').val() === 'agent' || root.child('acl').child(auth.uid).child('role').val() === 'manager' || ( root.child('acl').child(auth.uid).child('role').val() === 'admin' || root.child('acl').child(auth.uid).child('role').val() === 'super' ) )"
           }
         }
       }
@@ -60,40 +60,48 @@
     "campus": {
       "$campus": {
         // 캠퍼스 데이터 읽기: 같은 캠퍼스 활성 멤버(instructor/manager/admin/agent)
-        ".read": "auth != null && root.child('acl').child(auth.uid).child('active').val() === true && ( root.child('acl').child(auth.uid).child('role').val() === 'admin' || root.child('acl').child(auth.uid).child('campus').val() === $campus )",
+        ".read": "auth != null && root.child('acl').child(auth.uid).child('active').val() === true && ( ( root.child('acl').child(auth.uid).child('role').val() === 'admin' || root.child('acl').child(auth.uid).child('role').val() === 'super' ) || root.child('acl').child(auth.uid).child('campus').val() === $campus )",
 
         // 명단(students/classes): 같은 캠퍼스 admin 만 쓰기
         "students": {
-          ".write": "auth != null && root.child('acl').child(auth.uid).child('active').val() === true && ( root.child('acl').child(auth.uid).child('role').val() === 'admin' || ( root.child('acl').child(auth.uid).child('campus').val() === $campus && root.child('acl').child(auth.uid).child('role').val() === 'manager' ) )"
+          ".write": "auth != null && root.child('acl').child(auth.uid).child('active').val() === true && ( ( root.child('acl').child(auth.uid).child('role').val() === 'admin' || root.child('acl').child(auth.uid).child('role').val() === 'super' ) || ( root.child('acl').child(auth.uid).child('campus').val() === $campus && root.child('acl').child(auth.uid).child('role').val() === 'manager' ) )"
         },
         "classes": {
-          ".write": "auth != null && root.child('acl').child(auth.uid).child('active').val() === true && ( root.child('acl').child(auth.uid).child('role').val() === 'admin' || ( root.child('acl').child(auth.uid).child('campus').val() === $campus && root.child('acl').child(auth.uid).child('role').val() === 'manager' ) )"
+          ".write": "auth != null && root.child('acl').child(auth.uid).child('active').val() === true && ( ( root.child('acl').child(auth.uid).child('role').val() === 'admin' || root.child('acl').child(auth.uid).child('role').val() === 'super' ) || ( root.child('acl').child(auth.uid).child('campus').val() === $campus && root.child('acl').child(auth.uid).child('role').val() === 'manager' ) )"
         },
 
         // 수업 운영(input/obs/scores/session/history): 같은 캠퍼스 instructor/운영자(admin)/관리자(manager) (agent 제외)
-        "input":   { ".write": "auth != null && root.child('acl').child(auth.uid).child('active').val() === true && ( root.child('acl').child(auth.uid).child('role').val() === 'admin' || ( root.child('acl').child(auth.uid).child('campus').val() === $campus && ( root.child('acl').child(auth.uid).child('role').val() === 'instructor' || root.child('acl').child(auth.uid).child('role').val() === 'manager' ) ) )" },
-        "obs":     { ".write": "auth != null && root.child('acl').child(auth.uid).child('active').val() === true && ( root.child('acl').child(auth.uid).child('role').val() === 'admin' || ( root.child('acl').child(auth.uid).child('campus').val() === $campus && ( root.child('acl').child(auth.uid).child('role').val() === 'instructor' || root.child('acl').child(auth.uid).child('role').val() === 'manager' ) ) )" },
-        "scores":  { ".write": "auth != null && root.child('acl').child(auth.uid).child('active').val() === true && ( root.child('acl').child(auth.uid).child('role').val() === 'admin' || ( root.child('acl').child(auth.uid).child('campus').val() === $campus && ( root.child('acl').child(auth.uid).child('role').val() === 'instructor' || root.child('acl').child(auth.uid).child('role').val() === 'manager' ) ) )" },
-        "session": { ".write": "auth != null && root.child('acl').child(auth.uid).child('active').val() === true && ( root.child('acl').child(auth.uid).child('role').val() === 'admin' || ( root.child('acl').child(auth.uid).child('campus').val() === $campus && ( root.child('acl').child(auth.uid).child('role').val() === 'instructor' || root.child('acl').child(auth.uid).child('role').val() === 'manager' ) ) )" },
-        "history": { ".write": "auth != null && root.child('acl').child(auth.uid).child('active').val() === true && ( root.child('acl').child(auth.uid).child('role').val() === 'admin' || ( root.child('acl').child(auth.uid).child('campus').val() === $campus && ( root.child('acl').child(auth.uid).child('role').val() === 'instructor' || root.child('acl').child(auth.uid).child('role').val() === 'manager' ) ) )" },
-        "config":  { ".write": "auth != null && root.child('acl').child(auth.uid).child('active').val() === true && ( root.child('acl').child(auth.uid).child('role').val() === 'admin' || ( root.child('acl').child(auth.uid).child('campus').val() === $campus && root.child('acl').child(auth.uid).child('role').val() === 'manager' ) )" },
+        "input":   { ".write": "auth != null && root.child('acl').child(auth.uid).child('active').val() === true && ( ( root.child('acl').child(auth.uid).child('role').val() === 'admin' || root.child('acl').child(auth.uid).child('role').val() === 'super' ) || ( root.child('acl').child(auth.uid).child('campus').val() === $campus && ( root.child('acl').child(auth.uid).child('role').val() === 'instructor' || root.child('acl').child(auth.uid).child('role').val() === 'manager' ) ) )" },
+        "obs":     { ".write": "auth != null && root.child('acl').child(auth.uid).child('active').val() === true && ( ( root.child('acl').child(auth.uid).child('role').val() === 'admin' || root.child('acl').child(auth.uid).child('role').val() === 'super' ) || ( root.child('acl').child(auth.uid).child('campus').val() === $campus && ( root.child('acl').child(auth.uid).child('role').val() === 'instructor' || root.child('acl').child(auth.uid).child('role').val() === 'manager' ) ) )" },
+        "scores":  { ".write": "auth != null && root.child('acl').child(auth.uid).child('active').val() === true && ( ( root.child('acl').child(auth.uid).child('role').val() === 'admin' || root.child('acl').child(auth.uid).child('role').val() === 'super' ) || ( root.child('acl').child(auth.uid).child('campus').val() === $campus && ( root.child('acl').child(auth.uid).child('role').val() === 'instructor' || root.child('acl').child(auth.uid).child('role').val() === 'manager' ) ) )" },
+        "session": { ".write": "auth != null && root.child('acl').child(auth.uid).child('active').val() === true && ( ( root.child('acl').child(auth.uid).child('role').val() === 'admin' || root.child('acl').child(auth.uid).child('role').val() === 'super' ) || ( root.child('acl').child(auth.uid).child('campus').val() === $campus && ( root.child('acl').child(auth.uid).child('role').val() === 'instructor' || root.child('acl').child(auth.uid).child('role').val() === 'manager' ) ) )" },
+        "history": { ".write": "auth != null && root.child('acl').child(auth.uid).child('active').val() === true && ( ( root.child('acl').child(auth.uid).child('role').val() === 'admin' || root.child('acl').child(auth.uid).child('role').val() === 'super' ) || ( root.child('acl').child(auth.uid).child('campus').val() === $campus && ( root.child('acl').child(auth.uid).child('role').val() === 'instructor' || root.child('acl').child(auth.uid).child('role').val() === 'manager' ) ) )" },
+        "config":  {
+          ".write": "auth != null && root.child('acl').child(auth.uid).child('active').val() === true && ( ( root.child('acl').child(auth.uid).child('role').val() === 'admin' || root.child('acl').child(auth.uid).child('role').val() === 'super' ) || ( root.child('acl').child(auth.uid).child('campus').val() === $campus && root.child('acl').child(auth.uid).child('role').val() === 'manager' ) )",
+          "instructors": {
+            "$instructorId": {
+              // 강사 본인 설정(AI 문체·프리셋·담당배정)은 본인 노드만 쓰기 — 같은 캠퍼스·활성·instructorId 일치
+              ".write": "auth != null && root.child('acl').child(auth.uid).child('active').val() === true && root.child('acl').child(auth.uid).child('campus').val() === $campus && $instructorId === root.child('acl').child(auth.uid).child('instructorId').val()"
+            }
+          }
+        },
 
         // 리포트 작업 큐 — 키=instructorId. 강사는 본인 큐만(소유권 검증), 관리자(manager) 캠퍼스 전체, 운영자(admin) 전역.
         // 웹이 genJobs 적재 → 에이전트(본인 로그인)가 drafts/status 회신. agents=하트비트(에이전트 본인 키 기록).
         // 읽기는 상위 campus '.read'(같은 캠퍼스 멤버)가 커버.
         "genJobs": {
           "$instructorId": {
-            ".write": "auth != null && root.child('acl').child(auth.uid).child('active').val() === true && ( root.child('acl').child(auth.uid).child('role').val() === 'admin' || ( root.child('acl').child(auth.uid).child('campus').val() === $campus && ( root.child('acl').child(auth.uid).child('role').val() === 'manager' || ( root.child('acl').child(auth.uid).child('role').val() === 'instructor' && $instructorId === root.child('acl').child(auth.uid).child('instructorId').val() ) ) ) )"
+            ".write": "auth != null && root.child('acl').child(auth.uid).child('active').val() === true && ( ( root.child('acl').child(auth.uid).child('role').val() === 'admin' || root.child('acl').child(auth.uid).child('role').val() === 'super' ) || ( root.child('acl').child(auth.uid).child('campus').val() === $campus && ( root.child('acl').child(auth.uid).child('role').val() === 'manager' || ( root.child('acl').child(auth.uid).child('role').val() === 'instructor' && $instructorId === root.child('acl').child(auth.uid).child('instructorId').val() ) ) ) )"
           }
         },
         "sendJobs": {
           "$instructorId": {
-            ".write": "auth != null && root.child('acl').child(auth.uid).child('active').val() === true && ( root.child('acl').child(auth.uid).child('role').val() === 'admin' || ( root.child('acl').child(auth.uid).child('campus').val() === $campus && ( root.child('acl').child(auth.uid).child('role').val() === 'manager' || ( root.child('acl').child(auth.uid).child('role').val() === 'instructor' && $instructorId === root.child('acl').child(auth.uid).child('instructorId').val() ) ) ) )"
+            ".write": "auth != null && root.child('acl').child(auth.uid).child('active').val() === true && ( ( root.child('acl').child(auth.uid).child('role').val() === 'admin' || root.child('acl').child(auth.uid).child('role').val() === 'super' ) || ( root.child('acl').child(auth.uid).child('campus').val() === $campus && ( root.child('acl').child(auth.uid).child('role').val() === 'manager' || ( root.child('acl').child(auth.uid).child('role').val() === 'instructor' && $instructorId === root.child('acl').child(auth.uid).child('instructorId').val() ) ) ) )"
           }
         },
         "agents": {
           "$instructorId": {
-            ".write": "auth != null && root.child('acl').child(auth.uid).child('active').val() === true && ( root.child('acl').child(auth.uid).child('role').val() === 'admin' || ( root.child('acl').child(auth.uid).child('campus').val() === $campus && ( root.child('acl').child(auth.uid).child('role').val() === 'manager' || ( root.child('acl').child(auth.uid).child('role').val() === 'instructor' && $instructorId === root.child('acl').child(auth.uid).child('instructorId').val() ) ) ) )"
+            ".write": "auth != null && root.child('acl').child(auth.uid).child('active').val() === true && ( ( root.child('acl').child(auth.uid).child('role').val() === 'admin' || root.child('acl').child(auth.uid).child('role').val() === 'super' ) || ( root.child('acl').child(auth.uid).child('campus').val() === $campus && ( root.child('acl').child(auth.uid).child('role').val() === 'manager' || ( root.child('acl').child(auth.uid).child('role').val() === 'instructor' && $instructorId === root.child('acl').child(auth.uid).child('instructorId').val() ) ) ) )"
           }
         }
       }

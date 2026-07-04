@@ -1,7 +1,7 @@
 # DailyReportWizard — 요구사항 명세서
 
 **Crafted by IDO(idocho@kakao.com) · Powered by Claude AI**  
-**문서 버전**: 8.94 · **앱 버전**: v2.5.0(정식·전면도입) · **최종 수정**: 2026-06-26
+**문서 버전**: 8.95 · **앱 버전**: v2.5.0(정식·전면도입) · **최종 수정**: 2026-06-26
 
 > Firebase 스키마 전체 명세: [DB_SCHEMA.md](DB_SCHEMA.md) (구 ClassManager에서 이관)
 
@@ -11,6 +11,7 @@
 
 | 문서 버전 | 날짜 | 주요 변경 |
 |-----------|------|-----------|
+| 8.95 | 2026-06-26 | **[룰] 강사 본인 config 쓰기 허용 + super≡admin (쓰기 401 수정)**. ① **강사 설정 저장 401**: DB 잠금 후 `config` 쓰기 룰이 admin/manager만 허용 → 강사가 본인 `config/instructors/{self}`(AI 문체·프리셋·담당배정)에 저장 시 401. `config/instructors/$instructorId`에 중첩 `.write` 추가(genJobs 패턴: 활성·같은 캠퍼스·`$instructorId===본인 instructorId`) → 강사 본인 노드만 쓰기 가능. ② **운영자(super) 전체 쓰기 401**: 역할 super가 룰 어디에도 없어(admin/manager만) 로그인만 되고 students·classes·config·input 등 **모든 쓰기 거부**됐음. 모든 `role==='admin'` 검사에 `|| role==='super'`를 OR(super≡admin, 최상위) + acl `.validate` 정규식에 super 추가. `database.rules.v2.json` 재배포. 검증: 무인증 config write·acl read 여전히 401, campuses 200(과개방 없음). |
 | 8.94 | 2026-06-26 | **학급 추가/삭제 경로 일원화 — '학생 명단' 탭 단일 소스**. 학급 추가가 설정 명단 탭(`addClsModal`/`saveCls`)과 학생 명단 탭(`rsAddCls`) 두 경로로 중복이던 근본 문제. 설정 명단 탭에서 학급 추가/삭제 UI·함수(`addClsModal`·`saveCls`·`rmCls`·+학급추가·학급삭제·✕) **전부 제거** → 학급 CRUD는 학생 명단 탭(`rsAddCls`/`rsDelCls`/`rsRenameCls`)만. 설정 명단 탭은 **과정·교재 관리 전용**(내 담당 학급 + [관리자 모드]전체 학급 탐색 드릴인으로 과목 관리, 안내문 추가). 과목 추가(addCourseInline)는 강사 본인 학급 유지. 웹 v323. |
 | 8.93 | 2026-06-26 | **`_rosterAdmin()` = `_isMgr()&&adminOn` — 학급 관리 관리자 모드 종속(일관)**. 8.92의 `_isMgr()`(모드 무관)는 매니저가 강사 모드여도 설정 명단 탭에 학급 추가/전체탐색이 떠 사이드바 관리 메뉴(adminOn 게이트)와 불일치. `_rosterAdmin()`을 `_isMgr()&&adminOn`으로 통일 → 학급 추가/삭제·전체 학급 탐색·드릴인이 **관리자 모드에서만**. 모드 토글 하나로 전체 관리 surface(관리 메뉴·학생명단 탭·학급 관리) 일괄 온/오프. 과목 추가(addCourseInline)는 강사 본인 학급 유지(비종속). 웹 v322. |
 | 8.92 | 2026-06-26 | **강사 명단 탭 권한 제한 — 본인 담당 학급만**. 강사(instructor)가 설정 명단 탭의 '전체 학급 탐색'으로 담당 아닌 학급에 드릴인→과목 추가까지 가능하던 누수 차단. `renderClsMgmtTop`의 '전체 학급 탐색' 섹션(드릴 목록+학급 추가 버튼) 전체를 `_rosterAdmin()`(=`_isMgr`)로 게이트 → 강사는 **'내 담당 학급'만** 표시(과목 추가는 본인 학급 한정 유지). `renderClsMgmt`에 드릴인 가드 추가(`clsDrillSh!==null&&!_rosterAdmin()→null`)로 상태 잔존 시에도 강사 접근 차단. 학급 추가/삭제 권한은 `_isMgr()` 유지(모드 무관, 사용자 확정). 웹 v321. |
