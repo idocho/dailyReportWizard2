@@ -89,6 +89,10 @@
               // 강사 본인 설정(AI 문체·프리셋·담당배정)은 본인 노드만 쓰기 — 같은 캠퍼스·활성·instructorId 일치
               ".write": "auth != null && root.child('acl').child(auth.uid).child('active').val() === true && root.child('acl').child(auth.uid).child('campus').val() === $campus && $instructorId === root.child('acl').child(auth.uid).child('instructorId').val()"
             }
+          },
+          "textbooks": {
+            // 전역 교재 레지스트리(자동완성) — 과목 등록 시 강사가 교재명 자동 등록(_registerTbName). 같은 캠퍼스 활성 강사 허용(비민감 이름 목록)
+            ".write": "auth != null && root.child('acl').child(auth.uid).child('active').val() === true && root.child('acl').child(auth.uid).child('campus').val() === $campus && root.child('acl').child(auth.uid).child('role').val() === 'instructor'"
           }
         },
 
