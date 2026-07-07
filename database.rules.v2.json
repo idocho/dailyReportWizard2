@@ -67,7 +67,13 @@
           ".write": "auth != null && root.child('acl').child(auth.uid).child('active').val() === true && ( ( root.child('acl').child(auth.uid).child('role').val() === 'admin' || root.child('acl').child(auth.uid).child('role').val() === 'super' ) || ( root.child('acl').child(auth.uid).child('campus').val() === $campus && root.child('acl').child(auth.uid).child('role').val() === 'manager' ) )"
         },
         "classes": {
-          ".write": "auth != null && root.child('acl').child(auth.uid).child('active').val() === true && ( ( root.child('acl').child(auth.uid).child('role').val() === 'admin' || root.child('acl').child(auth.uid).child('role').val() === 'super' ) || ( root.child('acl').child(auth.uid).child('campus').val() === $campus && root.child('acl').child(auth.uid).child('role').val() === 'manager' ) )"
+          ".write": "auth != null && root.child('acl').child(auth.uid).child('active').val() === true && ( ( root.child('acl').child(auth.uid).child('role').val() === 'admin' || root.child('acl').child(auth.uid).child('role').val() === 'super' ) || ( root.child('acl').child(auth.uid).child('campus').val() === $campus && root.child('acl').child(auth.uid).child('role').val() === 'manager' ) )",
+          "$classId": {
+            "courses": {
+              // 과목(과정·교재) 등록·보관은 강사도 가능 — 같은 캠퍼스 활성 강사(UI가 본인 담당 학급으로 한정). 학급 노드/group·추가/삭제는 상위 .write(매니저/운영자)만
+              ".write": "auth != null && root.child('acl').child(auth.uid).child('active').val() === true && root.child('acl').child(auth.uid).child('campus').val() === $campus && root.child('acl').child(auth.uid).child('role').val() === 'instructor'"
+            }
+          }
         },
 
         // 수업 운영(input/obs/scores/session/history): 같은 캠퍼스 instructor/운영자(admin)/관리자(manager) (agent 제외)
