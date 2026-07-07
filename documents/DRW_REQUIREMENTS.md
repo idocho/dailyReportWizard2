@@ -1,7 +1,7 @@
 # DailyReportWizard — 요구사항 명세서
 
 **Crafted by IDO(idocho@kakao.com) · Powered by Claude AI**  
-**문서 버전**: 8.97 · **앱 버전**: v2.5.0(정식·전면도입) · **최종 수정**: 2026-06-26
+**문서 버전**: 8.98 · **앱 버전**: v2.5.0(정식·전면도입) · **최종 수정**: 2026-06-26
 
 > Firebase 스키마 전체 명세: [DB_SCHEMA.md](DB_SCHEMA.md) (구 ClassManager에서 이관)
 
@@ -11,6 +11,7 @@
 
 | 문서 버전 | 날짜 | 주요 변경 |
 |-----------|------|-----------|
+| 8.98 | 2026-06-26 | **강사 전체 학급 열람·과목 관리 허용 (8.92 부분 환원) — 교재 없는 학급 배정 불가 해소**. 교재(과목)가 없는 학급은 배정 자체가 불가(담당=class+subject)한데, 8.92가 강사의 전체 학급 탐색을 막아 강사가 그 학급에 교재를 못 넣던 꼬임. 설정 명단 탭 **전체 학급 탐색·드릴인을 전 역할 개방**(게이트·드릴가드 제거) → 강사가 모든 학급 열람 + 과정·교재 추가/삭제(addCourseInline/rmCourse, 룰 8.96/8.97로 허용). **학급·학생 CRUD는 강사 불가 유지**(설정 명단엔 이미 없음; 학생 명단 탭=관리자 전용). 즉 강사=과목(교재)만, 매니저=학급·학생·과목 전부. 웹 v324. |
 | 8.97 | 2026-06-26 | **[룰] 강사 config/textbooks 쓰기 허용 + 전 쓰기경로 401 전수 감사**. 과목 등록 시 `_registerTbName`(addCourseInline·restoreCourse)가 전역 교재 레지스트리 `config/textbooks`에 자동 등록하는데 config 쓰기가 매니저/admin만 → 강사 401(과목은 저장돼도 교재명 레지스트리 등록 실패). `config/textbooks`에 강사 쓰기 `.write` 추가(같은 캠퍼스·활성·instructor, 비민감 이름 목록). **전수 감사 결과**: 웹 모든 fbPut/fbPatch 경로×역할 대조 완료 — 강사 쓰기 누수는 config/instructors(8.95)·classes/courses(8.96)·config/textbooks(8.97) 3건뿐이었고 전부 해소. input/obs/scores/session은 룰상 instructor 기허용, students·classes-node·config전체는 강사 UI서 제거됨, genJobs/sendJobs/agents는 본인키 소유권, 에이전트는 instructor/manager 신원으로 씀(별도 agent 계정 미사용). 잔여 누수 없음. |
 | 8.96 | 2026-06-26 | **[룰] 강사 과목(courses) 쓰기 허용 — 과목 추가/삭제 401 수정**. 과목(과정·교재)은 `classes/{classId}/courses/{subject}`에 쓰는데 `classes` 쓰기 룰이 admin/manager만이라 강사가 과목 추가/삭제 시 401(추가는 로컬만 반영→재확인 시 소실). 설계상 강사=과목등록 유지. `classes/$classId/courses`에 중첩 `.write`(활성·같은 캠퍼스·`role==='instructor'`) 추가 → 강사가 과목 등록·보관 가능. 학급 노드·group·학급 추가/삭제는 상위 `.write`(매니저/운영자)만 유지. 담당 학급 한정은 UI가 담보(전체 학급 탐색 매니저 전용). 룰 재배포·무인증 401 유지. |
 | 8.95 | 2026-06-26 | **[룰] 강사 본인 config 쓰기 허용 + super≡admin (쓰기 401 수정)**. ① **강사 설정 저장 401**: DB 잠금 후 `config` 쓰기 룰이 admin/manager만 허용 → 강사가 본인 `config/instructors/{self}`(AI 문체·프리셋·담당배정)에 저장 시 401. `config/instructors/$instructorId`에 중첩 `.write` 추가(genJobs 패턴: 활성·같은 캠퍼스·`$instructorId===본인 instructorId`) → 강사 본인 노드만 쓰기 가능. ② **운영자(super) 전체 쓰기 401**: 역할 super가 룰 어디에도 없어(admin/manager만) 로그인만 되고 students·classes·config·input 등 **모든 쓰기 거부**됐음. 모든 `role==='admin'` 검사에 `|| role==='super'`를 OR(super≡admin, 최상위) + acl `.validate` 정규식에 super 추가. `database.rules.v2.json` 재배포. 검증: 무인증 config write·acl read 여전히 401, campuses 200(과개방 없음). |
