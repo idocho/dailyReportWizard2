@@ -381,7 +381,21 @@ def _call_ai_hub(engine_type, api_key, prompt, max_tokens=300, temperature=0.5, 
             if he.code in _RETRY and _attempt < 3:
                 time.sleep(2 ** _attempt)   # 1·2·4초
                 continue
-            raise
+            # 비재시도 오류(404·400·401·403 등) — API 에러 본문을 읽어 원인 명확화.
+            # 404는 대개 모델/엔드포인트 없음(키가 해당 모델 권한 없음 포함) → 재시도 무의미, 설정 안내.
+            try:
+                body = he.read().decode('utf-8', 'replace')[:400]
+            except Exception:
+                body = ''
+            if he.code == 404:
+                hint = f"모델/엔드포인트를 찾을 수 없음 — 엔진({engine_type})·모델·API 키 권한 확인"
+            elif he.code in (401, 403):
+                hint = "API 키 인증/권한 오류 — 키 확인"
+            elif he.code == 400:
+                hint = "요청 형식 오류 — 모델명·파라미터 확인"
+            else:
+                hint = "API 오류"
+            raise RuntimeError(f"AI {he.code}: {hint}. {body}".strip()) from he
         except urllib.error.URLError as ue:   # 네트워크 일시 단절
             last_err = ue
             if _attempt < 3:
