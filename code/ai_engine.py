@@ -371,16 +371,19 @@ def _call_ai_hub(engine_type, api_key, prompt, max_tokens=300, temperature=0.5, 
         }
 
     elif engine_type == "gemini":
-        # 무료 티어. key는 헤더 아닌 쿼리파람. thinkingBudget=0 필수(출력 잘림 방지).
+        # 무료 티어(3.5-flash: 15RPM/1500RPD). key는 헤더 아닌 쿼리파람.
+        # gemini-3.x 이행(2026-07): thinkingBudget(2.5 구파라미터)→thinkingLevel 대체.
+        # 3.x는 thinking 완전 off 불가(최저 minimal) → 짧은 생성엔 minimal 고정,
+        # thinking 토큰이 maxOutputTokens를 잠식하므로 1.3배 보정(출력 잘림 방지).
         url = (f"https://generativelanguage.googleapis.com/v1beta/models/"
                f"{GEMINI_MODEL}:generateContent?key={api_key}")
         headers = {"Content-Type": "application/json"}
         body = {
             "contents": [{"parts": [{"text": prompt}]}],
             "generationConfig": {
-                "maxOutputTokens": max_tokens,
+                "maxOutputTokens": int(max_tokens * 1.3),
                 "temperature":     temperature,
-                "thinkingConfig":  {"thinkingBudget": 0},
+                "thinkingConfig":  {"thinkingLevel": "minimal"},
             },
         }
         if system:
