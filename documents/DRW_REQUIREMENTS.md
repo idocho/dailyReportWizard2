@@ -1,7 +1,7 @@
 # DailyReportWizard — 요구사항 명세서
 
 **Crafted by IDO(idocho@kakao.com) · Powered by Claude AI**  
-**문서 버전**: 9.01 · **앱 버전**: v2.5.0(정식·전면도입) · **최종 수정**: 2026-07-22
+**문서 버전**: 9.02 · **앱 버전**: v2.5.0(정식·전면도입) · **최종 수정**: 2026-07-22
 
 > Firebase 스키마 전체 명세: [DB_SCHEMA.md](DB_SCHEMA.md) (구 ClassManager에서 이관)
 
@@ -11,6 +11,7 @@
 
 | 문서 버전 | 날짜 | 주요 변경 |
 |-----------|------|-----------|
+| 9.02 | 2026-07-22 | **[에이전트] 히스토리 참조 고도화 — 맥락 반영 + 시제 구분(과거 혼입 방지)**. 9.00의 중복회피 블록에서 과거 문구의 내용이 오늘 일처럼 섞여 들어가는 사실 혼입 발견 → 블록을 `[지난 발송 이력 — 맥락 참고용 · 전부 과거 기록 · 오늘=날짜]`로 재설계. 이력을 **날짜 오름차순(과거→최근)** 제시 + 오늘 날짜 명시로 전후 관계 고정. 활용 규칙 4종: ⓐ시제 엄수(과거 언급 시 '지난 수업에서' 등 과거 표지 필수, 오늘 일처럼 서술 금지·오늘 사실은 오늘 데이터만) ⓑ맥락 연결 권장(극복·지속·변화 흐름 보이면 1문장 이내, 중심은 오늘) ⓒ과거 수치(점수·페이지) 재인용 금지(오전사 위험) ⓓ표현 중복 금지(억지 연결이면 연결 생략). 배치 필드 `최근발송문구_표현중복금지`→`지난발송이력_과거기록_맥락참고`(동일 규칙). 지침 14 문구 정합. 이력 절단 160→200자. 에이전트 0.94 exe 재빌드·clobber 교체. |
 | 9.01 | 2026-07-22 | **[에이전트] Gemini 엔진 gemini-3.5-flash 이행**. `GEMINI_MODEL` gemini-2.5-flash→**gemini-3.5-flash**(2026-05-19 GA, 무료 티어 15RPM/1500RPD 유지). 이행 대응 — 3.x는 `thinkingBudget`(2.5 구파라미터) 대신 `thinkingLevel` 체계(둘 동시 전송 시 400)이고 thinking 완전 off 불가(최저 minimal) → `thinkingConfig:{thinkingLevel:"minimal"}` 교체 + thinking 토큰의 출력 잠식 보정 `maxOutputTokens×1.3`. 에이전트 0.94 exe **동일 파일명 재빌드·릴리스 clobber 교체**(DL 링크·웹 무변경). |
 | 9.00 | 2026-07-22 | **[에이전트] AI 생성 문구 다양화 + Claude 엔진 claude-sonnet-5 이행**. ① **표현 중복 회피**: 같은 학생에 같은 태그가 반복되면 매일 비슷한 문구가 나가던 문제 — `history/{nameKey}` 최근 발송 노트 3건을 프롬프트에 주입(`[최근 발송 특이사항 — 중복 회피용]` 블록, 단건 `build_single_prompt(recent_notes=)` / 배치 target `recent`→`최근발송문구_표현중복금지` 필드). 워커 `_fetch_recent_notes`(nameKey당 1회 캐시, 실패 무해) + `generate/generate_batch(recent_provider=)`. 공통 지침 14번 신설(문장 시작 표현·구조·어휘 다양화, 상투 문구 금지, 학생 간 돌려쓰기 금지). ② **Claude 엔진**: `claude-sonnet-4-6`→`claude-sonnet-5`. 이행 대응 — sonnet-5는 temperature 등 샘플링 파라미터 400 거부(다양화는 ①의 프롬프트로 대체), thinking 생략 시 adaptive 기본이라 짧은 생성에 낭비 → `thinking:{type:"disabled"}` 명시, 신형 토크나이저(~30% 토큰 증가) 보정 `max_tokens×1.3`, GA된 `prompt-caching` 베타 헤더 제거. gemini/openai 경로는 temperature 유지(변경 없음). **에이전트 exe 재빌드·재배포 필요.** |
 | 8.99 | 2026-06-26 | **[에이전트] AI 생성 404 등 비재시도 오류 원인 표면화**. `_call_ai_hub`가 HTTP 오류를 urllib 기본 예외로 raise해 "HTTP Error 404"만 떠 원인 불명이던 것. 재시도 대상(429/5xx) 외 오류(404·400·401·403)는 **API 에러 본문을 읽어** 명확한 메시지로 raise — 404="모델/엔드포인트 없음(키 권한 포함) — 엔진·모델·키 확인", 401/403="키 인증/권한", 400="요청 형식". ※ 모델 ID 자체는 정상(claude-sonnet-4-6·gpt-4o-mini·gemini-2.5-flash 전부 현행 유효) — 404는 특정 강사 엔진/키 조합 문제이므로 메시지로 자가진단. **에이전트 exe 재빌드·재배포 필요.** |
