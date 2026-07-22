@@ -176,7 +176,12 @@ def _base_conditions() -> str:
         "성의 없게 들리는 표현 금지. 보통 수준이어도 '차분히 집중하며'·'안정적으로' 등 "
         "학습에 충실한 묘사로 대체하세요.\n"
         "13. 항상 학부모가 읽고 안심·신뢰할 수 있도록, 사실에 기반하되 건설적이고 "
-        "앞을 향한 어조로 마무리하세요."
+        "앞을 향한 어조로 마무리하세요.\n"
+        "14. 표현 다양화: 같은 학생에게 매일 비슷한 관찰 태그가 반복되더라도, 문장 시작 표현·"
+        "문장 구조·어휘를 매번 다르게 쓰세요. '오늘도', '성실하게 참여했습니다' 같은 상투 문구의 "
+        "반복 사용 금지. 같은 사실도 관찰 장면(어떤 문제에서·어떤 행동으로), 성취 과정, 변화 추이 등 "
+        "매일 다른 각도로 서술하세요. [최근 발송 특이사항] 블록이 있으면 그 문구들과 "
+        "겹치지 않는 것이 최우선입니다."
     )
 
 
@@ -189,15 +194,34 @@ _DEFAULT_STYLE_BLOCK = (
 )
 
 
+def _recent_notes_block(recent_notes):
+    """학생별 최근 발송 특이사항 [(date, note), ...] → 중복회피 프롬프트 블록.
+
+    같은 태그 반복 → 매일 비슷한 문구가 나가는 문제의 핵심 대응: 실제로 학부모에게
+    최근 발송된 문구를 보여주고 '이것과 다르게' 쓰도록 강제. 노트는 토큰 절약 위해 절단.
+    """
+    rows = [(d, (n or "").strip()) for d, n in (recent_notes or []) if (n or "").strip()]
+    if not rows:
+        return ""
+    lines = "\n".join(f"- {d}: \"{n[:160]}\"" for d, n in rows[:3])
+    return (
+        "[최근 발송 특이사항 — 중복 회피용, 사실은 위 데이터만 사용]\n"
+        f"{lines}\n"
+        "위 문구들과 문장 시작 표현·문장 구조·핵심 어휘가 겹치지 않게 새로 작성하세요. "
+        "같은 내용이라도 다른 관찰 각도(구체 행동·성취 과정·변화 추이)로 서술해야 합니다.\n\n"
+    )
+
+
 def build_single_prompt(sheet, cls, name, textbooks, student_data, progress_data,
                         existing_note, tags, tb_grade=None, style_block="",
-                        display_name=None):
+                        display_name=None, recent_notes=None):
     """단건 AI 생성용 프롬프트 조립 (v2.0 키 구조).
 
     name: nameKey(출결번호) — 데이터/태그 조회 키.
     display_name: 프롬프트 [학생 이름]에 노출할 표시 이름. 미지정 시 name 사용
         (구버전 호환). 출결번호가 이름으로 새는 것을 방지하려면 반드시 표시명 전달.
     style_block: ai_style.style_prompt_block() 결과(문체 지침+예시). 비면 기본 예시.
+    recent_notes: [(date, note), ...] 학생별 최근 발송 문구 — 표현 중복 회피 블록 주입.
     """
     _tg = tb_grade or {}
     lines = []
@@ -226,6 +250,7 @@ def build_single_prompt(sheet, cls, name, textbooks, student_data, progress_data
     )
     if tags_block:
         prompt += f"[수업 관찰 및 이벤트 정보]\n{tags_block}\n\n"
+    prompt += _recent_notes_block(recent_notes)
     if existing_note:
         prompt += (
             "[직접 작성 메모 — 반드시 반영]\n"
@@ -267,6 +292,10 @@ def build_batch_prompt(targets, style_block="", custom_block=""):
         tags_block = _build_tags_context(t.get("tags") or {})
         if tags_block:
             entry["수업관찰및이벤트"] = tags_block
+        recent = [(n or "").strip()[:160] for _, n in (t.get("recent") or [])[:3]
+                  if (n or "").strip()]
+        if recent:
+            entry["최근발송문구_표현중복금지"] = recent
         students_payload.append(entry)
 
     students_json = json.dumps(students_payload, ensure_ascii=False, indent=2)
@@ -285,6 +314,9 @@ def build_batch_prompt(targets, style_block="", custom_block=""):
         "가능하면 독립 문장으로 명확히 작성하세요.\n"
         "각 학생의 '직접작성메모_반드시반영' 필드는 교사가 직접 입력한 핵심 전달 사항이므로 "
         "최종 note에 반드시 자연스럽게 포함하세요.\n"
+        "'최근발송문구_표현중복금지' 필드가 있으면 그 문구들과 문장 시작 표현·구조·핵심 어휘가 "
+        "겹치지 않게 새로 쓰고, 학생 간에도 서로 같은 상투 문구를 돌려쓰지 마세요 — "
+        "학생마다 관찰 각도와 문장 구조를 다르게.\n"
         "⭐ 하이라이트 항목이 있으면 가장 인상적인 표현으로 강조.\n\n"
         "⚠️ 코드블록(```)·머리말·맺음말 없이, '[' 로 시작해 ']' 로 끝나는 순수 JSON 배열만 출력:\n"
         '[{"cls":"반명","name":"이름","note":"특이사항"}, ...]\n\n'
@@ -300,17 +332,20 @@ def _call_ai_hub(engine_type, api_key, prompt, max_tokens=300, temperature=0.5, 
     engine_type = engine_type.strip().lower()
 
     if engine_type == "claude":
+        # claude-sonnet-5 이행(2026-07): ① temperature 등 샘플링 파라미터 미허용(400) —
+        # 문구 다양화는 프롬프트(최근 발송 중복회피 블록·지침 14)로 대체.
+        # ② thinking 생략 시 adaptive 기본 → 짧은 생성에 토큰·지연 낭비라 명시적 disabled.
+        # ③ 신형 토크나이저(동일 텍스트 ~30% 토큰 증가) → max_tokens 1.3배 보정.
         url = "https://api.anthropic.com/v1/messages"
         headers = {
             "X-API-Key":         api_key,
             "Anthropic-Version": "2023-06-01",
-            "Anthropic-Beta":    "prompt-caching-2024-07-31",
             "Content-Type":      "application/json"
         }
         body = {
-            "model":      "claude-sonnet-4-6",
-            "max_tokens":  max_tokens,
-            "temperature": temperature,
+            "model":      "claude-sonnet-5",
+            "max_tokens":  int(max_tokens * 1.3),
+            "thinking":   {"type": "disabled"},
             "messages":    [{"role": "user", "content": prompt}]
         }
         if system:

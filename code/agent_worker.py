@@ -72,9 +72,10 @@ TONE_DIRECTIVES = {
 }
 
 
-def generate(cfg, job, ai_call=_call_ai_hub, notes_provider=None):
+def generate(cfg, job, ai_call=_call_ai_hub, notes_provider=None, recent_provider=None):
     """단건 생성 — 본인 로컬 키 + 문체(ai_style)·개별지침 적용(PC앱 gen_single 동일).
-    job['tone']로 톤 재생성. notes_provider=AUTO 말투 학습용 강사 노트 공급자."""
+    job['tone']로 톤 재생성. notes_provider=AUTO 말투 학습용 강사 노트 공급자.
+    recent_provider(nameKey)→[(date,note)] 학생별 최근 발송 문구 — 표현 중복 회피 주입."""
     engine = cfg.get("ai_engine_type", "gemini").strip().lower()
     key = cfg.get(f"{engine}_api_key", "").strip()
     if not key:
@@ -87,10 +88,15 @@ def generate(cfg, job, ai_call=_call_ai_hub, notes_provider=None):
         style_block = ai_style.style_prompt_block(guidance, examples)
     except Exception:
         style_block = ""
+    try:
+        recent = recent_provider(c["name"]) if recent_provider else []
+    except Exception:
+        recent = []
     prompt = build_single_prompt(
         c["sheet"], c["cls"], c["name"], c["textbooks"],
         c["student_data"], c["progress_data"], c["note"], c["tags"],
-        tb_grade=c["tb_grade"], style_block=style_block, display_name=c["display"])
+        tb_grade=c["tb_grade"], style_block=style_block, display_name=c["display"],
+        recent_notes=recent)
     # 톤 조절: 사실은 데이터에서, 어조만 조정. 이전 작성본 참고로 연속성 유지.
     tone = (job.get("tone") or "").strip()
     if tone in TONE_DIRECTIVES:
@@ -105,8 +111,9 @@ def generate(cfg, job, ai_call=_call_ai_hub, notes_provider=None):
     return ai_call(engine, key, prompt, max_tokens=400, temperature=0.75, system=system)
 
 
-def generate_batch(cfg, job, ai_call=_call_ai_hub, notes_provider=None):
-    """반 전체 1회 호출 생성(PC gen_all 동일) — build_batch_prompt. 반환: {nameKey: note}."""
+def generate_batch(cfg, job, ai_call=_call_ai_hub, notes_provider=None, recent_provider=None):
+    """반 전체 1회 호출 생성(PC gen_all 동일) — build_batch_prompt. 반환: {nameKey: note}.
+    recent_provider(nameKey)→[(date,note)] 학생별 최근 발송 문구 — 표현 중복 회피 주입."""
     engine = cfg.get("ai_engine_type", "gemini").strip().lower()
     key = cfg.get(f"{engine}_api_key", "").strip()
     if not key:
@@ -125,9 +132,14 @@ def generate_batch(cfg, job, ai_call=_call_ai_hub, notes_provider=None):
                 data[label] = it["value"]
             if it.get("progress") or it.get("homework"):
                 progress[label] = {"progress": it.get("progress", ""), "homework": it.get("homework", "")}
+        try:
+            recent = recent_provider(st.get("nameKey", "")) if recent_provider else []
+        except Exception:
+            recent = []
         targets.append({"sheet": "", "cls": cls, "name": st.get("displayName", ""),
                         "data": data, "progress": progress,
-                        "existing": (st.get("note") or "").strip(), "tags": st.get("tags") or {}})
+                        "existing": (st.get("note") or "").strip(), "tags": st.get("tags") or {},
+                        "recent": recent})
     if not targets:
         return {}
     try:
@@ -207,6 +219,23 @@ def _fetch_instructor_notes(db, cfg, instructor_id, token):
     return [n for _, n in rows[:40]]
 
 
+def _fetch_recent_notes(db, cfg, name_key, token, k=3):
+    """history/{nameKey} 에서 해당 학생의 최근 발송 노트 k건 — [(date, note)] 최신순.
+
+    같은 태그 반복 시 매일 비슷한 문구가 나가는 문제 대응: 프롬프트에 실제 최근
+    발송 문구를 주입해 표현 중복을 회피. 실패해도 무해(빈 리스트 → 블록 생략)."""
+    if not name_key:
+        return []
+    try:
+        days = _get(db, f"campus/{cfg['campus']}/history/{urllib.parse.quote(name_key)}", token) or {}
+    except Exception:
+        return []
+    rows = [(d, rec["note"]) for d, rec in days.items()
+            if isinstance(rec, dict) and (rec.get("note") or "").strip()]
+    rows.sort(key=lambda x: x[0], reverse=True)
+    return rows[:k]
+
+
 def process_genjobs(cfg, db, instructor_id, token=None, ai_call=_call_ai_hub):
     """본인 genJobs 큐의 queued 작업을 생성 처리. 반환: 처리 건수."""
     base = f"campus/{cfg['campus']}/genJobs/{urllib.parse.quote(instructor_id)}"
@@ -219,13 +248,20 @@ def process_genjobs(cfg, db, instructor_id, token=None, ai_call=_call_ai_hub):
         if _notes[0] is None:
             _notes[0] = _fetch_instructor_notes(db, cfg, instructor_id, token)
         return _notes[0]
+    _recent_cache = {}   # 학생별 최근 발송 문구 — nameKey당 1회 fetch 캐시
+    def _rp(nk):
+        if nk not in _recent_cache:
+            _recent_cache[nk] = _fetch_recent_notes(db, cfg, nk, token)
+        return _recent_cache[nk]
     for jid, job in pending.items():
         try:
             if job.get("batch"):
-                drafts = generate_batch(cfg, job, ai_call=ai_call, notes_provider=_np)
+                drafts = generate_batch(cfg, job, ai_call=ai_call, notes_provider=_np,
+                                        recent_provider=_rp)
                 _patch(db, f"{base}/{jid}", {"drafts": drafts, "status": "done"}, token)
             else:
-                draft = generate(cfg, job, ai_call=ai_call, notes_provider=_np)
+                draft = generate(cfg, job, ai_call=ai_call, notes_provider=_np,
+                                 recent_provider=_rp)
                 _patch(db, f"{base}/{jid}", {"draft": draft, "status": "done"}, token)
             done += 1
         except Exception as e:

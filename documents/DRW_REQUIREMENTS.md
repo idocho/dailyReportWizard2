@@ -1,7 +1,7 @@
 # DailyReportWizard — 요구사항 명세서
 
 **Crafted by IDO(idocho@kakao.com) · Powered by Claude AI**  
-**문서 버전**: 8.99 · **앱 버전**: v2.5.0(정식·전면도입) · **최종 수정**: 2026-06-26
+**문서 버전**: 9.00 · **앱 버전**: v2.5.0(정식·전면도입) · **최종 수정**: 2026-07-22
 
 > Firebase 스키마 전체 명세: [DB_SCHEMA.md](DB_SCHEMA.md) (구 ClassManager에서 이관)
 
@@ -11,6 +11,7 @@
 
 | 문서 버전 | 날짜 | 주요 변경 |
 |-----------|------|-----------|
+| 9.00 | 2026-07-22 | **[에이전트] AI 생성 문구 다양화 + Claude 엔진 claude-sonnet-5 이행**. ① **표현 중복 회피**: 같은 학생에 같은 태그가 반복되면 매일 비슷한 문구가 나가던 문제 — `history/{nameKey}` 최근 발송 노트 3건을 프롬프트에 주입(`[최근 발송 특이사항 — 중복 회피용]` 블록, 단건 `build_single_prompt(recent_notes=)` / 배치 target `recent`→`최근발송문구_표현중복금지` 필드). 워커 `_fetch_recent_notes`(nameKey당 1회 캐시, 실패 무해) + `generate/generate_batch(recent_provider=)`. 공통 지침 14번 신설(문장 시작 표현·구조·어휘 다양화, 상투 문구 금지, 학생 간 돌려쓰기 금지). ② **Claude 엔진**: `claude-sonnet-4-6`→`claude-sonnet-5`. 이행 대응 — sonnet-5는 temperature 등 샘플링 파라미터 400 거부(다양화는 ①의 프롬프트로 대체), thinking 생략 시 adaptive 기본이라 짧은 생성에 낭비 → `thinking:{type:"disabled"}` 명시, 신형 토크나이저(~30% 토큰 증가) 보정 `max_tokens×1.3`, GA된 `prompt-caching` 베타 헤더 제거. gemini/openai 경로는 temperature 유지(변경 없음). **에이전트 exe 재빌드·재배포 필요.** |
 | 8.99 | 2026-06-26 | **[에이전트] AI 생성 404 등 비재시도 오류 원인 표면화**. `_call_ai_hub`가 HTTP 오류를 urllib 기본 예외로 raise해 "HTTP Error 404"만 떠 원인 불명이던 것. 재시도 대상(429/5xx) 외 오류(404·400·401·403)는 **API 에러 본문을 읽어** 명확한 메시지로 raise — 404="모델/엔드포인트 없음(키 권한 포함) — 엔진·모델·키 확인", 401/403="키 인증/권한", 400="요청 형식". ※ 모델 ID 자체는 정상(claude-sonnet-4-6·gpt-4o-mini·gemini-2.5-flash 전부 현행 유효) — 404는 특정 강사 엔진/키 조합 문제이므로 메시지로 자가진단. **에이전트 exe 재빌드·재배포 필요.** |
 | 8.98 | 2026-06-26 | **강사 전체 학급 열람·과목 관리 허용 (8.92 부분 환원) — 교재 없는 학급 배정 불가 해소**. 교재(과목)가 없는 학급은 배정 자체가 불가(담당=class+subject)한데, 8.92가 강사의 전체 학급 탐색을 막아 강사가 그 학급에 교재를 못 넣던 꼬임. 설정 명단 탭 **전체 학급 탐색·드릴인을 전 역할 개방**(게이트·드릴가드 제거) → 강사가 모든 학급 열람 + 과정·교재 추가/삭제(addCourseInline/rmCourse, 룰 8.96/8.97로 허용). **학급·학생 CRUD는 강사 불가 유지**(설정 명단엔 이미 없음; 학생 명단 탭=관리자 전용). 즉 강사=과목(교재)만, 매니저=학급·학생·과목 전부. 웹 v324. |
 | 8.97 | 2026-06-26 | **[룰] 강사 config/textbooks 쓰기 허용 + 전 쓰기경로 401 전수 감사**. 과목 등록 시 `_registerTbName`(addCourseInline·restoreCourse)가 전역 교재 레지스트리 `config/textbooks`에 자동 등록하는데 config 쓰기가 매니저/admin만 → 강사 401(과목은 저장돼도 교재명 레지스트리 등록 실패). `config/textbooks`에 강사 쓰기 `.write` 추가(같은 캠퍼스·활성·instructor, 비민감 이름 목록). **전수 감사 결과**: 웹 모든 fbPut/fbPatch 경로×역할 대조 완료 — 강사 쓰기 누수는 config/instructors(8.95)·classes/courses(8.96)·config/textbooks(8.97) 3건뿐이었고 전부 해소. input/obs/scores/session은 룰상 instructor 기허용, students·classes-node·config전체는 강사 UI서 제거됨, genJobs/sendJobs/agents는 본인키 소유권, 에이전트는 instructor/manager 신원으로 씀(별도 agent 계정 미사용). 잔여 누수 없음. |
