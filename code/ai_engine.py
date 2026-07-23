@@ -389,10 +389,12 @@ def _call_ai_hub(engine_type, api_key, prompt, max_tokens=300, temperature=0.5, 
         }
 
     elif engine_type == "gemini":
-        # 무료 티어(3.5-flash: 15RPM/1500RPD). key는 헤더 아닌 쿼리파람.
-        # gemini-3.x 이행(2026-07): thinkingBudget(2.5 구파라미터)→thinkingLevel 대체.
-        # 3.x는 thinking 완전 off 불가(최저 minimal) → 짧은 생성엔 minimal 고정,
-        # thinking 토큰이 maxOutputTokens를 잠식하므로 1.3배 보정(출력 잘림 방지).
+        # 무료 티어. key는 헤더 아닌 쿼리파람.
+        # gemini-3.5-flash (2026-07-22 실콜 검증: 단일·6연속 200, 프로덕션 구성 정상):
+        # - 3.x는 thinkingLevel 체계(thinkingBudget과 병행 시 400·off 불가 → minimal 고정)
+        # - thinking 토큰의 출력 잠식 보정 maxOutputTokens×1.3
+        # - 무료 쿼터는 키(프로젝트)별 상이 — 순간 429는 아래 _RETRY 백오프(1·2·4s)가 흡수.
+        #   2.5 계열은 신규 사용자 차단 진행 중(2.5-flash-lite 404 확인)이라 회귀 금지.
         url = (f"https://generativelanguage.googleapis.com/v1beta/models/"
                f"{GEMINI_MODEL}:generateContent?key={api_key}")
         headers = {"Content-Type": "application/json"}
