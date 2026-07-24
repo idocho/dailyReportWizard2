@@ -32,7 +32,7 @@ AI_ENGINE_LABELS = {
 }
 
 # Gemini 기본 모델 (무료·stable). 교체 시 이 한 줄만 수정.
-GEMINI_MODEL = "gemini-3.5-flash"
+GEMINI_MODEL = "gemini-flash-latest"
 
 # ── 색상 (미니멀·프로 디자인 시스템, v2.1.0 리뉴얼) ──────────────────
 BG       = "#FAFAFB"

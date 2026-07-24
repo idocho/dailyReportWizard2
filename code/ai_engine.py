@@ -420,11 +420,13 @@ def _call_ai_hub(engine_type, api_key, prompt, max_tokens=300, temperature=0.5, 
 
     elif engine_type == "gemini":
         # 무료 티어. key는 헤더 아닌 쿼리파람.
-        # gemini-3.5-flash (2026-07-22 실콜 검증: 단일·6연속 200, 프로덕션 구성 정상):
-        # - 3.x는 thinkingLevel 체계(thinkingBudget과 병행 시 400·off 불가 → minimal 고정)
-        # - thinking 토큰의 출력 잠식 보정 maxOutputTokens×1.3
-        # - 무료 쿼터는 키(프로젝트)별 상이 — 순간 429는 아래 _RETRY 백오프(1·2·4s)가 흡수.
-        #   2.5 계열은 신규 사용자 차단 진행 중(2.5-flash-lite 404 확인)이라 회귀 금지.
+        # 기본 GEMINI_MODEL=gemini-flash-latest (2026-07-24 채택):
+        # - 특정 모델(gemini-3.5-flash) 무료 트래픽 상시 혼잡으로 지속 503 → 구글 관리 별칭으로
+        #   전환(가용 모델 자동 라우팅). 실콜 품질 비교서 자연어·형식·규칙준수 최상.
+        # - 3.x는 thinkingLevel 체계(minimal). thinking 토큰 출력 잠식 보정 maxOutputTokens×1.3.
+        # - 별칭이 향후 thinkingLevel 미지원 모델로 이동할 위험 대비: 아래 요청 루프에서
+        #   'thinking 관련 400' 발생 시 thinkingConfig 제거 후 1회 재시도(gemini_no_think 플래그).
+        # - 순간 503/429는 _RETRY 백오프(1·2·4s)가 흡수. 2.5 계열은 신규 사용자 차단 진행 중이라 회귀 금지.
         url = (f"https://generativelanguage.googleapis.com/v1beta/models/"
                f"{GEMINI_MODEL}:generateContent?key={api_key}")
         headers = {"Content-Type": "application/json"}
@@ -459,8 +461,10 @@ def _call_ai_hub(engine_type, api_key, prompt, max_tokens=300, temperature=0.5, 
     # Gemini 무료티어는 503 "overloaded"가 잦아 재시도로 대부분 해소.
     _RETRY = {429, 500, 502, 503, 504}
     last_err = None
+    _gem_stripped = False   # gemini 별칭 thinkingLevel 미지원 이동 대비 — 1회 무-thinking 재시도
     _n = max(1, int(retries))
-    for _attempt in range(_n):
+    _attempt = 0
+    while _attempt < _n:
         try:
             with urllib.request.urlopen(req, timeout=40) as r:
                 resp = json.loads(r.read().decode('utf-8'))
@@ -469,6 +473,7 @@ def _call_ai_hub(engine_type, api_key, prompt, max_tokens=300, temperature=0.5, 
             last_err = he
             if he.code in _RETRY and _attempt < _n - 1:
                 time.sleep(2 ** _attempt)   # 1·2·4초
+                _attempt += 1
                 continue
             # 비재시도 오류(404·400·401·403 등) — API 에러 본문을 읽어 원인 명확화.
             # 404는 대개 모델/엔드포인트 없음(키가 해당 모델 권한 없음 포함) → 재시도 무의미, 설정 안내.
@@ -476,6 +481,17 @@ def _call_ai_hub(engine_type, api_key, prompt, max_tokens=300, temperature=0.5, 
                 body = he.read().decode('utf-8', 'replace')[:400]
             except Exception:
                 body = ''
+            # gemini 별칭(flash-latest)이 thinkingLevel 미지원 모델로 이동한 경우:
+            # 400 + 본문에 'thinking' 언급 → thinkingConfig 제거 후 1회 재시도(추가 시도 소비 없음).
+            if (engine_type == "gemini" and he.code == 400 and not _gem_stripped
+                    and "thinking" in body.lower()):
+                _gem_stripped = True
+                body_dict = json.loads(req.data.decode('utf-8'))
+                body_dict.get("generationConfig", {}).pop("thinkingConfig", None)
+                req = urllib.request.Request(
+                    url, data=json.dumps(body_dict, ensure_ascii=False).encode('utf-8'),
+                    headers=headers, method='POST')
+                continue   # _attempt 미증가 — 파라미터 교정 재시도 1회 보장
             if he.code == 404:
                 hint = f"모델/엔드포인트를 찾을 수 없음 — 엔진({engine_type})·모델·API 키 권한 확인"
             elif he.code in (401, 403):
@@ -489,6 +505,7 @@ def _call_ai_hub(engine_type, api_key, prompt, max_tokens=300, temperature=0.5, 
             last_err = ue
             if _attempt < _n - 1:
                 time.sleep(2 ** _attempt)
+                _attempt += 1
                 continue
             raise
     else:
@@ -502,6 +519,15 @@ def _call_ai_hub(engine_type, api_key, prompt, max_tokens=300, temperature=0.5, 
         if not cands:
             # safety filter 등으로 후보 없음
             raise RuntimeError(f"Gemini 빈 응답: {json.dumps(resp, ensure_ascii=False)[:300]}")
-        return cands[0]['content']['parts'][0]['text'].strip()
+        # flash-latest(이동 별칭)가 parts 없는 후보를 줄 수 있음(thinking-only·MAX_TOKENS·안전필터).
+        # 원시 KeyError 대신 finishReason 포함 명확한 메시지로 표면화.
+        c0 = cands[0]
+        parts = (c0.get('content') or {}).get('parts') or []
+        texts = [p.get('text', '') for p in parts if p.get('text')]
+        if not texts:
+            fr = c0.get('finishReason', '?')
+            raise RuntimeError(f"Gemini 텍스트 없음(finishReason={fr}) — 재시도 권장. "
+                               f"{json.dumps(resp, ensure_ascii=False)[:200]}")
+        return "".join(texts).strip()
     else:
         return resp['choices'][0]['message']['content'].strip()
