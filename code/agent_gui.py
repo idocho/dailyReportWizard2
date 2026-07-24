@@ -27,7 +27,7 @@ except Exception:
     _HAS_TRAY = False   # pystray 미설치/실패 → 트레이 비활성(일반 창으로 동작)
 
 INDIGO, INK, GREEN, RED, SUB = "#4F46E5", "#15171F", "#16A34A", "#DC2626", "#94A3B8"
-AGENT_VERSION = "0.94"
+AGENT_VERSION = "0.95"
 # 캠퍼스 표시명 → id (app.py / 웹 게이트와 동일 정본). 캠퍼스 추가 시 여기만 갱신.
 CAMPUS = {"동수원": "dongsuwon"}
 _Q = queue.Queue()
@@ -148,6 +148,13 @@ class AgentGUI:
         self._eng_keys = {x: e.get(f"{x}_api_key", "") for x in AI_ENGINE_ORDER}
         self._key_eng = cur_eng
         row("개인 API 키 (엔진별 개별 저장)", "_api_key", self._eng_keys.get(cur_eng, ""), show="•")
+        # 키 유효성 실콜 검증 — 초소형 생성 1회로 인증/쿼터/모델 상태 즉시 판별
+        kt = tk.Frame(frm, bg=INK); kt.pack(fill="x", pady=(4, 0))
+        tk.Button(kt, text="🔑 키 테스트", command=self._test_key, bg="#334155", fg="#fff",
+                  relief="flat", font=("맑은 고딕", 9), cursor="hand2").pack(side="left", ipadx=6)
+        self.keytest_var = tk.StringVar(value="")
+        tk.Label(kt, textvariable=self.keytest_var, bg=INK, fg=SUB,
+                 font=("맑은 고딕", 9), anchor="w").pack(side="left", padx=(8, 0), fill="x", expand=True)
         row("웹 로그인 비밀번호 (DB 보안 전환 대비)", "login_password",
             e.get("login_password", ""), show="•")
         row('카톡 방 접두사 (예: "오직 ")', "roomPrefix", e.get("roomPrefix", ""))
@@ -157,6 +164,24 @@ class AgentGUI:
                        bg=INK, fg="#cbd5e1", selectcolor=INK, activebackground=INK,
                        font=("맑은 고딕", 9)).pack(anchor="w", pady=(8, 0))
         # (저장 버튼은 위에서 하단 고정으로 배치됨)
+
+    def _test_key(self):
+        """현재 입력칸 키를 선택 엔진으로 실콜 검증(스레드) — 결과를 버튼 옆 라벨에 표시."""
+        eng = self._eng_id()
+        key = self.vars["_api_key"].get().strip()
+        if not key:
+            self.keytest_var.set("키를 먼저 입력하세요")
+            return
+        self.keytest_var.set("검증 중…")
+
+        def run():
+            try:
+                import ai_engine
+                ok, msg = ai_engine.validate_key(eng, key)
+            except Exception as ex:
+                ok, msg = False, "검증 오류: " + str(ex)[:60]
+            self.root.after(0, lambda: self.keytest_var.set(msg))
+        threading.Thread(target=run, daemon=True).start()
 
     def _eng_id(self):
         lbl = self.eng_var.get()

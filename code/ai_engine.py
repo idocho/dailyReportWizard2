@@ -345,8 +345,38 @@ def build_batch_prompt(targets, style_block="", custom_block=""):
 
 
 # ── 멀티 엔진 API 허브 (직관적 선택형 분기) ───────────────────────────
-def _call_ai_hub(engine_type, api_key, prompt, max_tokens=300, temperature=0.5, system=""):
-    """설정창에서 선택된 특정 AI 엔진 규격에 맞추어 통신을 처리합니다."""
+def validate_key(engine_type, api_key):
+    """API 키 유효성 실콜 검증 — 초소형 생성으로 키 상태 판별.
+
+    반환: (ok: bool, msg: str). 설정창 '키 테스트' 버튼용.
+    - 503/500/502/504: 서버 일시 과부하 → 키 무효 아님. 검증엔 짧은 재시도(2회, 1s 백오프)로
+      순간 과부하 흡수, 그래도 지속되면 '키 상태 불명(서버 과부하)'로 별도 안내.
+    - 429: 키는 유효하나 쿼터 제한(무료 일일 쿼터는 태평양 자정=KST 오후 4~5시 리셋).
+    """
+    if not (api_key or "").strip():
+        return False, "키가 비어 있습니다"
+    try:
+        _call_ai_hub(engine_type, api_key.strip(), "1", max_tokens=8, retries=2)
+        return True, "✅ 유효 — 호출 성공"
+    except Exception as e:
+        s = str(e)
+        if "401" in s or "403" in s:
+            return False, "❌ 인증 실패 — 키 값 또는 권한 확인"
+        if "429" in s:
+            return False, "⚠️ 쿼터 제한 — 키는 유효, 무료 한도 소진(KST 오후 4~5시 리셋)"
+        if any(c in s for c in ("503", "500", "502", "504")):
+            return False, "⚠️ 서버 일시 과부하 — 키 무효 아님, 잠시 후 다시 테스트"
+        if "404" in s:
+            return False, "❌ 모델 접근 불가 — 이 키의 프로젝트에서 현재 모델 미지원"
+        if "400" in s:
+            return False, "❌ 요청 거부(400) — 키 형식/엔진 선택 확인"
+        return False, "❌ 실패: " + s[:80]
+
+
+def _call_ai_hub(engine_type, api_key, prompt, max_tokens=300, temperature=0.5, system="",
+                 retries=4):
+    """설정창에서 선택된 특정 AI 엔진 규격에 맞추어 통신을 처리합니다.
+    retries: 일시 오류(429/5xx) 총 시도 횟수 — 키 검증 등 즉답 용도는 1."""
     engine_type = engine_type.strip().lower()
 
     if engine_type == "claude":
@@ -429,14 +459,15 @@ def _call_ai_hub(engine_type, api_key, prompt, max_tokens=300, temperature=0.5, 
     # Gemini 무료티어는 503 "overloaded"가 잦아 재시도로 대부분 해소.
     _RETRY = {429, 500, 502, 503, 504}
     last_err = None
-    for _attempt in range(4):
+    _n = max(1, int(retries))
+    for _attempt in range(_n):
         try:
             with urllib.request.urlopen(req, timeout=40) as r:
                 resp = json.loads(r.read().decode('utf-8'))
             break
         except urllib.error.HTTPError as he:
             last_err = he
-            if he.code in _RETRY and _attempt < 3:
+            if he.code in _RETRY and _attempt < _n - 1:
                 time.sleep(2 ** _attempt)   # 1·2·4초
                 continue
             # 비재시도 오류(404·400·401·403 등) — API 에러 본문을 읽어 원인 명확화.
@@ -456,7 +487,7 @@ def _call_ai_hub(engine_type, api_key, prompt, max_tokens=300, temperature=0.5, 
             raise RuntimeError(f"AI {he.code}: {hint}. {body}".strip()) from he
         except urllib.error.URLError as ue:   # 네트워크 일시 단절
             last_err = ue
-            if _attempt < 3:
+            if _attempt < _n - 1:
                 time.sleep(2 ** _attempt)
                 continue
             raise
