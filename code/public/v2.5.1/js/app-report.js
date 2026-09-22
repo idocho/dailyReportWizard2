@@ -94,7 +94,13 @@ function _subjLabel(gs, subject){
   gs = (gs || '').trim();
   return (gs && !subject.startsWith(gs + ' ')) ? `${gs} ${subject}` : subject;
 }
+// 메시지 표시 전용: 동명이인 식별용 끝 숫자만 제거. 수신자 이름·nameKey는 원본 유지.
+function _messageName(name){
+  const full = String(name || '').trim();
+  return full.replace(/[0-9]+$/, '').trimEnd() || full;
+}
 function _nickSuffix(full){
+  full = _messageName(full);
   const nick = full.length > 1 ? full.slice(1) : full;
   const c = nick.charCodeAt(nick.length - 1);
   return (c >= 0xAC00 && c <= 0xD7A3 && (c - 0xAC00) % 28 !== 0) ? nick + '이는' : nick + '는';
@@ -114,7 +120,12 @@ function _rpData(classId, nk){
     const pd = progressData[`${classId}|${sub}`] || {};
     const ex = _excludeProg.has(`${classId}|${sub}`);   // 발송 제외 → 그 교재의 진도·과제·수행도 전부 빈값(메시지·생성 동시 제외)
     classInfo[sub] = { progress: ex ? '' : (pd.progress || ''), homework: ex ? '' : (pd.homework || '') };
-    assignMap[sub] = ex ? '' : _assignText((getTags(classId, nk, sub) || {}).assign_grade);
+    // 과제 수행도: 직접입력(assign_note)이 있으면 그 문구가 최우선 — 버튼 등급(assign_grade)
+    // 라벨은 직접입력이 없을 때만 폴백으로 사용. 메시지("▶ 과제 수행도")·AI 프롬프트(items[].value)
+    // 둘 다 이 값을 그대로 쓰므로 실제 최종 메시지에 확정 반영됨.
+    const gt = getTags(classId, nk, sub) || {};
+    const customNote = (gt.assign_note || '').trim();
+    assignMap[sub] = ex ? '' : (customNote || _assignText(gt.assign_grade));
     tbGrade[sub] = courses[sub].curriculum || '';
   });
   return { subjects, classInfo, assignMap, tbGrade };
@@ -157,11 +168,11 @@ function _saveDraft(nk, val){
 
 // ── 에이전트 실행 감지 + 미실행 시 설치 안내 ──────────────────────────
 // 에이전트가 agents/{id}.ts(ms) 하트비트를 ~15s마다 기록 → 90s 이내면 살아있음
-const AGENT_DL = 'https://github.com/idocho/dailyReportWizard2/releases/download/agent/DRW-AI-Agent-0.97.exe';
+const AGENT_DL = 'https://github.com/idocho/dailyReportWizard2/releases/download/agent/DRW-AI-Agent-0.99.exe';
 let _rpPending = null;
 async function _agentAlive(){
   try{ const a = await fbGet(`agents/${instructor.id}`); return !!(a && a.ts && Date.now() - a.ts < 90000); }
-  catch(_){ return false; }
+  catch(_){ return null; } // 조회 실패는 종료 확인이 아님
 }
 function _agentGuide(proceed){
   _rpPending = proceed || null;
@@ -314,7 +325,7 @@ function _genCtx(classId, nk, name){
   }));
   // obs 태그 병합(과제수행도 제외 — value로 전달). 발송 제외 교재는 관찰 태그도 제외(교재 단위 일관)
   const tags = {};
-  d.subjects.forEach(sub => { if(_excludeProg.has(`${classId}|${sub}`)) return; const t = { ...(getTags(classId, nk, sub) || {}) }; delete t.assign_grade; Object.assign(tags, t); });
+  d.subjects.forEach(sub => { if(_excludeProg.has(`${classId}|${sub}`)) return; const t = { ...(getTags(classId, nk, sub) || {}) }; delete t.assign_grade; delete t.assign_note; Object.assign(tags, t); });
   const job = {
     nameKey: nk, cls: classId, displayName: name, sheet: '',
     items, tags, note: _readNote(nk) || '',
@@ -428,21 +439,47 @@ function toggleJobDetail(id){
   if(_rpJobDetailOpen.has(id)) _rpJobDetailOpen.delete(id); else _rpJobDetailOpen.add(id);
   loadReportJobs();
 }
+const _STALE_JOB_ERROR = '에이전트 응답 없음(강제 종료 추정) — 자동 정리됨';
+async function _reconcileSendJob(id, agentAlive){
+  const path = `sendJobs/${instructor.id}/${id}`;
+  const response = await _fbReq(path, { headers: { 'X-Firebase-ETag': 'true' } });
+  if(!response.ok) throw new Error('전송 상태 조회 실패');
+  const job = await response.json();
+  if(!job) return null;
+  const autoError = job.status === 'error' && job.error === _STALE_JOB_ERROR;
+  if(job.status !== 'sending' && !autoError) return job;
+  const recs = job.recipients || [];
+  const complete = recs.length > 0 && recs.every(r => r && r.status === '완료');
+  let next;
+  if(complete){
+    next = { ...job, status: 'done', fail: 0 };
+    if(next.error === _STALE_JOB_ERROR) delete next.error;
+  }else if(job.status === 'sending' && agentAlive === false){
+    next = { ...job, status: 'error', error: _STALE_JOB_ERROR };
+  }else return job;
+  const etag = response.headers.get('ETag');
+  if(!etag) return job; // 조건부 갱신 불가 시 쓰기 생략
+  const saved = await _fbReq(path, { method: 'PUT',
+    headers: { 'Content-Type': 'application/json', 'if-match': etag }, body: JSON.stringify(next) });
+  if(saved.status === 412) return fbGet(path); // 에이전트 갱신·삭제 우선
+  if(!saved.ok) throw new Error('전송 상태 저장 실패');
+  return next;
+}
 async function loadReportJobs(){
   if(activeTab !== 'report' && activeTab !== 'bulk'){ clearInterval(_rpJobTimer); return; }
   let jobs = {};
   try{ jobs = await fbGet(`sendJobs/${instructor.id}`) || {}; }catch(e){ return; }
-  // 유령 작업 자동 정리 — 에이전트 프로세스가 강제종료·PC재부팅 등으로 죽으면
-  // agent_worker.py의 finally 블록 자체가 못 돌아 job.status='sending'이 영구 고정됨
-  // (취소 눌러도 cancel 플래그만 서고 아무도 안 읽어 "중단 중…"도 영구 고정 — 삭제 버튼도
-  // done/canceled/error만 대상이라 안 지워짐). 에이전트 하트비트(90s) 죽었는데 아직
-  // sending인 job은 죽은 작업으로 간주해 error로 전환 → 기존 삭제 버튼 대상에 자연 편입.
-  const stuck = Object.entries(jobs).filter(([, j]) => j && j.status === 'sending');
-  if(stuck.length && !(await _agentAlive())){
-    const errMsg = '에이전트 응답 없음(강제 종료 추정) — 자동 정리됨';
-    await Promise.all(stuck.map(([id]) =>
-      fbPatch(`sendJobs/${instructor.id}/${id}`, { status: 'error', error: errMsg }).catch(() => {})));
-    stuck.forEach(([id]) => { jobs[id] = { ...jobs[id], status: 'error', error: errMsg }; });
+  // 오래된 조회 결과로 완료 상태를 덮어쓰지 않도록 ETag 조건부 갱신.
+  const candidates = Object.entries(jobs).filter(([, j]) => j &&
+    (j.status === 'sending' || (j.status === 'error' && j.error === _STALE_JOB_ERROR)));
+  if(candidates.length){
+    const alive = await _agentAlive();
+    await Promise.all(candidates.map(async ([id]) => {
+      try{
+        const current = await _reconcileSendJob(id, alive);
+        if(current) jobs[id] = current; else delete jobs[id];
+      }catch(_){} // 조회·저장 실패 시 로컬 상태도 오류로 조작하지 않음
+    }));
   }
   const arr = Object.entries(jobs).sort((x, y) => (y[1].ts || 0) - (x[1].ts || 0)).slice(0, 6);
   const hasDone = Object.values(jobs).some(j => j && (j.status === 'done' || j.status === 'canceled' || j.status === 'error'));
@@ -509,18 +546,20 @@ async function clearDoneJobs(){
 //  일괄 공지 전송 (PC _build_bulk_tab 이식) — 템플릿 메시지를 담당 학생에게 일괄
 // ══════════════════════════════════════════════════════════════════════
 let _bulkSel = new Set(), _bulkImg = null, _bulkImgName = '';
+let _bulkTabFresh = true;   // true일 때만 renderBulk가 전체선택으로 리셋 (goNav가 탭 진입 시 세팅)
 function _bulkRender(tmpl, name, cls){
   const d = new Date();
-  return String(tmpl || '').replace(/\{이름\}/g, name || '').replace(/\{반\}/g, cls || '')
+  return String(tmpl || '').replace(/\{이름\}/g, () => _messageName(name)).replace(/\{반\}/g, cls || '')
     .replace(/\{날짜\}/g, `${d.getMonth() + 1}/${d.getDate()}`);
 }
 function renderBulk(mc){
   renderMhdr('일괄 공지');
   if(!config){ mc.innerHTML = makeTb('일괄 공지') + `<div class="empty">⚙️ 설정 후 이용하세요.</div>`; return; }
   if(!(instructor?.assignments || []).length){ mc.innerHTML = makeTb('일괄 공지') + `<div class="empty">설정 → 담당 수업을 추가해 주세요.</div>`; return; }
-  // 진입 시 기본 전체선택 → 예외만 해제(CM 일괄전송과 조작감 통일)
+  // 진입 시 기본 전체선택 → 예외만 해제(CM 일괄전송과 조작감 통일). 탭 내부 재렌더(폴드 토글·이미지 첨부 등)에선 기존 선택 유지
   const valid = _allMyStudents();
-  _bulkSel = new Set(Object.keys(valid));
+  if(_bulkTabFresh){ _bulkSel = new Set(Object.keys(valid)); _bulkTabFresh = false; }
+  else { [..._bulkSel].forEach(nk => { if(!valid[nk]) _bulkSel.delete(nk); }); }
   const tmpl = (typeof _bulkTmplCache === 'string') ? _bulkTmplCache : '';
   const tmplOpts = _bulkTemplates().map(t => `<option value="${esc(t.name)}">${esc(t.name)}</option>`).join('');
   const imgPv = _bulkImg ? `<div class="rp-imgpv"><img src="${_bulkImg}"><span>${esc(_bulkImgName)}</span><button class="rp-btn ghost" onclick="bulkClearImg()">제거</button><label class="rp-imgopt"><input type="checkbox" id="bulk-imgfirst">이미지 먼저</label></div>` : '';

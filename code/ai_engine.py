@@ -11,7 +11,7 @@ import urllib.error
 # 외부(main.py)에서 주입 가능한 디버그 플래그 (기본: 비활성)
 DEBUG_AI_PROMPT: bool = False
 
-from constants import GEMINI_MODEL, grade_label
+from constants import GEMINI_MODEL, OPENAI_MODEL, grade_label
 import ai_style
 
 def dprint(*args, **kwargs):
@@ -346,17 +346,19 @@ def build_batch_prompt(targets, style_block="", custom_block=""):
 
 # ── 멀티 엔진 API 허브 (직관적 선택형 분기) ───────────────────────────
 def validate_key(engine_type, api_key):
-    """API 키 유효성 실콜 검증 — 초소형 생성으로 키 상태 판별.
+    """API 키 유효성 실콜 검증 — 소형 생성으로 키 상태 판별.
 
     반환: (ok: bool, msg: str). 설정창 '키 테스트' 버튼용.
-    - 503/500/502/504: 서버 일시 과부하 → 키 무효 아님. 검증엔 짧은 재시도(2회, 1s 백오프)로
-      순간 과부하 흡수, 그래도 지속되면 '키 상태 불명(서버 과부하)'로 별도 안내.
+    - 프로브 토큰은 넉넉히(64): thinking(gemini flash-latest·GPT reasoning)이 초소형 예산을
+      먹고 MAX_TOKENS·텍스트 없음으로 끝나 유효한 키가 오판되던 문제 방지.
+    - HTTP 200 도달 후의 '텍스트 없음/MAX_TOKENS'은 인증·라우팅 성공(=키 유효)이므로 성공 처리.
+    - 503/500/502/504: 서버 일시 과부하 → 키 무효 아님(재시도 2회로 순간 과부하 흡수).
     - 429: 키는 유효하나 쿼터 제한(무료 일일 쿼터는 태평양 자정=KST 오후 4~5시 리셋).
     """
     if not (api_key or "").strip():
         return False, "키가 비어 있습니다"
     try:
-        _call_ai_hub(engine_type, api_key.strip(), "1", max_tokens=8, retries=2)
+        _call_ai_hub(engine_type, api_key.strip(), "안녕", max_tokens=64, retries=2)
         return True, "✅ 유효 — 호출 성공"
     except Exception as e:
         s = str(e)
@@ -368,6 +370,11 @@ def validate_key(engine_type, api_key):
             return False, "⚠️ 서버 일시 과부하 — 키 무효 아님, 잠시 후 다시 테스트"
         if "404" in s:
             return False, "❌ 모델 접근 불가 — 이 키의 프로젝트에서 현재 모델 미지원"
+        # HTTP 200 이후 파서 단계 오류(텍스트 없음·MAX_TOKENS·빈 응답)는 요청이 인증되고
+        # 모델까지 도달했다는 뜻 → 키는 유효. 출력이 짧아 잘렸을 뿐이므로 성공으로 판정.
+        if ("텍스트 없음" in s or "finishReason" in s or "빈 응답" in s
+                or "MAX_TOKENS" in s):
+            return True, "✅ 유효 — 호출 성공(출력 짧음)"
         if "400" in s:
             return False, "❌ 요청 거부(400) — 키 형식/엔진 선택 확인"
         return False, "❌ 실패: " + s[:80]
@@ -402,6 +409,14 @@ def _call_ai_hub(engine_type, api_key, prompt, max_tokens=300, temperature=0.5, 
             ]
 
     elif engine_type == "openai":
+        # 기본 OPENAI_MODEL=gpt-5.6-luna (2026-08 채택, gpt-4o-mini 공식 후속·GA·저가형):
+        # - Chat Completions 엔드포인트 그대로 유지(Responses API 미전환) — 최소 변경으로
+        #   안정성 확보, 스키마·엔드포인트 재작성 리스크 회피.
+        # - gpt-5.6 계열은 max_tokens 대신 max_completion_tokens, temperature 미지원(제거).
+        # - reasoning_effort="none": 짧은 리포트에 불필요한 추론 토큰·지연 방지
+        #   (gemini thinkingLevel minimal·claude thinking disabled와 동일 취지).
+        # - 실측 비교(8케이스×2회, 2026-08): 4o-mini 평균 129자(목표 100자 초과 잦음·상투구
+        #   반복) vs luna 평균 91자(분량 안정·구체적 서술). 규칙 위반은 둘 다 0.
         url = "https://api.openai.com/v1/chat/completions"
         headers = {
             "Content-Type":  "application/json",
@@ -412,10 +427,10 @@ def _call_ai_hub(engine_type, api_key, prompt, max_tokens=300, temperature=0.5, 
             messages.append({"role": "system", "content": system})
         messages.append({"role": "user", "content": prompt})
         body = {
-            "model":       "gpt-4o-mini",
-            "messages":    messages,
-            "max_tokens":  max_tokens,
-            "temperature": temperature
+            "model":                 OPENAI_MODEL,
+            "messages":              messages,
+            "max_completion_tokens": max_tokens,
+            "reasoning_effort":      "none",
         }
 
     elif engine_type == "gemini":

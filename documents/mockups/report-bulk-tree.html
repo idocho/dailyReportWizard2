@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<!-- 목업(미승인): 리포트·일괄공지 통합 — 디렉토리 트리 레일(반→학생, 오늘 수업 전체). FHD 풀폭. -->
+<html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>리포트·일괄 통합 트리 목업</title>
+<style>
+:root{--bg:#F6F7FB;--panel:#fff;--panel2:#F7F8FB;--border:#ECEDF2;--line:#F2F3F7;
+ --ind:#4F46E5;--ind-ink:#4338CA;--ind-l:#EEF0FF;--gray:#9AA1AE;--txt:#1A1C23;--sub:#646B7A;
+ --pos-b:#ECFDF5;--pos-t:#047857;--pos-l:#A7F3D0;--warn-b:#FFFBEB;--warn-t:#B45309;--ash-b:#F1F4F8;}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Pretendard','Malgun Gothic',sans-serif;background:var(--bg);color:var(--txt);font-size:14px;letter-spacing:-.011em}
+.top{height:56px;background:var(--panel);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;padding:0 18px}
+.seg{display:flex;background:var(--panel2);border:1px solid var(--border);border-radius:10px;overflow:hidden}
+.seg button{padding:8px 16px;border:none;background:transparent;font-size:13px;font-weight:700;cursor:pointer;color:var(--sub)}
+.seg button.on{background:var(--ind);color:#fff}
+.chip-ro{font-size:12px;color:var(--sub);margin-left:4px}.chip-ro b{color:var(--ind-ink)}
+.btn{padding:9px 15px;border-radius:10px;border:1px solid var(--border);background:var(--panel);font-size:12.5px;font-weight:700;cursor:pointer}
+.btn.p{background:var(--ind);color:#fff;border-color:var(--ind)}
+.grid{display:grid;grid-template-columns:240px minmax(0,1fr) 360px 200px;gap:12px;padding:14px;height:calc(100vh - 56px)}
+.col{background:var(--panel);border:1px solid var(--border);border-radius:14px;display:flex;flex-direction:column;overflow:hidden}
+.col-h{padding:11px 14px;font-size:11px;font-weight:700;color:var(--sub);border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center}
+.col-h b{color:var(--ind-ink)}
+.scroll{overflow-y:auto;flex:1}
+/* 트리 */
+.cls{border-bottom:1px solid var(--line)}
+.cls-h{display:flex;align-items:center;gap:7px;padding:9px 12px;cursor:pointer;background:var(--panel2);font-size:12.5px;font-weight:700}
+.cls-h .arw{font-size:10px;color:var(--gray);width:10px}
+.cls-h .cnt{margin-left:auto;font-size:10px;font-weight:700;color:var(--ind-ink);background:var(--ind-l);border-radius:8px;padding:1px 7px}
+.cls-h .today{font-size:9px;font-weight:800;color:var(--pos-t);background:var(--pos-b);border:1px solid var(--pos-l);border-radius:7px;padding:1px 6px}
+.stu{display:flex;align-items:center;gap:8px;padding:8px 12px 8px 26px;cursor:pointer;border-left:3px solid transparent;font-size:13px}
+.stu:hover{background:var(--panel2)}
+.stu.on{background:var(--ind-l);border-left-color:var(--ind)}
+.stu .nm{flex:1;font-weight:600}
+.bd{font-size:9px;font-weight:800;padding:1px 6px;border-radius:7px}
+.bd.ok{background:var(--pos-b);color:var(--pos-t)}.bd.no{background:var(--ash-b);color:var(--gray)}
+.stu input[type=checkbox],.cls-h input[type=checkbox]{width:15px;height:15px;accent-color:var(--ind);cursor:pointer}
+.hide{display:none}
+/* 편집/컴포저 */
+.edit{padding:18px 20px;overflow-y:auto}
+.ed-h{font-size:18px;font-weight:800;margin-bottom:3px}
+.ed-h .meta{font-size:12px;color:var(--sub);font-weight:400;margin-left:8px}
+.metrics{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
+.metric{background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:7px 11px}
+.metric .k{font-size:10px;color:var(--sub)}.metric .v{font-size:13px;font-weight:700;margin-top:2px}
+.tags{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.tag{font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px}
+.tag.pos{background:var(--pos-b);color:var(--pos-t)}.tag.warn{background:var(--warn-b);color:var(--warn-t)}.tag.neu{background:var(--ind-l);color:var(--ind-ink)}
+.lbl{font-size:12px;color:var(--sub);font-weight:700;margin:10px 0 6px}
+textarea{width:100%;min-height:190px;border:1px solid var(--border);border-radius:12px;padding:13px;font-size:14px;font-family:inherit;line-height:1.6;resize:vertical}
+.vars{font-size:11px;color:var(--sub);margin-bottom:7px}.vars button{font-size:11px;border:1px solid var(--border);background:var(--panel2);border-radius:8px;padding:3px 8px;cursor:pointer;margin-left:4px}
+.gen{margin-top:12px;background:var(--ind);color:#fff;border:none;padding:11px 20px;border-radius:11px;font-weight:800;font-size:13px;cursor:pointer}
+.pv{background:var(--panel2)} .pv .scroll{padding:16px}
+.kk{background:#fff;border:1px solid var(--border);border-radius:4px 16px 16px 16px;padding:14px 16px;font-size:13px;line-height:1.7;white-space:pre-wrap;box-shadow:0 1px 3px rgba(20,20,40,.05)}
+.mon{background:#1E2129;border-color:#2A2F3A}.mon .col-h{color:#9CA6B8;border-bottom-color:#2A2F3A}
+.live{font-size:10px;color:#34D399;font-weight:800}
+.job{background:#262A34;border:1px solid #333A48;border-radius:10px;margin:8px;padding:9px 11px;font-size:12px;color:#D7DCE6}
+.job .pill{font-size:9px;font-weight:800;padding:2px 7px;border-radius:999px;background:rgba(99,102,241,.24);color:#A5B4FC;float:right}
+</style></head>
+<body>
+<div class="top">
+  <div class="seg">
+    <button id="b-rep" class="on" onclick="mode('rep')">📤 리포트·전송</button>
+    <button id="b-bulk" onclick="mode('bulk')">📢 일괄 공지</button>
+  </div>
+  <span class="chip-ro">문체 <b>정돈·균형형</b></span>
+  <span style="margin-left:auto"></span>
+  <span id="bulk-cnt" class="chip-ro hide">선택 <b>0</b>명</span>
+  <button class="btn">✨ 일괄 생성</button>
+  <button class="btn p" id="sendbtn">전송 →</button>
+</div>
+<div class="grid">
+  <div class="col">
+    <div class="col-h"><span>오늘 수업 <b id="tot">3반 · 13명</b></span></div>
+    <div class="scroll" id="tree"></div>
+  </div>
+  <div class="col edit" id="center"></div>
+  <div class="col pv"><div class="col-h" id="pvh">미리보기</div><div class="scroll"><div class="kk" id="pv"></div></div></div>
+  <div class="col mon"><div class="col-h">전송 모니터 <span class="live">● 실시간</span></div><div class="scroll"><div class="job">중2A (12명)<span class="pill">전송 중 7/12</span></div></div></div>
+</div>
+<script>
+const CLS=[
+ {id:'중2A',today:true,stu:[{nk:'1',n:'김서연',d:1},{nk:'2',n:'이준호',d:1},{nk:'3',n:'박지민',d:0},{nk:'4',n:'최유나',d:1},{nk:'5',n:'정우성',d:0}]},
+ {id:'중2B',today:true,stu:[{nk:'6',n:'한지우',d:1},{nk:'7',n:'오세훈',d:0},{nk:'8',n:'문가영',d:0},{nk:'9',n:'배수지',d:1}]},
+ {id:'중3A',today:false,stu:[{nk:'10',n:'조현우',d:0},{nk:'11',n:'신민아',d:0},{nk:'12',n:'권나라',d:0},{nk:'13',n:'류준열',d:0}]},
+];
+let M='rep', cur='1', open={}, checked={};
+CLS.forEach(c=>open[c.id]=c.today);  // 오늘 수업 펼침, 그 외 접힘
+function tree(){
+ document.getElementById('tree').innerHTML=CLS.map(c=>{
+  const cb = M==='bulk' ? `<input type="checkbox" onclick="event.stopPropagation();chkCls('${c.id}',this.checked)" ${c.stu.every(s=>checked[s.nk])?'checked':''}>` : '';
+  const head=`<div class="cls-h" onclick="tog('${c.id}')"><span class="arw">${open[c.id]?'▾':'▸'}</span>${cb}<span>${c.id}</span>${c.today?'<span class="today">오늘</span>':''}<span class="cnt">${c.stu.length}</span></div>`;
+  const rows=open[c.id]? c.stu.map(s=>{
+    if(M==='bulk') return `<label class="stu"><input type="checkbox" onclick="chk('${s.nk}',this.checked)" ${checked[s.nk]?'checked':''}><span class="nm">${s.n}</span></label>`;
+    return `<div class="stu${s.nk===cur?' on':''}" onclick="sel('${s.nk}')"><span class="nm">${s.n}</span><span class="bd ${s.d?'ok':'no'}">${s.d?'검토중':'미생성'}</span></div>`;
+  }).join(''):'';
+  return `<div class="cls">${head}${rows}</div>`;
+ }).join('');
+ const n=Object.values(checked).filter(Boolean).length;
+ document.getElementById('bulk-cnt').innerHTML=`선택 <b>${n}</b>명`;
+}
+function tog(id){open[id]=!open[id];tree();}
+function chk(nk,v){checked[nk]=v;tree();}
+function chkCls(id,v){CLS.find(c=>c.id===id).stu.forEach(s=>checked[s.nk]=v);tree();}
+function find(nk){for(const c of CLS){const s=c.stu.find(x=>x.nk===nk);if(s)return{c,s};}}
+function center(){
+ const el=document.getElementById('center');
+ if(M==='bulk'){
+   el.classList.remove('edit'); el.style.padding='18px 20px';
+   el.innerHTML=`<div class="ed-h">일괄 공지<span class="meta">선택한 학생들에게 같은 메시지 발송</span></div>
+    <div class="vars">변수:<button>{이름}</button><button>{반}</button><button>{날짜}</button></div>
+    <select style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:9px;margin-bottom:8px"><option>저장 템플릿 불러오기…</option></select>
+    <textarea placeholder="예: 안녕하세요 {이름} 학부모님. {날짜} 공지드립니다.">안녕하세요 {이름} 학부모님.\n금일 {반} 정기 학부모 상담 신청 안내드립니다.</textarea>
+    <div style="margin-top:8px;font-size:11px;color:var(--sub)">📎 이미지 첨부 가능</div>`;
+   document.getElementById('pvh').textContent='📨 미리보기 (예: 김서연)';
+   document.getElementById('pv').textContent='안녕하세요 김서연 학부모님.\n금일 중2A 정기 학부모 상담 신청 안내드립니다.';
+ }else{
+   const{c,s}=find(cur);
+   el.classList.add('edit'); el.style.padding='18px 20px';
+   el.innerHTML=`<div class="ed-h">${s.n}<span class="meta">${c.id} · 쎈 중2-1 · ${s.d?'검토중':'미생성'}</span></div>
+    <div class="metrics"><div class="metric"><div class="k">진도</div><div class="v">근의 공식</div></div><div class="metric"><div class="k">과제</div><div class="v">쎈 p.84~89</div></div><div class="metric"><div class="k">수행도</div><div class="v">대부분</div></div></div>
+    <div class="tags"><span class="tag neu">이해 완벽</span><span class="tag pos">심화도전</span><span class="tag warn">시험 실수 실점</span></div>
+    <div class="lbl">발송 특이사항 · AI 생성·검토</div>
+    <textarea>${s.d?'근의 공식을 완전히 습득하였습니다. 응용까지 막힘 없이 풀어내며 심화에도 도전하는 모습이 인상적이었습니다.':''}</textarea>
+    <button class="gen">✨ ${s.d?'다시 생성':'생성'}</button>`;
+   document.getElementById('pvh').textContent='📨 '+s.n+' · 발송 미리보기';
+   document.getElementById('pv').textContent=`[데일리 리포트] 6/24 (화)\n-------------------------\n▶ 오늘의 진도\n근의 공식\n\n▶ 과제 수행도\n대부분\n\n▶ 오늘의 ${s.n.slice(1)}는?\n`+(s.d?'근의 공식을 완전히 습득하였습니다…':'(미생성)');
+ }
+}
+function mode(m){M=m;document.getElementById('b-rep').classList.toggle('on',m==='rep');document.getElementById('b-bulk').classList.toggle('on',m==='bulk');
+ document.getElementById('bulk-cnt').classList.toggle('hide',m!=='bulk');
+ document.getElementById('sendbtn').textContent=m==='bulk'?'📢 일괄 전송 →':'전송 →';
+ // 일괄 모드: 오늘 아닌 반도 펼쳐 선택 가능하게
+ if(m==='bulk')CLS.forEach(c=>open[c.id]=true); else CLS.forEach(c=>open[c.id]=c.today);
+ tree();center();}
+function sel(nk){cur=nk;tree();center();}
+tree();center();
+</script>
+</body></html>

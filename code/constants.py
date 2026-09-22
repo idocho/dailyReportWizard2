@@ -34,6 +34,17 @@ AI_ENGINE_LABELS = {
 # Gemini 기본 모델 (무료·stable). 교체 시 이 한 줄만 수정.
 GEMINI_MODEL = "gemini-flash-latest"
 
+# OpenAI 기본 모델 (GA·저가형, gpt-4o-mini 계열 공식 후속). 교체 시 이 한 줄만 수정.
+OPENAI_MODEL = "gpt-5.6-luna"
+
+# 카톡 채팅방 이름 고정 포맷: "오직 {학생이름}! {브랜드}" — 캠퍼스 무관 전사 고정 규칙,
+# 강사별 설정 아님(설정 메뉴에서 편집 폼 제거됨). 접미 "!"를 검색어에 포함시키면
+# 이름이 다른 학생 이름의 접두일 때(예: "이건" vs "이건호") 카톡 자체 검색에서부터
+# 컬리전 방지 — "오직 이건!"은 "오직 이건호! ..."의 부분문자열이 아니므로 애초에
+# 후보에서 배제됨(_title_matches_room 경계검사는 이후 이 규칙 없는 경우의 사후 방어).
+KAKAO_ROOM_PREFIX = "오직 "
+KAKAO_ROOM_SUFFIX = "!"
+
 # ── 색상 (미니멀·프로 디자인 시스템, v2.1.0 리뉴얼) ──────────────────
 BG       = "#FAFAFB"
 PANEL    = "#FFFFFF"

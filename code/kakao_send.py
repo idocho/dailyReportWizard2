@@ -3,6 +3,7 @@ kakao_send.py — KakaoTalk 자동 전송 (pyautogui + pyperclip)
 Extracted from DailyReportWizard2 · Crafted by IDO(idocho@kakao.com)
 """
 import os
+import re
 import subprocess
 import sys
 import time
@@ -189,6 +190,26 @@ def _norm_title(s: str) -> str:
     return re.sub(r"\s+", "", s or "")
 
 
+_NAME_CHAR = re.compile(r"[가-힣a-zA-Z0-9]")
+
+
+def _title_matches_room(title_norm: str, room_norm: str) -> bool:
+    """방 이름 경계 인식 매칭 — 단순 startswith/in 은 이름이 다른 방 이름의 접두라서
+    생기는 오매칭 차단 못함(예: "오직이건" 검색 → "오직이건호" 방도 통과해버림 →
+    동명이인·외자 이름 사고). room_norm 뒤로 인원수 "(3)" 등 비-이름 문자만 허용,
+    한글/영숫자 문자(=이름 이어짐)면 거부.
+
+    room_norm이 이미 "!" 같은 비-이름 문자로 끝나면(KAKAO_ROOM_SUFFIX) 그 자체가
+    확정 경계라 뒤에 뭐가 오든(브랜드명 "그릿PT" 등, 첫 글자가 한글이라도) 무관 —
+    이 경우까지 다음 글자 검사를 적용하면 정상 방까지 거부하는 오탐이 생김."""
+    if not room_norm or not title_norm.startswith(room_norm):
+        return False
+    if not _NAME_CHAR.match(room_norm[-1]):
+        return True
+    rest = title_norm[len(room_norm):]
+    return not rest or not _NAME_CHAR.match(rest)
+
+
 def close_rooms(rooms) -> int:
     """자동화로 열어둔 채팅방 창 일괄 닫기 (전체 전송 완료 후 호출).
 
@@ -210,8 +231,8 @@ def close_rooms(rooms) -> int:
     # 오폐쇄 방지 2중 가드:
     # ① 카카오톡 프로세스 소속 창만 — 학생 이름이 제목에 들어간 타 앱(메모장·브라우저 탭
     #    등)이 매칭돼 닫히는 사고 차단
-    # ② 제목 전방일치 — 방 이름으로 시작하는 창만(허용 잔여부 = 인원수 "(3)" 등).
-    #    room_opened()의 포함 비교보다 엄격(그쪽은 읽기 검증, 여기는 파괴 동작)
+    # ② 제목 전방일치(경계 인식, _title_matches_room) — 방 이름으로 시작하는 창만
+    #    (허용 잔여부 = 인원수 "(3)" 등, 다른 이름으로 이어지면 거부 — room_opened()와 동일 규칙)
     main_hwnd = _find_kakao_hwnd()
     if not main_hwnd:
         return 0
@@ -235,7 +256,7 @@ def close_rooms(rooms) -> int:
             if title in _KAKAO_TITLES:         # 메인 창 제외
                 return True
             nt = _norm_title(title)
-            if nt and any(nt.startswith(r) for r in targets):   # ② 전방일치
+            if nt and any(_title_matches_room(nt, r) for r in targets):   # ② 경계 인식 전방일치
                 found.append(hwnd)
             return True
 
@@ -259,14 +280,13 @@ def room_opened(room: str, tries: int = 18, interval: float = 0.07) -> bool:
     사례("오직조이도" vs "오직 조이도") 실측 대응. 잔여부 숫자/괄호 허용(인원수)."""
     if not _IS_WIN:
         return True
-    import re
-    # 포함 비교(공백 무시) — "오직 XXX"는 검색 키워드, 실제 창 제목엔 다른 텍스트 혼재 가능.
-    norm = lambda s: re.sub(r'\s+', '', s)
-    nr = norm(room)
+    # 경계 인식 포함 비교(공백 무시) — "오직 XXX"는 검색 키워드, 실제 창 제목엔 인원수 등
+    # 다른 텍스트 혼재 가능하나, 다른 학생 이름으로 이어지면(동명이인/외자 접두 컬리전) 거부.
+    nr = _norm_title(room)
     if not nr:
         return False
     for _ in range(tries):
-        if nr in norm(foreground_title()):
+        if _title_matches_room(_norm_title(foreground_title()), nr):
             return True
         time.sleep(interval)
     return False

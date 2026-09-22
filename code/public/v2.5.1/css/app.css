@@ -209,6 +209,7 @@ body{font-family:'Pretendard','Malgun Gothic','맑은 고딕',-apple-system,sans
 /* 태그 행 레이아웃 */
 .tg-cell{display:flex;flex-wrap:wrap;gap:3px;align-content:center}
 .tg-sep{width:1px;background:var(--border);align-self:stretch;margin:4px 0;flex-shrink:0}
+
 .loading{display:flex;align-items:center;justify-content:center;padding:60px;color:var(--gray);font-size:13px}
 .spin{width:20px;height:20px;border:2px solid var(--border);border-top-color:var(--indigo);border-radius:50%;animation:sp .8s linear infinite;margin-right:8px;flex-shrink:0}
 @keyframes sp{to{transform:rotate(360deg)}}

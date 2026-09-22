@@ -28,7 +28,8 @@ Copy-Item $src $dst -Recurse
 $idx = Join-Path $dst 'index.html'
 if (Test-Path $idx) {
   (Get-Content $idx -Raw -Encoding UTF8) `
-    -replace "APP_VERSION='[^']*'", "APP_VERSION='$To'" |
+    -replace "APP_VERSION='[^']*'", "APP_VERSION='$To'" `
+    -replace "document\.title='DailyReportWizard [^']*'", "document.title='DailyReportWizard $To'" |
     Set-Content $idx -Encoding UTF8 -NoNewline
 }
 Write-Host "복제 완료: $From → $To" -ForegroundColor Green

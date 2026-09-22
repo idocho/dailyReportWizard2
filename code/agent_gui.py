@@ -27,7 +27,7 @@ except Exception:
     _HAS_TRAY = False   # pystray 미설치/실패 → 트레이 비활성(일반 창으로 동작)
 
 INDIGO, INK, GREEN, RED, SUB = "#4F46E5", "#15171F", "#16A34A", "#DC2626", "#94A3B8"
-AGENT_VERSION = "0.95"
+AGENT_VERSION = "0.99"
 # 캠퍼스 표시명 → id (app.py / 웹 게이트와 동일 정본). 캠퍼스 추가 시 여기만 갱신.
 CAMPUS = {"동수원": "dongsuwon"}
 _Q = queue.Queue()
@@ -157,7 +157,6 @@ class AgentGUI:
                  font=("맑은 고딕", 9), anchor="w").pack(side="left", padx=(8, 0), fill="x", expand=True)
         row("웹 로그인 비밀번호 (DB 보안 전환 대비)", "login_password",
             e.get("login_password", ""), show="•")
-        row('카톡 방 접두사 (예: "오직 ")', "roomPrefix", e.get("roomPrefix", ""))
 
         self.auto_var = tk.BooleanVar(value=True)
         tk.Checkbutton(frm, text="Windows 시작 시 자동 실행", variable=self.auto_var,
@@ -201,9 +200,6 @@ class AgentGUI:
 
     def _save_setup(self):
         v = {k: var.get().strip() for k, var in self.vars.items()}
-        # 방 접두사는 trim 금지 — "오직 " 처럼 끝 공백이 방 이름 일부(prefix+이름)
-        if "roomPrefix" in self.vars:
-            v["roomPrefix"] = self.vars["roomPrefix"].get()
         campus = CAMPUS.get(self.campus_var.get(), "")
         eng = self._eng_id()
         # 현재 입력칸 키를 선택 엔진에 반영(전환 없이 바로 저장하는 경우 포함)
@@ -219,7 +215,7 @@ class AgentGUI:
         fields = dict(self.cfg) if self.cfg else {}
         fields.update({
             "campus": campus, "instructorId": v["instructorId"],
-            "dbUrl": W.DEFAULT_DB, "roomPrefix": v.get("roomPrefix", ""),
+            "dbUrl": W.DEFAULT_DB,
             "ai_engine_type": eng,
         })
         # 엔진별 키 전부 저장(빈 값은 제거) — 전환해도 각 엔진 키 보존

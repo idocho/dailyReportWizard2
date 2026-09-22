@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>과제 수행도 — 직접 입력 옵션 목업</title>
+<style>
+:root{
+  --bg:#FAFAFB; --panel:#FFFFFF; --panel-2:#F7F7F9;
+  --indigo:#4F46E5; --indigo-ink:#4338CA; --indigo-l:#EEF0FF; --indigo-line:#DDE1FF;
+  --gray:#9CA3AF; --border:#ECECEF; --line-soft:#F3F3F5; --text:#18181B; --sub:#5C6370;
+  --r-lg:14px; --sh-1:0 1px 2px rgba(16,24,40,.04); --sh-2:0 1px 3px rgba(16,24,40,.06);
+}
+*{box-sizing:border-box}
+body{font-family:'Pretendard','Malgun Gothic','맑은 고딕',-apple-system,sans-serif;background:var(--bg);color:var(--text);font-size:14px;margin:0;padding:24px;letter-spacing:-.01em}
+.wrap{max-width:520px;margin:0 auto}
+h1{font-size:15px;margin:0 0 4px}
+.note{font-size:12px;color:var(--sub);margin:0 0 18px;line-height:1.6}
+.note b{color:var(--indigo-ink)}
+.badge{display:inline-block;background:var(--indigo-l);color:var(--indigo-ink);font-size:10px;font-weight:700;padding:2px 7px;border-radius:5px;margin-left:6px;vertical-align:1px}
+
+.si-card{background:var(--panel);border-radius:var(--r-lg);display:grid;grid-template-columns:84px 1fr;border:1px solid var(--border);box-shadow:var(--sh-1);margin-bottom:14px}
+.si-left{padding:12px 8px;background:var(--panel-2);border-right:1px solid var(--line-soft);border-radius:var(--r-lg) 0 0 var(--r-lg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px}
+.si-lname{font-size:12.5px;font-weight:700;color:var(--text)}
+.si-right{padding:0}
+.si-row{padding:10px 14px;border-bottom:1px solid var(--border)}
+.si-row:last-child{border-bottom:none}
+.si-lbl{font-size:9px;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:6px}
+.si-btns{display:flex;flex-wrap:wrap;gap:5px;align-items:center}
+
+.tg-radio{padding:5px 11px;border-radius:8px;border:1px solid var(--border);background:var(--panel);color:var(--sub);font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap;transition:all .12s;line-height:1.4;display:inline-flex;align-items:center;gap:4px;font-family:inherit}
+.tg-radio:hover{border-color:#D7D7DD;background:var(--panel-2)}
+.tg-radio.sel-c{border-color:transparent;color:#fff;background:var(--indigo)}
+.tg-radio.ag-done.sel-c{background:#16A34A}
+.tg-radio.ag-most.sel-c{background:#CA8A04}
+.tg-radio.ag-half.sel-c{background:#D97706}
+.tg-radio.ag-little.sel-c{background:#EA580C}
+.tg-radio.ag-none.sel-c{background:#DC2626}
+
+.tg-check{padding:5px 9px;border-radius:7px;border:1px dashed #C3C7CE;background:var(--panel-2);color:var(--gray);font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap;transition:all .12s;line-height:1.4;font-family:inherit}
+.tg-check:hover{border-color:var(--gray);color:var(--sub)}
+.tg-check.sel-m{background:var(--indigo);color:#fff;border-color:transparent;border-style:solid}
+
+.tg-sep{width:1px;background:var(--border);align-self:stretch;margin:2px 1px;flex-shrink:0}
+
+/* ── 신규: 직접 입력 트리거 + 커스텀 칩 ── */
+.tg-custom-add{padding:5px 9px;border-radius:7px;border:1px dashed var(--indigo-line);background:#fff;color:var(--indigo);font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;transition:all .12s;line-height:1.4;font-family:inherit}
+.tg-custom-add:hover{background:var(--indigo-l)}
+.tg-custom-chip{padding:5px 6px 5px 10px;border-radius:7px;border:1px solid transparent;background:#6366F1;color:#fff;font-size:11px;font-weight:600;white-space:nowrap;line-height:1.4;display:inline-flex;align-items:center;gap:5px;font-family:inherit}
+.tg-custom-chip button{all:unset;cursor:pointer;width:14px;height:14px;border-radius:50%;background:rgba(255,255,255,.25);display:flex;align-items:center;justify-content:center;font-size:10px;line-height:1}
+.tg-custom-chip button:hover{background:rgba(255,255,255,.45)}
+
+.custom-inp-row{display:none;align-items:center;gap:6px;margin-top:7px}
+.custom-inp-row.open{display:flex}
+.custom-inp{flex:1;padding:6px 9px;border:1.5px solid var(--indigo-line);border-radius:7px;font-size:12px;font-family:inherit;outline:none}
+.custom-inp:focus{border-color:var(--indigo)}
+.custom-inp-ok{padding:6px 12px;border-radius:7px;border:none;background:var(--indigo);color:#fff;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit}
+.custom-inp-ok:hover{background:var(--indigo-ink)}
+.custom-hint{font-size:10px;color:var(--gray);margin-top:5px;line-height:1.5}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>과제 수행도 — 직접 입력 옵션 <span class="badge">목업(실코드 미반영)</span></h1>
+  <p class="note">
+    기존 <b>고정 등급(✅완료·🔵대부분 등, 택1)</b>과 <b>강사 등록 프리셋(복수선택)</b>은 그대로 두고,
+    프리셋 목록에 없는 문구를 그때그때 <b>직접 입력</b>할 수 있는 옵션을 추가했습니다.<br>
+    ✏️ 직접입력 버튼 → 텍스트 입력 → 칩으로 추가(여러 개 가능, × 로 제거). 저장 위치는 기존 프리셋과
+    동일한 <code>assign_tags</code>(자유 문구 배열) — 리포트 AI 생성에 그대로 반영되고, 성취도 통계(analyzer)에
+    영향을 주는 <code>assign_grade</code> 등급과는 분리되어 안전합니다.
+  </p>
+
+  <div class="si-card">
+    <div class="si-left"><span class="si-lname">김민준</span></div>
+    <div class="si-right">
+      <div class="si-row">
+        <span class="si-lbl">과제</span>
+        <div class="si-btns" id="cell1">
+          <button class="tg-radio ag-done sel-c">✅ 완료</button>
+          <button class="tg-radio">🔵 대부분</button>
+          <button class="tg-radio">🟡 절반</button>
+          <button class="tg-radio">🟠 일부</button>
+          <button class="tg-radio">❌ 미완</button>
+          <div class="tg-sep"></div>
+          <button class="tg-check">지각제출</button>
+          <button class="tg-check sel-m">풀이과정 미흡</button>
+          <div class="tg-sep"></div>
+          <span id="chips1"></span>
+          <button class="tg-custom-add" onclick="toggleInp(1,this)">✏️ 직접입력</button>
+        </div>
+        <div class="custom-inp-row" id="inpRow1">
+          <input class="custom-inp" id="inp1" placeholder="예: 프린트 안 가져옴" maxlength="30">
+          <button class="custom-inp-ok" onclick="addChip(1)">추가</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="si-card">
+    <div class="si-left"><span class="si-lname">이서연</span></div>
+    <div class="si-right">
+      <div class="si-row">
+        <span class="si-lbl">과제</span>
+        <div class="si-btns" id="cell2">
+          <button class="tg-radio">✅ 완료</button>
+          <button class="tg-radio ag-half sel-c">🟡 절반</button>
+          <button class="tg-radio">🟠 일부</button>
+          <button class="tg-radio">❌ 미완</button>
+          <div class="tg-sep"></div>
+          <button class="tg-check">지각제출</button>
+          <button class="tg-check">풀이과정 미흡</button>
+          <div class="tg-sep"></div>
+          <span id="chips2">
+            <span class="tg-custom-chip">노트 분실<button onclick="this.parentElement.remove()">×</button></span>
+          </span>
+          <button class="tg-custom-add" onclick="toggleInp(2,this)">✏️ 직접입력</button>
+        </div>
+        <div class="custom-inp-row" id="inpRow2">
+          <input class="custom-inp" id="inp2" placeholder="예: 프린트 안 가져옴" maxlength="30">
+          <button class="custom-inp-ok" onclick="addChip(2)">추가</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <p class="custom-hint">
+    ※ 위 "이서연" 카드는 이미 직접입력으로 추가된 칩("노트 분실")이 있는 상태를 보여줍니다.<br>
+    ※ 입력창은 Enter 로도 추가되며(실제 구현 시), 빈 값·중복 문구는 무시됩니다.<br>
+    ※ 김민준 카드에서 직접 눌러 테스트해보세요 →
+  </p>
+</div>
+
+<script>
+function toggleInp(n, btn){
+  const row = document.getElementById('inpRow'+n);
+  const open = row.classList.toggle('open');
+  if(open){ document.getElementById('inp'+n).focus(); }
+}
+function addChip(n){
+  const inp = document.getElementById('inp'+n);
+  const val = inp.value.trim();
+  if(!val) return;
+  const chips = document.getElementById('chips'+n);
+  // 중복 방지(간단 목업 버전)
+  if([...chips.querySelectorAll('.tg-custom-chip')].some(c=>c.firstChild.textContent===val)) { inp.value=''; return; }
+  const chip = document.createElement('span');
+  chip.className = 'tg-custom-chip';
+  chip.innerHTML = val + '<button onclick="this.parentElement.remove()">×</button>';
+  chips.appendChild(chip);
+  inp.value = '';
+  document.getElementById('inpRow'+n).classList.remove('open');
+}
+document.querySelectorAll('.custom-inp').forEach(inp=>{
+  inp.addEventListener('keydown', e=>{
+    if(e.key==='Enter'){ e.preventDefault(); addChip(inp.id.replace('inp','')); }
+    if(e.key==='Escape'){ inp.closest('.custom-inp-row').classList.remove('open'); }
+  });
+});
+</script>
+</body>
+</html>

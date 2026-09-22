@@ -18,6 +18,10 @@ LLM 분석은 **이 세션의 네가 직접** 수행한다(외부 API 호출·�
    - 여러 학생·**여러 강사**에 걸쳐 반복되는 교육적으로 의미 있는 패턴만.
    - 단일 강사 복붙 문구·운영 공지·문체는 `ignore`. 기존 태그로 충분하면 `covered_by_existing:true`.
    - frequency는 실제 관찰 건수 근사. rationale에 어느 강사들에 걸쳤는지 명시.
+   - **`documents/tag-mining/state.json`의 기존 `candidates` 키·theme를 먼저 확인**하고, 이번 노트에서 같은
+     주제가 또 나오면 **같은 `suggested_key`를 재사용**한다. 새 이름을 지으면 streak가 끊겨 승격 신호가
+     죽는다(2026-07-15 실제 사고: 같은 날짜에 실행된 별도 세션이 `rushing`을 `careless_miss`로 다르게
+     명명해 진짜 3주 연속인 후보가 1로 잘못 표기됨 — `scripts/mine_note_tags.py recompute`로 사후 보정함).
 
 3. **결과 기록** — 분석 JSON을 `documents/tag-mining/_result.json`에 Write →
    `python scripts/mine_note_tags.py ingest documents/tag-mining/_result.json` 실행 →
@@ -30,5 +34,8 @@ LLM 분석은 **이 세션의 네가 직접** 수행한다(외부 API 호출·�
 - **태그를 자동으로 추가/승격하지 말 것.** 발굴·기록·보고까지만. 실제 태그 신설은 사용자가 결정한다.
   (신설 시엔 3곳 동기화: 웹 `app-core.js` TAGS·PC `constants.py` TAGS·`ai_engine.py` _*_TEXT + 캐시버스트 + exe 재빌드)
 - PROMPT.md·_result.json은 학생 PII 포함 → gitignore 대상(이미 설정됨). REPORT.md·state.json만 커밋.
-- 실행에 firebase url/path만 필요(읽기 secret 불요). 자격은 `code/dist/config.json`에서 자동 해석.
+- v2 보안룰(2026-06-25 배포) 이후 익명 읽기 차단됨. 인증은 `code/scripts/sa-key.json`(서비스 계정, 루트·전 캠퍼스
+  권장) 우선, 없으면 `scripts/.mine-creds.json`의 로그인 자격(campus 지정 필요) 폴백. url·apiKey는 자동 해석.
 - 스크립트 출력이 깨지면(cp949) 무시 — 스크립트가 utf-8로 재설정함.
+- streak 값이 이상해 보이면(연속 등장인데 낮게 나옴) `python scripts/mine_note_tags.py recompute`로
+  history 기준 재계산·보정 가능(멱등, 안전하게 반복 실행 가능).

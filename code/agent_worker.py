@@ -21,7 +21,7 @@ import urllib.parse
 from pathlib import Path
 
 from ai_engine import build_single_prompt, build_batch_prompt, _call_ai_hub, _base_conditions
-from constants import grade_label
+from constants import grade_label, KAKAO_ROOM_PREFIX, KAKAO_ROOM_SUFFIX
 import ai_style
 
 # frozen exe(PyInstaller)에선 __file__이 임시추출폴더(_MEI…, 종료 시 삭제)라
@@ -360,13 +360,43 @@ def process_sendjobs(cfg, db, instructor_id, token=None, real=False, progress_cb
     base=None → 본인 강사 큐(campus/{c}/sendJobs/{id}). claim_id 지정 시(캠퍼스 공지) sender 선점으로
     다중 매니저 PC 경쟁 방지. 수신자에 msg 없으면 job.body 템플릿으로 생성(일괄공지).
     progress_cb(state): GUI 오버레이용 진행 콜백(state={active,cls,done,total,fail})."""
-    from collections import Counter
+    from collections import defaultdict
+    # 건별 하트비트 보조 갱신 — GUI 메인루프는 process_once() 블로킹 동안 하트비트를 못 씀(최상단
+    # 15s 주기만) → 대량 발송(수신자 많음·재시도 누적)이 90초 넘게 걸리면 실제로는 살아있는데도
+    # 웹의 유령작업 자동정리(loadReportJobs, 9.12)가 하트비트 만료로 오판해 방금 성공한 건까지
+    # job.status를 "오류"로 뒤집는 사고 발생(실사용 테스트 확인). 수신자 완료 콜백마다(최대 12s
+    # 간격 스로틀) 하트비트를 직접 갱신해 "에이전트 생존"이 job 처리 시간과 무관하게 반영되게 함.
+    _hb_last = [0.0]
+
+    def _tick_heartbeat():
+        now = time.time()
+        if now - _hb_last[0] > 12:
+            write_heartbeat(cfg, db, instructor_id, token=token, real=real)
+            _hb_last[0] = now
+
     if base is None:
         base = f"campus/{cfg['campus']}/sendJobs/{urllib.parse.quote(instructor_id)}"
     jobs = _get(db, base, token) or {}
     pending = {jid: j for jid, j in jobs.items()
                if isinstance(j, dict) and j.get("status") == "queued"}
-    prefix = cfg.get("roomPrefix", "")
+    # 카톡 방 이름 = 전사 고정 포맷 "오직 {이름}!" (KAKAO_ROOM_PREFIX/SUFFIX, constants.py).
+    # 강사별 설정 아님(설정 메뉴에 편집 폼 없음). "!" 를 검색어에 포함시켜 카톡 검색
+    # 단계에서부터 동명 접두 컬리전(예: "이건" vs "이건호") 예방 — "오직 이건!"은
+    # "오직 이건호! ..."의 부분문자열이 아니므로 애초에 후보에서 배제됨.
+    prefix, suffix = KAKAO_ROOM_PREFIX, KAKAO_ROOM_SUFFIX
+    # 동명이인 오발송 가드 — 웹이 반별로 job 분리 생성(app-report.js)해 같은 이름이
+    # 다른 job(다른 반)에 흩어질 수 있음 → job 내부만 보면 놓침. 이번 배치(pending)
+    # 전체 수신자를 이름별로 모아 크로스-job까지 본다.
+    # 이름별 nameKey 집합으로 판정 — 진짜 동명이인(서로 다른 nameKey)만 제외.
+    # 같은 학생이 여러 반(=여러 job) 걸쳐 이름이 반복되는 정상 케이스(동일 nameKey)는
+    # 같은 방으로 보내는 게 맞으므로 제외하면 안 됨(과거 이 구분 없이 name만 보다 오탐 발견).
+    name_keys = defaultdict(set)
+    for j in pending.values():
+        for r in j.get("recipients", []):
+            n = r.get("name", "")
+            if n:
+                name_keys[n].add(str(r.get("nameKey") or ""))
+    global_dups = {n for n, keys in name_keys.items() if len(keys) > 1}
     done = 0
     for jid, job in pending.items():
         # 캠퍼스 공지 다중 매니저 경쟁 방지(best-effort, REST 비트랜잭션):
@@ -380,17 +410,16 @@ def process_sendjobs(cfg, db, instructor_id, token=None, real=False, progress_cb
         if claim_id and (_get(db, f"{base}/{jid}/sender", token) or "") != claim_id:
             continue
         recs = job.get("recipients", [])
-        # 동명이인 오발송 가드(계승) — 같은 표시이름은 카톡방 검색이 합쳐져 타 학부모에게 갈 위험.
-        names = [r.get("name", "") for r in recs]
-        dups = {n for n, c in Counter(names).items() if n and c > 1}
+        # 동명이인 오발송 가드(계승, 크로스-job 확장) — 같은 표시이름은 카톡방 검색이 합쳐져
+        # 타 학부모에게 갈 위험. global_dups = 이번 배치 전체(job 경계 무관) 기준.
         send_idx = []
         for i, r in enumerate(recs):
-            if r.get("name", "") in dups:
+            if r.get("name", "") in global_dups:
                 _patch(db, f"{base}/{jid}/recipients/{i}", {"status": "제외(동명이인)"}, token)
             else:
                 send_idx.append(i)
         img_path = decode_image(job.get("image")) if job.get("image") else None   # 일괄 공지 이미지
-        msgs = [{"room": (prefix + (recs[i].get("name") or "")).strip(),
+        msgs = [{"room": (prefix + (recs[i].get("name") or "") + suffix).strip(),
                  "msg": recs[i].get("msg") or render(job.get("body", ""), recs[i].get("name"), job.get("cls", "")),
                  **({"image": img_path, "image_first": bool(job.get("imageFirst"))} if img_path else {})}
                 for i in send_idx]
@@ -422,6 +451,7 @@ def process_sendjobs(cfg, db, instructor_id, token=None, real=False, progress_cb
             if progress_cb:
                 progress_cb({"active": True, "cls": cls, "done": len(results),
                              "total": total, "fail": results.count(False)})
+            _tick_heartbeat()
 
         # 웹이 sending 중 set 하는 cancel 플래그를 건별 폴링(현재 건 보호, 나머지 중단)
         def _canceled(_jid=jid):
@@ -442,8 +472,9 @@ def process_sendjobs(cfg, db, instructor_id, token=None, real=False, progress_cb
             if progress_cb:
                 progress_cb({"active": False})
             final = "canceled" if _canceled() else "done"
+            excluded = len(recs) - len(send_idx)
             _patch(db, f"{base}/{jid}",
-                   {"status": final, "fail": results.count(False), "excluded": len(dups)}, token)
+                   {"status": final, "fail": results.count(False), "excluded": excluded}, token)
             done += 1
         except Exception as e:
             if progress_cb:
@@ -537,7 +568,6 @@ def _setup_cli():
     f["campus"] = input("캠퍼스 id (예: dongsuwon): ").strip()
     f["instructorId"] = input("본인 이름(로그인 id): ").strip()
     f["dbUrl"] = input(f"DB URL [{DEFAULT_DB}]: ").strip() or DEFAULT_DB
-    f["roomPrefix"] = input('카톡 방 이름 접두사 (예: "오직 ", 없으면 빈칸): ')
     eng = (input("AI 엔진 [gemini/claude/openai] (기본 gemini): ").strip() or "gemini").lower()
     f["ai_engine_type"] = eng
     f[f"{eng}_api_key"] = input(f"본인 {eng} 개인 API 키: ").strip()

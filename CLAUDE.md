@@ -21,14 +21,14 @@
 ### 프로젝트 파일 위치
 | 항목 | 경로 |
 |------|------|
-| **현재 개발 라인 (웹 수정은 여기만)** | `code/public/v2.4.0/` — JS `js/app-core.js`·`app-input.js`·`app-scores.js`·`app-settings.js`, CSS `css/app.css`, HTML `index.html` |
-| 동결 버전 (수정 금지) | `code/public/v2.3.0/` 이하 전 버전 — 릴리즈 시 `scripts/new-version.ps1`로 동결 복제 |
+| **현재 개발 라인 (웹 수정은 여기만)** | `code/public/v2.5.1/` — JS `js/app-core.js`·`app-input.js`·`app-scores.js`·`app-settings.js`·`app-report.js`, CSS `css/app.css`, HTML `index.html` |
+| 동결 버전 (수정 금지) | `code/public/v2.5.0/` 이하 전 버전 — 릴리즈 시 `scripts/new-version.ps1`로 동결 복제 |
 | 버전 포털 | `code/public/versions.json` → `scripts/build-portal.ps1` 로 `code/public/index.html` 생성 |
-| 강사 에이전트 (PC 앱 대체) | `code/agent_gui.py`(셋업·상태 GUI)·`agent_worker.py`(생성·전송 워커)·`kakao_send.py`·`ai_engine.py`(프롬프트·`_call_ai_hub`)·`ai_style.py`·`constants.py`·`secret_codec.py`. 빌드: `scripts/build-agent.ps1`. ※ PC 풀 클라이언트(`app.py`/`main.py`/`firebase.py`/`storage.py`/`errors.py`/`message.py`/`kakao_image.py`)는 웹+에이전트 통합으로 **제거됨**(필요 시 git 이력 복원) |
+| 강사 에이전트 (PC 앱 대체) | `code/agent_gui.py`(셋업·상태 GUI)·`agent_worker.py`(생성·전송 워커)·`kakao_send.py`·`ai_engine.py`(프롬프트·`_call_ai_hub`)·`ai_style.py`·`constants.py`·`secret_codec.py`. 빌드: `scripts/build-agent.ps1`(exe 산출은 `code/dist/` — 재빌드 시 `-Clean` 주의: 그 안 실행 중이던 exe의 로컬 설정파일까지 삭제됨, 실사용 exe는 `dist/` 밖 고정 폴더로 복사해서 실행할 것). ※ PC 풀 클라이언트(`app.py`/`main.py`/`firebase.py`/`storage.py`/`errors.py`/`message.py`/`kakao_image.py`)는 웹+에이전트 통합으로 **제거됨**(필요 시 git 이력 복원) |
 | 요구사항 문서 | `documents/DRW_REQUIREMENTS.md` |
 | Analyzer 요구사항 | `documents/ANALYZER_REQUIREMENTS.md` |
 | DB 스키마 정본 | `documents/DB_SCHEMA.md` (구 ClassManager에서 이관 — repo 삭제) |
-| 커리큘럼 원본 JSON | `code/public/v2.4.0/data/math-curriculum-2022.json` (버전 디렉터리 내 — 별도 `src/` 없음) |
+| 커리큘럼 원본 JSON | `code/public/v2.5.1/data/math-curriculum-2022.json` (버전 디렉터리 내 — 별도 `src/` 없음) |
 
 ### 버전 정책 (2026-06-11~)
 - **DB 스키마 완전 하위호환 버전만 호스팅 공개.** 구버전은 `firebase.json` ignore + `/v최신/` 302 redirect
