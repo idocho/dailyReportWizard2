@@ -664,7 +664,7 @@ function bulkPickImg(e){
 function bulkClearImg(){ _bulkImg = null; _bulkImgName = ''; renderBulk(document.getElementById('mc')); }
 async function bulkSend(force){
   const tmpl = (document.getElementById('bulk-tmpl')?.value || '').trim();
-  if(!tmpl) return toast('메시지를 입력하세요');
+  if(!tmpl && !_bulkImg) return toast('메시지를 입력하거나 이미지를 첨부하세요');
   if(!force && !await _agentAlive()){ _agentGuide(() => bulkSend(true)); return; }
   const all = _allMyStudents();
   const sel = [..._bulkSel].filter(nk => all[nk]);   // 여러 반 가로질러 선택된 수신자
