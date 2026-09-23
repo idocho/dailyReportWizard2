@@ -213,8 +213,8 @@ def _title_matches_room(title_norm: str, room_norm: str) -> bool:
 def close_rooms(rooms) -> int:
     """자동화로 열어둔 채팅방 창 일괄 닫기 (전체 전송 완료 후 호출).
 
-    이미지 방은 업로드 취소 위험("전송 중인 파일" 팝업) 때문에 건별 esc 정리를
-    생략하고 잔류시킴 — 전송이 모두 끝난 시점에 제목 매칭으로 WM_CLOSE 발송.
+    호출자는 이미지 전송 대상 방을 제외해야 함. 텍스트 전송 오류로 남은 방만
+    전송이 모두 끝난 시점에 제목 매칭으로 WM_CLOSE 발송.
     · 키 입력이 아니라 창 메시지라 전면 포커스 불필요(다른 작업 중에도 안전)
     · 업로드가 아직 진행 중이면 카톡이 확인 팝업으로 닫기를 보류 — 그 창은
       그대로 두고(자동 확인 금지: 확인=업로드 취소) 미정리 개수만 반환에 반영
@@ -423,7 +423,6 @@ def send_messages(msgs, wait_time=0.5, status_cb=None, done_cb=None, wait_ctrl=N
         while time.time() < deadline and not _in_room():
             time.sleep(0.15)
         if not _in_room():
-            pyautogui.press("esc")
             raise RuntimeError(f"이미지 전송 확인 실패(팝업 미종료): {room}")
 
     def _run():
@@ -439,7 +438,8 @@ def send_messages(msgs, wait_time=0.5, status_cb=None, done_cb=None, wait_ctrl=N
                 done_cb(0)
             return
         sent = 0
-        lingering = []   # 정리 대상 잔류 방 — 이미지 방(의도적 미닫음) + 오류로 esc 정리 못 한 방
+        lingering = []   # 텍스트 전송 오류로 남은 방만 정리
+        image_rooms = {m['room'] for m in msgs if m.get('image')}
         for i, m in enumerate(msgs):
             # 취소 폴링 — 다음 건 시작 전 확인(진행 중 건은 보호, 나머지 중단)
             if should_cancel and should_cancel():
@@ -499,9 +499,9 @@ def send_messages(msgs, wait_time=0.5, status_cb=None, done_cb=None, wait_ctrl=N
 
                 # 방 정리: 이미지 보낸 방은 닫지 않음 — 업로드 진행 중 esc 시
                 # "전송 중인 파일" 팝업(확인=업로드 취소 위험)에 막힘. 텍스트만이면 esc 탈출.
-                # 잔류 방은 전체 전송 완료 후 close_rooms() 로 일괄 정리.
-                if m.get("image"):
-                    lingering.append(m["room"])
+                # 이미지 대상 방은 전체 완료·취소·오류 후에도 유지. 같은 방의 텍스트 건도 보호.
+                if m['room'] in image_rooms:
+                    pass
                 elif _IS_WIN:
                     for _ in range(4):
                         pyautogui.press("esc"); time.sleep(0.08)
@@ -514,17 +514,15 @@ def send_messages(msgs, wait_time=0.5, status_cb=None, done_cb=None, wait_ctrl=N
                     item_cb(i, True, m["room"], None)
             except Exception as e:
                 print(f"오류 [{m['room']}]: {e}")
-                lingering.append(m["room"])   # 오류 중단 방도 열려 있을 수 있음
+                if m['room'] not in image_rooms:
+                    lingering.append(m["room"])
                 if item_cb:
                     item_cb(i, False, m["room"], str(e))
             time.sleep(0.05)  # 학생 간 간격 — 게이트(room_opened)가 보호하므로 최소화(0.3→0.1→0.05)
-        # 전체 전송 완료 → 자동화로 열어둔 잔류 창 일괄 닫기.
-        # 2초 유예: 마지막 이미지 업로드 여유 — 그래도 진행 중이면 카톡이 닫기를
-        # 보류하므로 그 창만 남고 업로드는 보호됨(자동 확인 안 함).
+        # 텍스트 오류 잔류 창만 정리. 이미지 업로드 대기·닫기 시도 없음.
         if lingering:
             if status_cb:
                 status_cb("🧹 열린 톡방 정리 중...")
-            time.sleep(2.0)
             closed = close_rooms(lingering)
             if status_cb:
                 left = len(set(lingering)) - closed
