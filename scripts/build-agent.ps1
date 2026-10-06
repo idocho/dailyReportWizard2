@@ -3,7 +3,7 @@
 # 키·카톡은 강사 PC 로컬(DPAPI). 웹(v2.5.1)이 입력·검토·전송요청 담당.
 #
 # 사전: pip install pyinstaller pyautogui pyperclip pillow pystray
-# 산출물: code/dist/DRW-AI-Agent-0.99.exe  (build/·dist/·*.spec 은 gitignore)
+# 산출물: code/dist/DRW-AI-Agent-{agent_version.AGENT_VERSION}.exe
 #
 # ⚠️ 실사용 exe는 이 dist/ 밖 별도 고정 폴더로 복사해서 그쪽에서 실행할 것.
 #    설정파일(agent_config.json)이 exe와 같은 폴더에 생성되는데, dist/에서 직접 실행하면
@@ -13,22 +13,28 @@ param([switch]$Clean)
 $ErrorActionPreference = 'Stop'
 Set-Location (Join-Path $PSScriptRoot '..\code')
 
+$agentVersion = python -c "from agent_version import AGENT_VERSION; print(AGENT_VERSION)"
+if ($LASTEXITCODE -ne 0 -or $agentVersion -notmatch '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$') {
+  throw 'agent_version.py must contain a valid MAJOR.MINOR.PATCH version'
+}
+$agentBuildName = "DRW-AI-Agent-$agentVersion"
+
 if ($Clean) { Remove-Item -Recurse -Force build, dist -ErrorAction SilentlyContinue }
 
 # 에이전트는 키 입력·클립보드만 사용(이미지 인식·스크린샷 미사용) → pyautogui가 끌어오는
 # cv2/numpy/pandas 등 무거운 의존성 제외(67MB→20MB). PIL/pyscreeze는 pyautogui import 안정성 위해 유지.
 # python -m PyInstaller (bare 'pyinstaller' CLI가 의존성 없는 다른 파이썬을 쓸 수 있어 명시)
 python -m PyInstaller --noconfirm --onefile --windowed `
-  --name DRW-AI-Agent-0.99 `
+  --name $agentBuildName `
   --hidden-import pyautogui --hidden-import pyperclip --hidden-import PIL `
   --collect-submodules pystray `
   --hidden-import pystray._win32 --hidden-import pystray._util --hidden-import pystray._util.win32 `
-  --hidden-import kakao_send --hidden-import secret_codec --hidden-import agent_auth `
+  --hidden-import kakao_send --hidden-import secret_codec `
   --hidden-import ai_engine --hidden-import ai_style --hidden-import constants --hidden-import agent_worker `
   --exclude-module cv2 --exclude-module numpy --exclude-module pandas `
   --exclude-module scipy --exclude-module matplotlib --exclude-module IPython --exclude-module pytest `
   agent_gui.py
 if ($LASTEXITCODE -ne 0) { throw "PyInstaller build failed (exit $LASTEXITCODE)" }
 
-Write-Host "`n[완료] code/dist/DRW-AI-Agent-0.99.exe" -ForegroundColor Green
-Write-Host "강사 PC 최초 1회: DRW AI Agent 실행 → 캠퍼스·이름·엔진·개인키 입력 → 저장하고 시작." -ForegroundColor Cyan
+Write-Host "`n[완료] code/dist/$agentBuildName.exe" -ForegroundColor Green
+Write-Host "강사 PC 최초 1회: DRW AI Agent 실행 → 캠퍼스 선택·등록된 강사 이름 입력·엔진·개인키 입력 → 저장하고 시작." -ForegroundColor Cyan

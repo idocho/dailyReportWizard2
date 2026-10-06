@@ -3,6 +3,7 @@ ai_engine.py — 멀티 LLM API 특이사항 생성 엔진 (Groq / Claude / GPT 
 Crafted by IDO(idocho@kakao.com) · Powered by Gemini
 """
 import json
+import re
 import threading
 import time
 import urllib.request
@@ -13,6 +14,7 @@ DEBUG_AI_PROMPT: bool = False
 
 from constants import GEMINI_MODEL, OPENAI_MODEL, grade_label
 import ai_style
+from ai_model_config import resolve
 
 def dprint(*args, **kwargs):
     """DEBUG_AI_PROMPT 플래그가 True일 때만 출력되는 디버그 프린트."""
@@ -97,9 +99,14 @@ def _build_tags_context(tags: dict) -> str:
         lines.append(f"- 수업 컨디션: {_CONDITION_TEXT[cond]}")
 
     # 과제 커스텀 프리셋(자유 텍스트, 복수) — 강사가 직접 등록한 문구 그대로 전달
-    assign_extra = [t for t in (tags.get("assign_tags") or []) if t]
+    assign_raw = tags.get("assign_tags") or []
+    if isinstance(assign_raw, dict):
+        assign_raw = list(assign_raw.values())
+    elif isinstance(assign_raw, str):
+        assign_raw = [assign_raw]
+    assign_extra = [t.strip() for t in assign_raw if isinstance(t, str) and t.strip()]
     if assign_extra:
-        lines.append("- 과제 관련 특이사항: " + ", ".join(assign_extra))
+        lines.append("- 과제 관련 특이사항 — 각 항목의 핵심 사실을 반드시 본문에 반영: " + ", ".join(assign_extra))
 
     und = tags.get("understand")
     if und and und in _UNDERSTAND_TEXT:
@@ -144,11 +151,13 @@ def _build_tags_context(tags: dict) -> str:
     return "\n".join(lines)
 
 
-def _base_conditions() -> str:
+def _base_conditions(batch=False) -> str:
     """모든 AI 생성 호출에 공통으로 들어가는 조건 문자열."""
     return (
         "[작성 지침]\n"
-        "1. 문체: ~했습니다 체로 통일 (했어요 혼용 금지).\n"
+        "1. 문체: 선택한 문체 지침의 말투를 따르고, 지정이 없으면 ~했습니다 체로 통일. "
+        "강사 개별 지침의 말투·구성·이모지 요청은 기본 및 선택 문체보다 우선합니다. "
+        "분량은 별도 메시지 길이 설정을 최우선으로 따릅니다. 사실·안전·출력 형식 규칙은 항상 유지.\n"
         "★ 학생 이름을 주어로 절대 쓰지 마세요. 메시지 바로 위에 '오늘의 OOO는?' 헤더가 "
         "이미 이름을 표시하므로, 본문에서 'OOO는'·'OOO 학생은'·'OO이는' 같은 이름 주어는 "
         "중복이라 금지합니다. 이름·호칭 없이 곧바로 수업 내용·성취·이해도·관찰된 행동으로 시작하세요.\n"
@@ -165,8 +174,13 @@ def _base_conditions() -> str:
         "7. 하이라이트: ⭐ 오늘의 하이라이트가 있으면 메시지에서 가장 먼저 또는 가장 인상적으로 표현.\n"
         "8. 과제 반복 금지: 진도·과제 정보(페이지·번호 등)는 메시지에 별도 항목으로 이미 전달됩니다. "
         "특이사항에서 '다음 과제는 p.XX입니다' 식으로 그대로 읽어주는 문장 절대 금지.\n"
-        "9. 결석: 데이터가 없으면 안부 인사와 다음 수업 기약 코멘트로 대체.\n"
-        "10. 출력: 순수 텍스트만 (JSON·마크다운·따옴표 금지). 2~3문장, 100자 내외.\n"
+        "9. 입력 부족: 데이터가 비었다는 이유로 출석·결석·정상 수업·성취를 단정하지 마세요. "
+        "오늘 관찰·메모가 있으면 그 사실만 작성하고, 모두 없으면 짧은 중립적 안부만 작성하세요.\n"
+        + ("10. 출력: 지정된 cls·name·note 키의 순수 JSON 배열만. note는 자연어 본문.\n" if batch else
+         "10. 출력: 순수 텍스트만 (JSON·마크다운·따옴표 금지).\n")
+        + "분량: 기본 2~3문장, 100자 내외. 문체 지침이 있으면 그 분량을 우선하되, "
+        "반드시 전달할 메모의 날짜·시간·준비물은 분량 때문에 생략하지 마세요.\n"
+        +
         "11. 컨디션 처리: 컨디션은 메시지의 '보조 맥락'입니다. 메시지를 컨디션 묘사로 "
         "시작하지 말고, 반드시 학습 내용·성취·이해도·관찰 행동을 먼저 전달한 뒤 필요한 "
         "경우에만 컨디션을 자연스럽게 녹이세요. great 외의 긍정/보통(good·normal) 컨디션은 "
@@ -180,14 +194,14 @@ def _base_conditions() -> str:
         "14. 표현 다양화: 같은 학생에게 매일 비슷한 관찰 태그가 반복되더라도, 문장 시작 표현·"
         "문장 구조·어휘를 매번 다르게 쓰세요. '오늘도', '성실하게 참여했습니다' 같은 상투 문구의 "
         "반복 사용 금지. 같은 사실도 관찰 장면(어떤 문제에서·어떤 행동으로), 성취 과정, 변화 추이 등 "
-        "매일 다른 각도로 서술하세요. [지난 발송 이력] 블록이 있으면 그 문구들과 표현이 "
+        "매일 다른 각도로 서술하되, 입력에 없는 문제 유형·행동·향상을 만들지 마세요. [지난 발송 이력] 블록이 있으면 그 문구들과 표현이 "
         "겹치지 않게 쓰되, 이력은 과거 기록이므로 오늘 일처럼 가져오지 마세요(블록 내 규칙 준수)."
     )
 
 
 # ── 단건 생성 프롬프트 ───────────────────────────────────────────────
 _DEFAULT_STYLE_BLOCK = (
-    "[문체 참고 예시 — 내용은 아래 학생 데이터로 새로 작성]\n"
+    "[문체 참고 예시 — 말투만 참고. 예시의 단원·행동·이벤트·성취는 복사 금지. 내용은 아래 학생 데이터로 새로 작성]\n"
     "예1) \"오늘 이차함수 단원에서 막혔던 개념을 반복 설명 후 이해했습니다. 틀린 문항을 스스로 재풀이하며 오답을 정리하는 모습이 인상적이었습니다.\"\n"
     "예2) \"주간 테스트를 실시했으며, 오늘은 다소 피곤해 보이는 날이었지만 끝까지 집중해서 임했습니다.\"\n"
     "예3) \"예습 내용을 바탕으로 설명을 빠르게 이해하고 응용 문제까지 도전했습니다. 오늘 다룬 개념을 완전히 자기 것으로 만든 하루였습니다.\""
@@ -251,7 +265,7 @@ def build_single_prompt(sheet, cls, name, textbooks, student_data, progress_data
                 + (f", 진도={pd_val['progress']}" if pd_val.get('progress') else "")
                 + (f", 과제={pd_val['homework']}"  if pd_val.get('homework') else "")
             )
-    context = "\n".join(lines) if lines else "수업 진행 완료"
+    context = "\n".join(lines) if lines else "오늘 수업 사실 제공 없음(출결 판단 근거 아님)"
 
     tags_block = _build_tags_context(tags)
 
@@ -299,7 +313,7 @@ def build_batch_prompt(targets, style_block="", custom_block=""):
         entry = {
             "name":  t["name"],
             "cls":   t["cls"],
-            "수업데이터": ", ".join(valid_data) if valid_data else "정상 수업 진행"
+            "수업데이터": ", ".join(valid_data) if valid_data else "오늘 수업 사실 제공 없음(출결 판단 근거 아님)"
         }
         if t.get("existing"):
             entry["직접작성메모_반드시반영"] = t["existing"]
@@ -345,46 +359,95 @@ def build_batch_prompt(targets, style_block="", custom_block=""):
 
 
 # ── 멀티 엔진 API 허브 (직관적 선택형 분기) ───────────────────────────
-def validate_key(engine_type, api_key):
-    """API 키 유효성 실콜 검증 — 소형 생성으로 키 상태 판별.
+class AIHTTPError(RuntimeError):
+    def __init__(self, code, message):
+        self.code = code
+        super().__init__(message)
 
-    반환: (ok: bool, msg: str). 설정창 '키 테스트' 버튼용.
-    - 프로브 토큰은 넉넉히(64): thinking(gemini flash-latest·GPT reasoning)이 초소형 예산을
-      먹고 MAX_TOKENS·텍스트 없음으로 끝나 유효한 키가 오판되던 문제 방지.
-    - HTTP 200 도달 후의 '텍스트 없음/MAX_TOKENS'은 인증·라우팅 성공(=키 유효)이므로 성공 처리.
-    - 503/500/502/504: 서버 일시 과부하 → 키 무효 아님(재시도 2회로 순간 과부하 흡수).
-    - 429: 키는 유효하나 쿼터 제한(무료 일일 쿼터는 태평양 자정=KST 오후 4~5시 리셋).
-    """
+
+def _quota_message(response_text):
+    """Summarize Google's structured quota failure without exposing raw API output."""
+    try:
+        error = json.loads(response_text).get("error", {})
+    except (ValueError, AttributeError):
+        return "Google 사용량 한도 초과(429) — AI Studio에서 프로젝트·모델 한도 확인", False
+    violations = [v for d in error.get("details", []) if isinstance(d, dict)
+                  and "QuotaFailure" in d.get("@type", "") for v in d.get("violations", [])
+                  if isinstance(v, dict)]
+    ids = " ".join(str(v.get("quotaId", "")) for v in violations).lower()
+    metric = " ".join(str(v.get("quotaMetric", "")) for v in violations).lower()
+    detail = str(error.get("message", "")).lower()
+    zero_limit = bool(re.search(r"\blimit\s*:\s*0\b", detail))
+    if "perday" in ids or "perday" in metric:
+        unit = "일일"
+    elif "perminute" in ids or "perminute" in metric:
+        unit = "분당"
+    else:
+        unit = "사용량"
+    if "token" in ids or "token" in metric:
+        target = "토큰"
+    elif "request" in ids or "request" in metric:
+        target = "요청"
+    else:
+        target = ""
+    label = f"{unit} {target} 한도".replace("  ", " ").strip()
+    if zero_limit:
+        return f"Google {label}가 0으로 설정됨(429) — 해당 프로젝트·모델의 무료/결제 등급 확인", True
+    return f"Google {label} 초과(429) — AI Studio에서 프로젝트·모델 한도 확인", unit == "일일"
+
+
+def validate_key(engine_type, api_key, model_settings=None):
+    """Probe the exact selected model; server failures do not prove key validity."""
     if not (api_key or "").strip():
         return False, "키가 비어 있습니다"
     try:
-        _call_ai_hub(engine_type, api_key.strip(), "안녕", max_tokens=64, retries=2)
+        _call_ai_hub(engine_type, api_key.strip(), "안녕", max_tokens=64, retries=2,
+                     model_settings=model_settings)
         return True, "✅ 유효 — 호출 성공"
-    except Exception as e:
-        s = str(e)
-        if "401" in s or "403" in s:
+    except AIHTTPError as e:
+        code = e.code
+        if code in (401, 403):
             return False, "❌ 인증 실패 — 키 값 또는 권한 확인"
-        if "429" in s:
-            return False, "⚠️ 쿼터 제한 — 키는 유효, 무료 한도 소진(KST 오후 4~5시 리셋)"
-        if any(c in s for c in ("503", "500", "502", "504")):
-            return False, "⚠️ 서버 일시 과부하 — 키 무효 아님, 잠시 후 다시 테스트"
-        if "404" in s:
-            return False, "❌ 모델 접근 불가 — 이 키의 프로젝트에서 현재 모델 미지원"
-        # HTTP 200 이후 파서 단계 오류(텍스트 없음·MAX_TOKENS·빈 응답)는 요청이 인증되고
-        # 모델까지 도달했다는 뜻 → 키는 유효. 출력이 짧아 잘렸을 뿐이므로 성공으로 판정.
-        if ("텍스트 없음" in s or "finishReason" in s or "빈 응답" in s
-                or "MAX_TOKENS" in s):
-            return True, "✅ 유효 — 호출 성공(출력 짧음)"
-        if "400" in s:
-            return False, "❌ 요청 거부(400) — 키 형식/엔진 선택 확인"
-        return False, "❌ 실패: " + s[:80]
+        if code == 429:
+            return False, "⚠️ " + str(e)
+        if code == 503 and engine_type.strip().lower() == "gemini":
+            try:
+                model = resolve("gemini", model_settings)["model"]
+                req = urllib.request.Request(
+                    f"https://generativelanguage.googleapis.com/v1beta/models/{model}",
+                    headers={"x-goog-api-key": api_key.strip()})
+                with urllib.request.urlopen(req, timeout=20) as response:
+                    info = json.loads(response.read().decode("utf-8"))
+                if "generateContent" in info.get("supportedGenerationMethods", []):
+                    return True, "⚠️ 키·모델 접근 확인. 생성 서버 503 과부하 — 생성은 나중에 재시도"
+                return False, "❌ 모델이 generateContent를 지원하지 않습니다"
+            except urllib.error.HTTPError as probe_error:
+                if probe_error.code in (401, 403):
+                    return False, "❌ 키 인증/모델 권한 오류 (모델 조회)"
+                if probe_error.code == 404:
+                    return False, "❌ 모델을 찾을 수 없습니다 (모델 조회)"
+            except (urllib.error.URLError, OSError, ValueError, KeyError):
+                pass
+        if code in (500, 502, 503, 504):
+            return False, f"⚠️ 생성 서버 HTTP {code} — 키 유효성 미확정, 잠시 후 재시도"
+        if code == 404:
+            return False, "❌ 모델 접근 불가 — 모델 ID·프로젝트 지원 여부 확인"
+        if code == 400:
+            return False, "❌ 요청 거부 — 모델·사고 옵션·키 형식 확인"
+        return False, f"❌ API 오류 ({code})"
+    except Exception as e:
+        text = str(e).replace(api_key.strip(), "[REDACTED]")
+        if "finishReason=MAX_TOKENS" in text:
+            return True, "✅ 유효 — 호출 성공(검사 출력 제한)"
+        return False, "❌ 실패: " + text[:100]
 
 
 def _call_ai_hub(engine_type, api_key, prompt, max_tokens=300, temperature=0.5, system="",
-                 retries=4):
+                 retries=4, model_settings=None):
     """설정창에서 선택된 특정 AI 엔진 규격에 맞추어 통신을 처리합니다.
     retries: 일시 오류(429/5xx) 총 시도 횟수 — 키 검증 등 즉답 용도는 1."""
     engine_type = engine_type.strip().lower()
+    selected = resolve(engine_type, model_settings)
 
     if engine_type == "claude":
         # claude-sonnet-5 이행(2026-07): ① temperature 등 샘플링 파라미터 미허용(400) —
@@ -398,7 +461,7 @@ def _call_ai_hub(engine_type, api_key, prompt, max_tokens=300, temperature=0.5, 
             "Content-Type":      "application/json"
         }
         body = {
-            "model":      "claude-sonnet-5",
+            "model":      selected["model"],
             "max_tokens":  int(max_tokens * 1.3),
             "thinking":   {"type": "disabled"},
             "messages":    [{"role": "user", "content": prompt}]
@@ -427,30 +490,26 @@ def _call_ai_hub(engine_type, api_key, prompt, max_tokens=300, temperature=0.5, 
             messages.append({"role": "system", "content": system})
         messages.append({"role": "user", "content": prompt})
         body = {
-            "model":                 OPENAI_MODEL,
+            "model":                 selected["model"],
             "messages":              messages,
             "max_completion_tokens": max_tokens,
             "reasoning_effort":      "none",
         }
 
     elif engine_type == "gemini":
-        # 무료 티어. key는 헤더 아닌 쿼리파람.
-        # 기본 GEMINI_MODEL=gemini-flash-latest (2026-07-24 채택):
-        # - 특정 모델(gemini-3.5-flash) 무료 트래픽 상시 혼잡으로 지속 503 → 구글 관리 별칭으로
-        #   전환(가용 모델 자동 라우팅). 실콜 품질 비교서 자연어·형식·규칙준수 최상.
-        # - 3.x는 thinkingLevel 체계(minimal). thinking 토큰 출력 잠식 보정 maxOutputTokens×1.3.
-        # - 별칭이 향후 thinkingLevel 미지원 모델로 이동할 위험 대비: 아래 요청 루프에서
-        #   'thinking 관련 400' 발생 시 thinkingConfig 제거 후 1회 재시도(gemini_no_think 플래그).
-        # - 순간 503/429는 _RETRY 백오프(1·2·4s)가 흡수. 2.5 계열은 신규 사용자 차단 진행 중이라 회귀 금지.
+        # 2026-09-28: latest/Lite의 503과 2.5 신규 접근 제한을 실측.
+        # latest는 장애 우회 라우터가 아닌 이동 별칭이므로 성공한 3.8 GA로 고정.
+        # 3.8은 minimal을 거부하며 low/medium/high만 지원한다.
+        # 400 thinking 교정 및 일시 오류 백오프는 유지한다.
         url = (f"https://generativelanguage.googleapis.com/v1beta/models/"
-               f"{GEMINI_MODEL}:generateContent?key={api_key}")
-        headers = {"Content-Type": "application/json"}
+               f"{selected['model']}:generateContent")
+        headers = {"Content-Type": "application/json", "x-goog-api-key": api_key}
         body = {
             "contents": [{"parts": [{"text": prompt}]}],
             "generationConfig": {
                 "maxOutputTokens": int(max_tokens * 1.3),
                 "temperature":     temperature,
-                "thinkingConfig":  {"thinkingLevel": "minimal"},
+                "thinkingConfig":  {"thinkingLevel": "low"},
             },
         }
         if system:
@@ -459,6 +518,22 @@ def _call_ai_hub(engine_type, api_key, prompt, max_tokens=300, temperature=0.5, 
     else:
         raise ValueError(f"지원하지 않는 엔진 선택 유형: {engine_type}")
     
+    # Explicit per-engine settings; omit means use the provider default.
+    level = selected["thinking_level"]
+    if engine_type == "gemini":
+        gc = body["generationConfig"]
+        gc.pop("thinkingConfig", None)
+        if level != "omit":
+            gc["thinkingConfig"] = {"thinkingLevel": level}
+    elif engine_type == "claude":
+        body.pop("thinking", None)
+        if level != "omit":
+            body["thinking"] = {"type": level}
+    elif engine_type == "openai":
+        body.pop("reasoning_effort", None)
+        if level != "omit":
+            body["reasoning_effort"] = level
+
     dprint("\n" + "="*60)
     dprint(f"[AI DEBUG] engine={engine_type}  max_tokens={max_tokens}  temp={temperature}")
     dprint(f"[AI DEBUG] URL: {url}")
@@ -486,20 +561,20 @@ def _call_ai_hub(engine_type, api_key, prompt, max_tokens=300, temperature=0.5, 
             break
         except urllib.error.HTTPError as he:
             last_err = he
-            if he.code in _RETRY and _attempt < _n - 1:
+            try:
+                error_body = he.read(16384).decode('utf-8', 'replace')
+            except Exception:
+                error_body = ''
+            quota_message, long_limit = _quota_message(error_body) if he.code == 429 else (None, False)
+            if he.code in _RETRY and not long_limit and _attempt < _n - 1:
                 time.sleep(2 ** _attempt)   # 1·2·4초
                 _attempt += 1
                 continue
-            # 비재시도 오류(404·400·401·403 등) — API 에러 본문을 읽어 원인 명확화.
-            # 404는 대개 모델/엔드포인트 없음(키가 해당 모델 권한 없음 포함) → 재시도 무의미, 설정 안내.
-            try:
-                body = he.read().decode('utf-8', 'replace')[:400]
-            except Exception:
-                body = ''
+            # 404는 대개 모델/엔드포인트 없음(키가 해당 모델 권한 없음 포함) → 재시도 무의미.
             # gemini 별칭(flash-latest)이 thinkingLevel 미지원 모델로 이동한 경우:
             # 400 + 본문에 'thinking' 언급 → thinkingConfig 제거 후 1회 재시도(추가 시도 소비 없음).
-            if (engine_type == "gemini" and he.code == 400 and not _gem_stripped
-                    and "thinking" in body.lower()):
+            if (model_settings is None and engine_type == "gemini" and he.code == 400 and not _gem_stripped
+                    and "thinking" in error_body.lower()):
                 _gem_stripped = True
                 body_dict = json.loads(req.data.decode('utf-8'))
                 body_dict.get("generationConfig", {}).pop("thinkingConfig", None)
@@ -513,9 +588,11 @@ def _call_ai_hub(engine_type, api_key, prompt, max_tokens=300, temperature=0.5, 
                 hint = "API 키 인증/권한 오류 — 키 확인"
             elif he.code == 400:
                 hint = "요청 형식 오류 — 모델명·파라미터 확인"
+            elif he.code == 429:
+                raise AIHTTPError(429, quota_message) from he
             else:
                 hint = "API 오류"
-            raise RuntimeError(f"AI {he.code}: {hint}. {body}".strip()) from he
+            raise AIHTTPError(he.code, f"AI {he.code}: {hint}. {error_body[:400]}".replace(api_key, "[REDACTED]").strip()) from he
         except urllib.error.URLError as ue:   # 네트워크 일시 단절
             last_err = ue
             if _attempt < _n - 1:

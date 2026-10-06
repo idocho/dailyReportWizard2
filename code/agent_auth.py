@@ -99,6 +99,9 @@ class TokenManager:
         self._exp = 0.0
         self.uid = ""
         self.last_error = None
+        self._next_attempt = 0.0
+        self._failures = 0
+        self._credentials_rejected = False
 
     def _login(self):
         s = sign_in(self.name, self.campus, self.password, self.api_key)
@@ -108,6 +111,8 @@ class TokenManager:
     def token(self):
         """현재 유효 idToken 반환. 비번 없으면 None. 로그인/갱신 실패 시 None(폴백)."""
         if not self.password:
+            return None
+        if self._credentials_rejected or time.monotonic() < self._next_attempt:
             return None
         now = time.time()
         try:
@@ -120,8 +125,25 @@ class TokenManager:
                 except Exception:
                     self._login()  # refresh 실패 → 재로그인
             self.last_error = None
+            self._failures = 0
+            self._next_attempt = 0.0
             return self._id
         except Exception as e:
-            self.last_error = str(e)[:200]
+            code = ""
+            if isinstance(e, urllib.error.HTTPError):
+                try:
+                    code = str(json.loads(e.read(4096).decode("utf-8")).get("error", {}).get("message", ""))
+                except (ValueError, OSError, AttributeError):
+                    pass
+            if code in ("INVALID_PASSWORD", "INVALID_LOGIN_CREDENTIALS", "EMAIL_NOT_FOUND"):
+                self.last_error = "웹 로그인 정보 불일치 — 설정 수정·재시작"
+                self._credentials_rejected = True
+            elif code == "TOO_MANY_ATTEMPTS_TRY_LATER":
+                self.last_error = "로그인 시도 제한 — 기다린 뒤 설정 수정·재시작"
+                self._credentials_rejected = True
+            else:
+                self.last_error = "로그인 연결 실패 — 네트워크 확인 후 자동 재시도"
+                self._failures += 1
+                self._next_attempt = time.monotonic() + min(300, 30 * 2 ** (self._failures - 1))
             self._id = None
             return None

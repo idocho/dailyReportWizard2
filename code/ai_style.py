@@ -122,7 +122,7 @@ def build_guidance(profile):
         parts.append("이모지는 사용하지 않습니다")
 
     if profile['yo_rate'] >= 0.35:
-        parts.append("기본은 격식체(~습니다)이되 부드러운 어조를 유지합니다")
+        parts.append("해요체(~어요·~아요)로 통일하며 부드러운 어조를 유지합니다")
     else:
         parts.append("격식체(~습니다)로 통일합니다")
 
@@ -159,7 +159,7 @@ def profile_summary(profile):
     if not profile:
         return "분석할 전송 노트가 없습니다. 기본 문체로 생성됩니다."
     avg  = round(profile['avg_len'])
-    tone = "격식체" if profile['yo_rate'] < 0.35 else "격식체+부드러운 어조"
+    tone = "격식체" if profile['yo_rate'] < 0.35 else "해요체"
     emoji = "이모지 사용" if profile['emoji_rate'] >= 0.4 else "이모지 미사용"
     excl  = " · 칭찬 시 느낌표" if profile['excl_rate'] >= 0.3 else ""
     bullet = " · 개조식" if profile['bullet_rate'] >= 0.4 else ""
@@ -176,7 +176,9 @@ def resolve_style(mode, instructor_notes_provider):
     mode = (mode or STYLE_AUTO).strip()
     if mode != STYLE_AUTO:
         p = STYLE_PRESETS.get(mode)
-        return (p['guidance'], list(p['examples'])) if p else ("", [])
+        if not p:
+            raise ValueError(f"지원하지 않는 문체: {mode}")
+        return p['guidance'], list(p['examples'])
     notes = instructor_notes_provider() if instructor_notes_provider else []
     return auto_style(notes)
 

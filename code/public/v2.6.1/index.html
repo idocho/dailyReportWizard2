@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<!--
+  DailyReportWizard for Web — v2.6.0 (캠퍼스·강사 선택)
+  Crafted by IDO(idocho@kakao.com) · Powered by Claude AI
+  기존 강사 설정을 선택해 동일한 campus/{campus} 데이터 경로로 진입한다.
+-->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Daily Report Wizard">
+<meta name="theme-color" content="#1A1D2E">
+<link rel="manifest" href="manifest.json?v=2">
+<link rel="icon" type="image/svg+xml" href="icons/favicon.svg?v=2">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png?v=2">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png?v=2">
+<title>DailyReportWizard</title>
+<link rel="stylesheet" href="css/app.css?v=20260643">
+<style>
+  #drw-gate{position:fixed;inset:0;z-index:9999;background:linear-gradient(160deg,#EEF0FF 0%,#FAFAFB 55%);
+    display:flex;align-items:center;justify-content:center;padding:24px;
+    font-family:"맑은 고딕","Malgun Gothic",system-ui,sans-serif}
+  #drw-gate .card{width:100%;max-width:360px;background:#fff;border:1px solid #ECECEF;border-radius:18px;
+    padding:28px 24px;box-shadow:0 12px 40px rgba(79,70,229,.10)}
+  #drw-gate h1{margin:0 0 2px;font-size:16px;font-weight:800;text-align:center;color:#18181B}
+  #drw-gate p{margin:0 0 14px;font-size:12px;color:#5C6370;text-align:center}
+  #drw-gate label{display:block;font-size:12px;font-weight:700;color:#5C6370;margin:12px 0 5px}
+  #drw-gate input,#drw-gate select{width:100%;padding:11px 12px;border:1px solid #ECECEF;border-radius:10px;font-size:14px;outline:none;box-sizing:border-box}
+  #drw-gate input:focus,#drw-gate select:focus{border-color:#4F46E5;box-shadow:0 0 0 3px #EEF0FF}
+  #drw-gate .btn{width:100%;margin-top:16px;padding:12px;border:none;border-radius:10px;background:#4F46E5;color:#fff;font-size:14px;font-weight:800;cursor:pointer}
+  #drw-gate .btn:disabled{opacity:.5}
+  #drw-gate .m{margin-top:11px;padding:9px 11px;border-radius:9px;font-size:12px;font-weight:600;display:none;background:#FEF2F2;color:#DC2626;border:1px solid #FECACA}
+  #drw-gate .m.show{display:block}
+  #drw-gate .foot{margin-top:14px;text-align:center;font-size:11px;color:#5C6370}
+</style>
+</head>
+<body>
+<!-- 강사 선택 게이트 (선택 후 앱 로드) -->
+<div id="drw-gate">
+  <div class="card">
+    <h1>DailyReportWizard</h1><p>캠퍼스를 선택하고 강사 이름을 입력하세요</p>
+    <label>캠퍼스</label><select id="gt-campus"><option value="dongsuwon">동수원</option></select>
+    <label for="gt-name">강사 이름</label><input id="gt-name" type="text" placeholder="등록된 강사 이름" autocomplete="off" disabled>
+    <button class="btn" id="gt-btn" disabled>시작하기</button>
+    <div class="m" id="gt-msg"></div>
+    <div class="foot">등록된 이름과 정확히 일치해야 합니다. 마지막 입력은 이 기기에 저장됩니다.</div>
+  </div>
+</div>
+
+<div id="wr" style="display:none">
+  <aside class="sidebar" id="sb"></aside>
+  <main class="main" id="mc"></main>
+  <div class="toast" id="toast"></div>
+</div>
+
+<script type="module">
+  const $=id=>document.getElementById(id);
+  let CAMPUS_PATH='';
+  const cfg=(await import('./js/auth/firebase-config.js')).firebaseConfig;
+  const base=cfg.databaseURL.replace(/\/$/,'');
+  let cachedAcl={};
+  let eligibleNames=null;
+  const message=s=>{ $('gt-msg').className='m show'; $('gt-msg').textContent=s; };
+  const fetchJson=async path=>{ const r=await fetch(base+'/'+path+'.json'); if(!r.ok)throw new Error('DB 응답 '+r.status); return r.json(); };
+  const saved=(()=>{try{return JSON.parse(localStorage.getItem('drw_choice')||'null');}catch(_){return null;}})();
+  async function loadCampuses(){
+    const cs=await fetchJson('campuses');
+    const entries=Object.entries(cs||{}).filter(([,v])=>v&&v.active!==false)
+      .sort((a,b)=>((a[1].order??99)-(b[1].order??99))||a[0].localeCompare(b[0]));
+    if(!entries.length)throw new Error('등록된 캠퍼스가 없습니다.');
+    $('gt-campus').replaceChildren(new Option('캠퍼스 선택',''),...entries.map(([id,v])=>new Option(v.name||id,id)));
+    if(saved&&entries.some(([id])=>id===saved.campus))$('gt-campus').value=saved.campus;
+  }
+  async function loadInstructors(){
+    const campus=$('gt-campus').value, input=$('gt-name');
+    $('gt-btn').disabled=true;
+    eligibleNames=null;
+    input.value=''; input.disabled=true;
+    input.placeholder=campus?'강사 명단 확인 중…':'캠퍼스를 먼저 선택하세요';
+    if(!campus)return;
+    try{
+      const [records,acl]=await Promise.all([
+        fetchJson('campus/'+encodeURIComponent(campus)+'/config/instructors'),
+        fetchJson('acl')
+      ]);
+      if($('gt-campus').value!==campus)return;
+      cachedAcl=acl||{};
+      const blocked=new Set(Object.values(cachedAcl).filter(a=>a&&a.campus===campus&&a.active===false).map(a=>a.instructorId));
+      const names=new Set(Object.keys(records||{}).filter(name=>records[name]&&typeof records[name]==='object'&&!blocked.has(name)));
+      for(const a of Object.values(cachedAcl)){
+        if(a&&a.campus===campus&&a.active===true&&['manager','admin','super'].includes(a.role)&&a.instructorId&&!blocked.has(a.instructorId))names.add(a.instructorId);
+      }
+      eligibleNames=names;
+      input.disabled=false; input.placeholder='등록된 강사 이름';
+      if(saved&&saved.campus===campus&&names.has(saved.name))input.value=saved.name;
+      $('gt-btn').disabled=!input.value.trim();
+      if(!names.size)message('등록된 강사가 없습니다. 관리자에게 문의하세요.');
+      else $('gt-msg').className='m';
+    }catch(e){if($('gt-campus').value===campus)message('강사 목록을 불러오지 못했습니다. DB 연결을 확인하세요. ('+e.message+')');}
+  }
+  $('gt-campus').onchange=loadInstructors;
+  $('gt-name').oninput=()=>{$('gt-btn').disabled=!$('gt-name').value.trim();$('gt-msg').className='m';};
+  $('gt-name').onkeydown=e=>{if(e.key==='Enter'&&!$('gt-btn').disabled)$('gt-btn').click();};
+  try{await loadCampuses();await loadInstructors();}catch(e){message('캠퍼스 목록을 불러오지 못했습니다. ('+e.message+')');}
+
+  function bootApp(){
+    // 선택한 캠퍼스의 기존 데이터 경로를 사용한다.
+    try{ localStorage.setItem('drw_db_url',cfg.databaseURL); localStorage.setItem('drw_db_path',CAMPUS_PATH);
+         localStorage.removeItem('drw_db_secret'); }catch(_){}
+    $('drw-gate').remove(); $('wr').style.display='';
+    const order=['data/curriculum.js?v=202606112000','js/app-core.js?v=v340','js/app-input.js?v=v335','js/app-settings.js?v=v346','js/app-scores.js?v=v324','js/app-report.js?v=v347'];
+    window.APP_VERSION='v2.6.1'; document.title='DailyReportWizard v2.6.1';
+    (function next(i){ if(i>=order.length)return; const s=document.createElement('script'); s.src=order[i]; s.onload=()=>next(i+1); document.body.appendChild(s); })(0);
+  }
+
+  window.doLogout=()=>{localStorage.removeItem('drw_instr');location.reload();};
+  $('gt-btn').onclick=async()=>{
+    const campus=$('gt-campus').value,name=$('gt-name').value.trim();
+    if(!campus||!name)return;
+    if(!eligibleNames){message('강사 명단을 확인하지 못했습니다. 잠시 후 다시 시도하세요.');return;}
+    if(!eligibleNames.has(name)){message('등록된 강사 이름과 일치하지 않습니다. 이름을 확인하세요.');return;}
+    $('gt-btn').disabled=true;$('gt-btn').textContent='불러오는 중…';
+    try{
+      const [record,acl]=await Promise.all([
+        fetchJson('campus/'+encodeURIComponent(campus)+'/config/instructors/'+encodeURIComponent(name)),
+        fetchJson('acl')
+      ]);
+      const entry=Object.values(acl||{}).find(a=>a&&a.campus===campus&&a.instructorId===name);
+      if(entry&&entry.active===false)throw new Error('비활성화된 강사입니다.');
+      if(!record&&(!entry||!['manager','admin','super'].includes(entry.role)))throw new Error('강사 데이터가 없습니다.');
+      const profile=(record&&typeof record==='object')?record:{};
+      const matched=Object.entries(acl||{}).find(([,a])=>a&&a.campus===campus&&a.instructorId===name&&a.active===true);
+      const role=matched?matched[1].role:'instructor';
+      CAMPUS_PATH='campus/'+campus;
+      if(saved&&(saved.campus!==campus||saved.name!==name)){
+        for(const key of ['drw_input','drw_prog','drw_tags','drw_obs','drw_config'])localStorage.removeItem(key);
+      }
+      localStorage.setItem('drw_choice',JSON.stringify({campus,name}));
+      localStorage.setItem('drw_instr',JSON.stringify({...profile,id:name,name:profile.name||name,assignments:profile.assignments||[],role,campus}));
+      bootApp();
+    }catch(e){message('강사를 열지 못했습니다. '+e.message);$('gt-btn').disabled=false;$('gt-btn').textContent='시작하기';}
+  };
+</script>
+</body>
+</html>

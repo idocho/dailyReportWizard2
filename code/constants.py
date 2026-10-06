@@ -31,8 +31,9 @@ AI_ENGINE_LABELS = {
     'openai': 'GPT (OpenAI)',
 }
 
-# Gemini 기본 모델 (무료·stable). 교체 시 이 한 줄만 수정.
-GEMINI_MODEL = "gemini-flash-latest"
+# Gemini 기본 모델: 이동 별칭 대신 검증한 GA 버전 고정(2026-09-28).
+# 3.8은 minimal 미지원 — ai_engine의 thinkingLevel=low와 함께 관리.
+GEMINI_MODEL = "gemini-3.5-flash-lite"
 
 # OpenAI 기본 모델 (GA·저가형, gpt-4o-mini 계열 공식 후속). 교체 시 이 한 줄만 수정.
 OPENAI_MODEL = "gpt-5.6-luna"

@@ -1,0 +1,11 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "campuses": { ".read": true, ".write": false },
+    "schema_version": { ".read": true, ".write": false },
+    "acl": { ".read": true, ".write": false },
+    "campus": { ".read": true, ".write": true },
+    "sendJobs": { ".read": true, ".write": true }
+  }
+}

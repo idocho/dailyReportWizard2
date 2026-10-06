@@ -12,6 +12,10 @@ genJobs 큐를 읽어 본인 **개인 API 키(로컬 DPAPI)** 로 `ai_engine` �
 전송(kakao_send)·트레이/오버레이/셋업 마법사는 별도 모듈. 여기는 생성만.
 """
 import argparse
+import copy
+import os
+import tempfile
+from ai_model_config import from_config
 import json
 import sys
 import threading
@@ -29,6 +33,7 @@ import ai_style
 _BASE_DIR = (Path(sys.executable).resolve().parent if getattr(sys, "frozen", False)
              else Path(__file__).resolve().parent)
 CFG_PATH = _BASE_DIR / "agent_config.json"
+_CONFIG_LOCK = threading.RLock()
 
 
 # ── genJobs payload → build_single_prompt 입력 재구성 ─────────────────
@@ -72,10 +77,39 @@ TONE_DIRECTIVES = {
 }
 
 
+def _length_options(job):
+    mode = job.get("messageLength") or "normal"
+    ranges = {"short": (80, 150), "normal": (180, 280), "long": (320, 450)}
+    if mode == "custom":
+        try:
+            target = max(80, min(800, int(job.get("messageTargetChars", 350))))
+        except (ValueError, TypeError):
+            target = 350
+        low, high = round(target * .85), round(target * 1.15)
+    else:
+        low, high = ranges.get(mode, ranges["normal"])
+    return ("[메시지 분량]" +
+            f"\n특이사항 본문은 공백 포함 {low}~{high}자를 목표로 작성하세요. "
+            "이 분량 설정은 기본 100자 지침·문체의 문장 수·예시 길이·개별 지침의 분량보다 우선합니다. "
+            "필수 메모와 선택한 과제 프리셋은 모두 보존하세요. 입력 사실이 적으면 목표보다 짧게 작성하고 "
+            "분량을 채우기 위한 사실 추가·반복·군더더기는 금지합니다.\n", max(600, high * 3 + 200))
+
+
+def _generation_system(job, batch=False):
+    length_block, budget = _length_options(job)
+    system = _base_conditions(batch=batch)
+    custom = (job.get("customPrompt") or "").strip()
+    if custom:
+        system += ("\n\n[강사 개별 지침 — 말투·구성 요청은 기본 및 선택 문체보다 우선; "
+                   "사실·안전·출력 형식 유지]\n" + custom)
+    return system + "\n\n" + length_block, budget
+
+
 def generate(cfg, job, ai_call=_call_ai_hub, notes_provider=None, recent_provider=None):
     """단건 생성 — 본인 로컬 키 + 문체(ai_style)·개별지침 적용(PC앱 gen_single 동일).
     job['tone']로 톤 재생성. notes_provider=AUTO 말투 학습용 강사 노트 공급자.
     recent_provider(nameKey)→[(date,note)] 학생별 최근 발송 문구 — 표현 중복 회피 주입."""
+    cfg = copy.deepcopy(cfg)  # Freeze model/key/options for this generation job.
     engine = cfg.get("ai_engine_type", "gemini").strip().lower()
     key = cfg.get(f"{engine}_api_key", "").strip()
     if not key:
@@ -86,8 +120,8 @@ def generate(cfg, job, ai_call=_call_ai_hub, notes_provider=None, recent_provide
         guidance, examples = ai_style.resolve_style(job.get("styleMode") or "auto",
                                                     notes_provider or (lambda: []))
         style_block = ai_style.style_prompt_block(guidance, examples)
-    except Exception:
-        style_block = ""
+    except Exception as exc:
+        raise RuntimeError("선택 문체 처리 실패 — 설정과 전송 이력을 확인하세요") from exc
     try:
         recent = recent_provider(c["name"]) if recent_provider else []
     except Exception:
@@ -104,16 +138,14 @@ def generate(cfg, job, ai_call=_call_ai_hub, notes_provider=None, recent_provide
         if job.get("currentDraft"):
             prompt += f"[이전 작성본(어조 참고용, 사실은 위 데이터 우선)]\n{job['currentDraft']}\n"
     # system = 공통 지침 + 강사 개별 지침
-    system = _base_conditions()
-    custom = (job.get("customPrompt") or "").strip()
-    if custom:
-        system += ("\n\n[강사 개별 지침 — 위 작성 지침과 사실·안전 규칙을 위반하지 않는 선에서 반영]\n" + custom)
-    return ai_call(engine, key, prompt, max_tokens=400, temperature=0.75, system=system)
+    system, budget = _generation_system(job)
+    return ai_call(engine, key, prompt, max_tokens=budget, temperature=0.75, system=system, model_settings=from_config(cfg, engine))
 
 
 def generate_batch(cfg, job, ai_call=_call_ai_hub, notes_provider=None, recent_provider=None):
     """반 전체 1회 호출 생성(PC gen_all 동일) — build_batch_prompt. 반환: {nameKey: note}.
     recent_provider(nameKey)→[(date,note)] 학생별 최근 발송 문구 — 표현 중복 회피 주입."""
+    cfg = copy.deepcopy(cfg)  # Freeze model/key/options for this generation job.
     engine = cfg.get("ai_engine_type", "gemini").strip().lower()
     key = cfg.get(f"{engine}_api_key", "").strip()
     if not key:
@@ -145,13 +177,14 @@ def generate_batch(cfg, job, ai_call=_call_ai_hub, notes_provider=None, recent_p
     try:
         guidance, examples = ai_style.resolve_style(job.get("styleMode") or "auto", notes_provider or (lambda: []))
         style_block = ai_style.style_prompt_block(guidance, examples)
-    except Exception:
-        style_block = ""
+    except Exception as exc:
+        raise RuntimeError("선택 문체 처리 실패 — 설정과 전송 이력을 확인하세요") from exc
     custom = (job.get("customPrompt") or "").strip()
     custom_block = (f"[강사 개별 지침 — 위 작성 지침과 사실·안전 규칙을 위반하지 않는 선에서 반영]\n{custom}" if custom else "")
     prompt = build_batch_prompt(targets, style_block=style_block, custom_block=custom_block)
-    raw = ai_call(engine, key, prompt, max_tokens=min(8192, 360 * len(targets) + 600),
-                  temperature=0.75, system=_base_conditions())
+    system, budget = _generation_system(job, batch=True)
+    raw = ai_call(engine, key, prompt, max_tokens=min(32768, budget * len(targets) + 600),
+                  temperature=0.75, system=system, model_settings=from_config(cfg, engine))
     # JSON 배열만 추출 — 일부 모델(클로드 등)이 ```펜스·서두/후미 산문을 덧붙임
     clean = raw.replace("```json", "").replace("```", "").strip()
     s, e = clean.find("["), clean.rfind("]")
@@ -192,22 +225,40 @@ def _patch(db, node, data, token):
         return json.loads(r.read())
 
 
+def list_existing_instructors(db, campus):
+    """등록된 강사만 선택하도록 현 캠퍼스의 강사 설정 키를 읽는다."""
+    records = _get(db, f"campus/{urllib.parse.quote(campus)}/config/instructors", None)
+    acl = _get(db, "acl", None)
+    blocked = {entry.get("instructorId") for entry in (acl or {}).values()
+               if isinstance(entry, dict) and entry.get("campus") == campus
+               and entry.get("active") is False}
+    names = {name for name, value in (records or {}).items()
+             if isinstance(value, dict) and name not in blocked}
+    names.update(entry.get("instructorId") for entry in (acl or {}).values()
+                 if isinstance(entry, dict) and entry.get("campus") == campus
+                 and entry.get("active") is True
+                 and entry.get("role") in {"manager", "admin", "super"}
+                 and entry.get("instructorId"))
+    return sorted(names, key=lambda name: name.casefold())
+
+
 def write_heartbeat(cfg, db, instructor_id, token=None, real=False):
     """웹이 에이전트 실행 여부를 감지하도록 주기적 하트비트 기록.
     campus/{campus}/agents/{instructorId} = {ts(ms), real}. 실패 무해."""
     try:
         base = f"campus/{cfg['campus']}/agents/{urllib.parse.quote(instructor_id)}"
         _patch(db, base, {"ts": int(time.time() * 1000), "real": bool(real)}, token)
+        return True
     except Exception:
-        pass
+        return False
 
 
 def _fetch_instructor_notes(db, cfg, instructor_id, token):
     """history/ 에서 해당 강사가 전송한 노트 본문(최신순 일부) — AUTO 말투 학습용."""
     try:
         hist = _get(db, f"campus/{cfg['campus']}/history", token) or {}
-    except Exception:
-        return []
+    except Exception as exc:
+        raise RuntimeError("자동 문체용 전송 이력 조회 실패") from exc
     rows = []
     for nk, days in hist.items():
         if not isinstance(days, dict):
@@ -287,9 +338,10 @@ def _persist_smartwait(value, path=CFG_PATH):
     """학습된 전송 대기값을 agent_config.json에 영속(평문·비민감). 암호화 키 필드는 미열람·미변경.
     재시작 후 warm-start용. 실패해도 무해(다음 잡은 시드 0.5에서 재학습)."""
     try:
-        raw = json.loads(path.read_text(encoding="utf-8"))
-        raw["smartWait"] = round(float(value), 3)
-        path.write_text(json.dumps(raw, ensure_ascii=False, indent=2), encoding="utf-8")
+        with _CONFIG_LOCK:
+            raw = json.loads(path.read_text(encoding="utf-8"))
+            raw["smartWait"] = round(float(value), 3)
+            _write_config_atomic(raw, Path(path))
     except Exception:
         pass
 
@@ -335,6 +387,7 @@ def _lookup_role(db, cfg, instructor_id, token=None, uid=None):
     if key in _ROLE_CACHE:
         return _ROLE_CACHE[key]
     role = None
+    lookup_ok = False
     try:
         if uid:
             a = _get(db, f"acl/{urllib.parse.quote(uid)}", token) or {}
@@ -348,9 +401,11 @@ def _lookup_role(db, cfg, instructor_id, token=None, uid=None):
                         and a.get("campus") == cfg.get("campus") and a.get("active") is True):
                     role = a.get("role")
                     break
+        lookup_ok = True
     except Exception:
         role = None
-    _ROLE_CACHE[key] = role
+    if lookup_ok:
+        _ROLE_CACHE[key] = role
     return role
 
 
@@ -528,6 +583,11 @@ def _load_cfg():
 
 
 def write_agent_config(fields, path=CFG_PATH):
+    with _CONFIG_LOCK:
+        return _write_agent_config(fields, path)
+
+
+def _write_agent_config(fields, path):
     """1회 설정 저장 — 개인 키는 DPAPI 암호화(secret_codec). 반환: 경로."""
     data = dict(fields)
     try:
@@ -535,8 +595,35 @@ def write_agent_config(fields, path=CFG_PATH):
         data = secret_codec.encrypt_fields(data)
     except Exception:
         pass
-    path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    path = Path(path)
+    return _write_config_atomic(data, path)
+
+
+def _write_config_atomic(data, path):
+    fd, tmp = tempfile.mkstemp(prefix=path.name + ".", suffix=".tmp", dir=path.parent)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as out:
+            json.dump(data, out, ensure_ascii=False, indent=2)
+            out.flush()
+            os.fsync(out.fileno())
+        os.replace(tmp, path)
+    finally:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
     return path
+
+
+def unregister_autostart(name="DRW_Instructor_Agent"):
+    """Remove current and legacy startup entries for this agent only."""
+    if sys.platform != "win32":
+        return False
+    try:
+        startup = Path(os.environ["APPDATA"]) / "Microsoft/Windows/Start Menu/Programs/Startup"
+        for suffix in (".bat", ".lnk"):
+            (startup / f"{name}{suffix}").unlink(missing_ok=True)
+        return True
+    except Exception:
+        return False
 
 
 def register_autostart(name="DRW_Instructor_Agent"):
@@ -556,6 +643,7 @@ def register_autostart(name="DRW_Instructor_Agent"):
             cwd, line = script.parent, f'start "" "{py}" "{script}" --loop --real'
         (startup / f"{name}.bat").write_text(
             f'@echo off\ncd /d "{cwd}"\n{line}\n', encoding="utf-8")
+        (startup / f"{name}.lnk").unlink(missing_ok=True)
         return True
     except Exception:
         return False

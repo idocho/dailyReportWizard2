@@ -1,7 +1,7 @@
 # Firebase DB 스키마 명세
 
 **공유 문서 — ClassManager / DRW2 / DailyReportAnalyzer 공통 참조**  
-**문서 버전**: 1.6 · **최종 수정**: 2026-06-12
+**문서 버전**: 1.7 · **최종 수정**: 2026-10-04
 
 > v1.6: `scores/trash/` 삭제 스냅샷 노드 신설(시험 삭제 전 자동 백업·관리자 복원). 학년 시험 testKey에서 날짜 제외(`{type}|{round}`), 기출모의고사 weekly 이동, 유형별 기본 만점(성취도평가·반배치고사 150). 추가만 있는 비파괴 개정 — `schema_version` 노드값 불변(14).
 
@@ -179,3 +179,10 @@ Firebase 노드 키:  "middle_school_grade_3_semester_1"
 const toCurriculumKey = (c) => c.replaceAll('.', '_');
 const fromCurriculumKey = (k) => k.replaceAll('_', '.');
 ```
+
+## v1.7 추가 설정 (DRW v2.6.1)
+
+하위호환 선택 필드이며 `schema_version` 값은 변경하지 않는다.
+- `campus/{campus}/config/instructors/{id}/ai_message_length`: short / normal / long / custom (누락 시 normal).
+- `campus/{campus}/config/instructors/{id}/ai_message_target_chars`: 정수 80~800 (기본 350, custom일 때 사용).
+- `campus/{campus}/genJobs/{instructorId}/{jobId}`: 단건·일괄 공통 `messageLength`, `messageTargetChars`. 과거 작업 필드 누락 허용.
