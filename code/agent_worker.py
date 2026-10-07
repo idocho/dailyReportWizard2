@@ -27,6 +27,7 @@ from pathlib import Path
 from ai_engine import build_single_prompt, build_batch_prompt, _call_ai_hub, _base_conditions
 from constants import grade_label, KAKAO_ROOM_PREFIX, KAKAO_ROOM_SUFFIX
 import ai_style
+from agent_version import AGENT_VERSION
 
 # frozen exe(PyInstaller)에선 __file__이 임시추출폴더(_MEI…, 종료 시 삭제)라
 # config가 휘발됨 → exe 옆 폴더에 저장(영속). 일반 .py 실행은 스크립트 폴더.
@@ -244,10 +245,12 @@ def list_existing_instructors(db, campus):
 
 def write_heartbeat(cfg, db, instructor_id, token=None, real=False):
     """웹이 에이전트 실행 여부를 감지하도록 주기적 하트비트 기록.
-    campus/{campus}/agents/{instructorId} = {ts(ms), real}. 실패 무해."""
+    campus/{campus}/agents/{instructorId} = {ts(ms), real, version}. 실패 무해."""
     try:
         base = f"campus/{cfg['campus']}/agents/{urllib.parse.quote(instructor_id)}"
-        _patch(db, base, {"ts": int(time.time() * 1000), "real": bool(real)}, token)
+        stamp = int(time.time() * 1000)
+        _patch(db, base, {"ts": stamp, "real": bool(real),
+                          "version": AGENT_VERSION, "versionTs": stamp}, token)
         return True
     except Exception:
         return False

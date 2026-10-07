@@ -170,11 +170,48 @@ function _saveDraft(nk, val){
 
 // ── 에이전트 실행 감지 + 미실행 시 설치 안내 ──────────────────────────
 // 에이전트가 agents/{id}.ts(ms) 하트비트를 ~15s마다 기록 → 90s 이내면 살아있음
-const AGENT_DL = 'https://github.com/idocho/dailyReportWizard2/releases/download/agent/DRW-AI-Agent-0.11.3.exe';
+const AGENT_DL = 'https://github.com/idocho/dailyReportWizard2/releases/download/agent/DRW-AI-Agent-0.11.4.exe';
+const AGENT_LATEST = '0.11.4';
+const _agentReminded = new Set();
 let _rpPending = null;
+function _agentVersionParts(v){
+  if(typeof v !== 'string' || !/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(v)) return null;
+  const parts=v.split('.').map(Number);
+  return parts.every(Number.isSafeInteger) ? parts : null;
+}
+function _classifyAgent(a, now=Date.now()){
+  if(!a || !Number.isFinite(a.ts) || now-a.ts >= 90000 || a.ts-now > 30000) return {state:'offline'};
+  const parts=_agentVersionParts(a.version), latest=_agentVersionParts(AGENT_LATEST);
+  if(!parts || a.versionTs !== a.ts) return {state:'unknown'};
+  for(let i=0;i<3;i++){
+    if(parts[i]<latest[i]) return {state:'old',version:a.version};
+    if(parts[i]>latest[i]) return {state:'latest',version:a.version};
+  }
+  return {state:'latest',version:a.version};
+}
+async function _agentStatus(){
+  try{return _classifyAgent(await fbGet(`agents/${instructor.id}`));}
+  catch(_){return {state:'unavailable'};}
+}
 async function _agentAlive(){
-  try{ const a = await fbGet(`agents/${instructor.id}`); return !!(a && a.ts && Date.now() - a.ts < 90000); }
-  catch(_){ return null; } // 조회 실패는 종료 확인이 아님
+  const s=await _agentStatus();
+  return s.state==='unavailable' ? null : s.state!=='offline';
+}
+async function _agentCheck(proceed){
+  const s=await _agentStatus();
+  if(s.state==='offline'){_agentGuide(proceed);return false;}
+  if(s.state!=='old' && s.state!=='unknown') return true;
+  const scope=typeof dbPath==='string'?dbPath:'';
+  const key=JSON.stringify([scope,instructor.id,AGENT_LATEST,s.version||'unknown']);
+  if(_agentReminded.has(key)) return true;
+  _agentReminded.add(key);
+  _rpPending=proceed;
+  _rpModal(`<h3>강사 에이전트 업데이트 권장</h3>
+    <div class="rp-hint">더 나은 메시지 생성을 위해 최신 에이전트로 업데이트해 주세요.</div>
+    <p class="rp-hint">${s.state==='old'?`실행 버전 v${esc(s.version)} → 최신 v${esc(AGENT_LATEST)}`:'에이전트는 실행 중이지만 버전을 확인할 수 없습니다.'}<br>새 메시지 길이·문체 개선은 최신 에이전트에서 적용됩니다.</p>
+    <div class="rp-mrow"><a class="rp-btn" href="${AGENT_DL}" style="text-decoration:none;text-align:center">⬇ 최신 버전 다운로드</a></div>
+    <div class="rp-mrow"><button class="rp-btn ghost" onclick="_rpPending=null;closeRpModal()">닫기</button><button class="rp-btn ghost" onclick="_rpProceed()">기존 버전으로 계속</button></div>`);
+  return false;
 }
 function _agentGuide(proceed){
   _rpPending = proceed || null;
@@ -342,7 +379,7 @@ function _genCtx(classId, nk, name){
   return job;
 }
 async function genReportOne(nk, force){
-  if(!force && (await _agentAlive()) === false){ _agentGuide(() => genReportOne(nk, true)); return; }
+  if(!force && !(await _agentCheck(() => genReportOne(nk, true)))) return;
   const cid = _rpActiveCls; if(!cid) return;
   const name = (_clsStudents(cid).find(s => s.nameKey === nk) || {}).name || nk;
   const ta = document.getElementById('rp-' + nk);
@@ -366,7 +403,7 @@ async function _pollDrafts(jid, ms = 180000){   // 배치 — 더 긴 여유
   throw new Error('생성 지연 — 에이전트 상태를 확인하세요');
 }
 async function genReportAll(force){
-  if(!force && (await _agentAlive()) === false){ _agentGuide(() => genReportAll(true)); return; }
+  if(!force && !(await _agentCheck(() => genReportAll(true)))) return;
   const classId = _rpActiveCls; if(!classId) return;
   const students = _clsStudents(classId).filter(s => _rpData(classId, s.nameKey).subjects.length);
   if(!students.length) return toast('생성 대상이 없습니다');
@@ -393,7 +430,7 @@ async function genReportAll(force){
 // ── 전송 (실제 메시지 = build_message 전체) ──────────────────────────
 // 여러 반의 '검토중'(발송문 작성) 학생을 한 번에 선택 → 반별 잡으로 큐 적재
 async function openReportSend(force){
-  if(!force && (await _agentAlive()) === false){ _agentGuide(() => openReportSend(true)); return; }
+  if(!force && !(await _agentCheck(() => openReportSend(true)))) return;
   // 검토완료(발송문 있음) 학생이 있는 반들 — 활성반 우선
   const groups = _myClassList().map(c => ({ cls: c.classId, ready: _clsStudents(c.classId).filter(s => _curDraft(s.nameKey).trim()) }))
     .filter(g => g.ready.length)
@@ -672,7 +709,7 @@ function bulkClearImg(){ _bulkImg = null; _bulkImgName = ''; renderBulk(document
 async function bulkSend(force){
   const tmpl = (document.getElementById('bulk-tmpl')?.value || '').trim();
   if(!tmpl && !_bulkImg) return toast('메시지를 입력하거나 이미지를 첨부하세요');
-  if(!force && (await _agentAlive()) === false){ _agentGuide(() => bulkSend(true)); return; }
+  if(!force && !(await _agentCheck(() => bulkSend(true)))) return;
   const all = _allMyStudents();
   const sel = [..._bulkSel].filter(nk => all[nk]);   // 여러 반 가로질러 선택된 수신자
   if(!sel.length) return toast('수신자를 선택하세요(트리에서 체크)');

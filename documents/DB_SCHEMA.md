@@ -1,7 +1,7 @@
 # Firebase DB 스키마 명세
 
 **공유 문서 — ClassManager / DRW2 / DailyReportAnalyzer 공통 참조**  
-**문서 버전**: 1.7 · **최종 수정**: 2026-10-04
+**문서 버전**: 1.9 · **최종 수정**: 2026-10-07
 
 > v1.6: `scores/trash/` 삭제 스냅샷 노드 신설(시험 삭제 전 자동 백업·관리자 복원). 학년 시험 testKey에서 날짜 제외(`{type}|{round}`), 기출모의고사 weekly 이동, 유형별 기본 만점(성취도평가·반배치고사 150). 추가만 있는 비파괴 개정 — `schema_version` 노드값 불변(14).
 
@@ -186,3 +186,10 @@ const fromCurriculumKey = (k) => k.replaceAll('_', '.');
 - `campus/{campus}/config/instructors/{id}/ai_message_length`: short / normal / long / custom (누락 시 normal).
 - `campus/{campus}/config/instructors/{id}/ai_message_target_chars`: 정수 80~800 (기본 350, custom일 때 사용).
 - `campus/{campus}/genJobs/{instructorId}/{jobId}`: 단건·일괄 공통 `messageLength`, `messageTargetChars`. 과거 작업 필드 누락 허용.
+
+## v1.8 하트비트 버전 정보 (2026-10-06)
+
+`campus/{campus}/agents/{instructorId}` = `{ts: 밀리초 정수, real: boolean, version: 문자열}`. version은 `agent_version.AGENT_VERSION`에서 공급한다. 구버전은 version을 기록하지 않으며 누락 허용. 추가 필드로 `schema_version` 변경 없음. 웹 버전 감지는 보류. 동일 경로를 여러 프로세스가 PATCH할 수 있으며, 구버전이 ts/real만 갱신하면 기존 version이 남을 수 있으므로 version 단독으로 현재 프로세스를 확정하지 않는다.
+
+## v1.9 버전 보고 시각 (2026-10-07)
+`campus/{campus}/agents/{instructorId}/versionTs` 선택 필드 추가. 새 에이전트는 ts와 동일 밀리초 값을 versionTs로 같은 PATCH에 기록한다. 웹은 ts가 유효하며 versionTs===ts일 때만 version을 신뢰한다. 구버전 ts-only PATCH 후 versionTs 불일치는 미확인. 주기·경로·schema_version 유지. 복수 에이전트 동시 실행에서는 마지막 기록한 프로세스 기준이며 전체 실행 프로세스 목록을 뜻하지 않는다.
