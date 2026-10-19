@@ -173,6 +173,16 @@ def _find_kakao_hwnd():
     return (main or fallback or [None])[0]
 
 
+def _foreground_hwnd():
+    """포인터 크기의 HWND 유지 — ctypes 기본 c_int 반환의 64비트 잘림 방지."""
+    import ctypes
+    from ctypes import wintypes
+    get_foreground = ctypes.windll.user32.GetForegroundWindow
+    get_foreground.argtypes = []
+    get_foreground.restype = wintypes.HWND
+    return get_foreground()
+
+
 def foreground_title() -> str:
     """현재 전면 창 제목. 비 Windows 는 빈 문자열."""
     if not _IS_WIN:
@@ -180,7 +190,8 @@ def foreground_title() -> str:
     import ctypes
     user32 = ctypes.windll.user32
     buf = ctypes.create_unicode_buffer(256)
-    user32.GetWindowTextW(user32.GetForegroundWindow(), buf, 256)
+    user32.GetWindowTextW.argtypes = [ctypes.wintypes.HWND, ctypes.wintypes.LPWSTR, ctypes.c_int]
+    user32.GetWindowTextW(_foreground_hwnd(), buf, 256)
     return buf.value
 
 
@@ -317,8 +328,13 @@ def focus_kakao(settle: float = 0.6) -> bool:
     import ctypes
     user32 = ctypes.windll.user32
     SW_RESTORE, VK_MENU, KEYEVENTF_KEYUP = 9, 0x12, 2
+    from ctypes import wintypes
+    user32.IsWindowVisible.argtypes = [wintypes.HWND]
+    user32.IsIconic.argtypes = [wintypes.HWND]
+    user32.ShowWindow.argtypes = [wintypes.HWND, ctypes.c_int]
+    user32.SetForegroundWindow.argtypes = [wintypes.HWND]
     # 빠른 경로: 이미 전면이면 복원/ALT/대기 생략
-    if user32.IsWindowVisible(hwnd) and user32.GetForegroundWindow() == hwnd:
+    if user32.IsWindowVisible(hwnd) and _foreground_hwnd() == hwnd:
         return True
     try:
         if not user32.IsWindowVisible(hwnd) or user32.IsIconic(hwnd):
@@ -328,7 +344,7 @@ def focus_kakao(settle: float = 0.6) -> bool:
         user32.keybd_event(VK_MENU, 0, KEYEVENTF_KEYUP, 0)
         user32.SetForegroundWindow(hwnd)
         time.sleep(settle)
-        return user32.GetForegroundWindow() == hwnd
+        return _foreground_hwnd() == hwnd
     except Exception as e:
         print(f"카카오톡 창 포커스 실패: {e}")
         return False
@@ -481,10 +497,12 @@ def send_messages(msgs, wait_time=0.5, status_cb=None, done_cb=None, wait_ctrl=N
                     pyautogui.press("esc"); time.sleep(0.3)
                     focus_kakao(0.4)
                     if not _open(0.3, max(wait, 1.0), 0.5):
+                        actual_title = foreground_title()
                         pyautogui.press("esc")
                         if wait_ctrl:
                             wait_ctrl.adjust(1.5, True)  # 완전 실패 — 최대 지연으로 학습
-                        raise RuntimeError(f"채팅방 열기 실패: {m['room']}")
+                        raise RuntimeError(
+                            f"채팅방 열기 실패: {m['room']} / 전면: {actual_title or '(제목 없음)'}")
                 if wait_ctrl:
                     wait_ctrl.adjust(
                         t_open_box[0] if t_open_box[0] is not None else 1.5, retried)

@@ -3,7 +3,7 @@ const ctx={instructor:{id:'tester'},dbPath:'campus/test',esc:s=>String(s),Date};
 vm.createContext(ctx);
 vm.runInContext(fs.readFileSync(__dirname+'/public/v2.6.1/js/app-report.js','utf8'),ctx);
 const now=Date.now(), beat=version=>({ts:now,versionTs:now,version});
-for(const [data,state] of [[beat('0.11.4'),'latest'],[beat('0.11.10'),'latest'],[beat('0.10.99'),'old'],
+for(const [data,state] of [[beat('0.11.5'),'latest'],[beat('0.11.4'),'old'],[beat('0.11.10'),'latest'],[beat('0.10.99'),'old'],
  [beat('bad'),'unknown'],[{ts:now},'unknown'],[{...beat('0.11.4'),versionTs:now-1},'unknown'],
  [{...beat('0.11.4'),ts:now-90000},'offline'],[null,'offline']]){
  assert.equal(ctx._classifyAgent(data,now).state,state);
